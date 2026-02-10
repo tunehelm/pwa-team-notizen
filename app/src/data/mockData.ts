@@ -1,0 +1,144 @@
+export type AccessType = 'team' | 'private' | 'readonly'
+
+export interface FolderItem {
+  id: string
+  name: string
+  parentId: string | null
+  access: AccessType
+}
+
+export interface NoteItem {
+  id: string
+  folderId: string
+  title: string
+  excerpt: string
+  content: string
+  updatedLabel: string
+  pinned: boolean
+}
+
+export const initialFolders: FolderItem[] = [
+  { id: 'team-hub', name: 'Team Hub', parentId: null, access: 'team' },
+  { id: 'projects', name: 'Projekte', parentId: null, access: 'team' },
+  { id: 'private-space', name: 'Privat', parentId: null, access: 'private' },
+  { id: 'read-only', name: 'Read-only', parentId: null, access: 'readonly' },
+  { id: 'archive', name: 'Archiv', parentId: null, access: 'readonly' },
+  { id: 'roadmap', name: 'Roadmap 2026', parentId: 'projects', access: 'team' },
+  { id: 'mobile', name: 'Mobile UX', parentId: 'projects', access: 'team' },
+  { id: 'weekly', name: 'Weekly Notizen', parentId: 'team-hub', access: 'team' },
+  {
+    id: 'private-brainstorm',
+    name: 'Brainstorm privat',
+    parentId: 'private-space',
+    access: 'private',
+  },
+]
+
+export const initialNotes: NoteItem[] = [
+  {
+    id: 'note-kickoff',
+    folderId: 'projects',
+    title: 'Kickoff – Team-Notizen',
+    excerpt: 'Umfang der ersten Release-Phase und Timeline.',
+    content:
+      'Kickoff-Notiz mit Zielen, Scope und den ersten UI-Shell-Bausteinen.',
+    updatedLabel: 'vor 2 Std.',
+    pinned: true,
+  },
+  {
+    id: 'note-ux',
+    folderId: 'mobile',
+    title: 'iPhone UX Checkliste',
+    excerpt: 'Topbar sichtbar, Keyboard-Flow, sichere Tap-Flächen.',
+    content: 'Checkliste für iOS-optimierte Bedienung in der PWA.',
+    updatedLabel: 'gestern',
+    pinned: true,
+  },
+  {
+    id: 'note-sync',
+    folderId: 'team-hub',
+    title: 'Sync-Status UI',
+    excerpt: 'Offline, Synchronisiere, Synchronisiert als visuelle States.',
+    content: 'Dummy-Notiz für spätere Zustände ohne Backend-Anbindung.',
+    updatedLabel: 'vor 3 Tagen',
+    pinned: false,
+  },
+  {
+    id: 'note-retro',
+    folderId: 'weekly',
+    title: 'Retro Woche 05',
+    excerpt: 'Was lief gut, was wird nächste Woche verbessert?',
+    content: 'Retro-Inhalte als Beispiel für die Ordneransicht.',
+    updatedLabel: 'vor 5 Tagen',
+    pinned: true,
+  },
+  {
+    id: 'note-private',
+    folderId: 'private-brainstorm',
+    title: 'Ideenskizzen',
+    excerpt: 'Persönliche Notizen für nächste Features.',
+    content: 'Lokale Dummy-Inhalte ohne Persistenz.',
+    updatedLabel: 'vor 1 Woche',
+    pinned: false,
+  },
+  {
+    id: 'note-readonly',
+    folderId: 'read-only',
+    title: 'Projektleitlinien',
+    excerpt: 'Referenzseite mit Regeln für das Team.',
+    content: 'Read-only Demo-Inhalt.',
+    updatedLabel: 'vor 8 Tagen',
+    pinned: true,
+  },
+]
+
+export const mainNavigationFolderIds = [
+  'team-hub',
+  'projects',
+  'private-space',
+  'archive',
+]
+
+export function getFolderById(folders: FolderItem[], folderId: string) {
+  return folders.find((folder) => folder.id === folderId)
+}
+
+export function getNoteById(notes: NoteItem[], noteId: string) {
+  return notes.find((note) => note.id === noteId)
+}
+
+export function getPinnedNotes(notes: NoteItem[]) {
+  return notes.filter((note) => note.pinned).slice(0, 4)
+}
+
+export function getMainFolders(folders: FolderItem[]) {
+  return folders.filter((folder) => folder.parentId === null)
+}
+
+export function getSubfolders(folders: FolderItem[], folderId: string) {
+  return folders.filter((folder) => folder.parentId === folderId)
+}
+
+export function getNotesByFolder(notes: NoteItem[], folderId: string) {
+  return notes.filter((note) => note.folderId === folderId)
+}
+
+export function getFolderPath(folders: FolderItem[], folderId: string) {
+  const path: FolderItem[] = []
+  let current = getFolderById(folders, folderId)
+  let guard = 0
+
+  while (current && guard < 20) {
+    path.unshift(current)
+    current = current.parentId ? getFolderById(folders, current.parentId) : undefined
+    guard += 1
+  }
+
+  return path
+}
+
+export function getAccessLabel(access: AccessType) {
+  if (access === 'private') return 'Privat'
+  if (access === 'readonly') return 'Read-only'
+  return 'Team'
+}
