@@ -8,14 +8,15 @@ import { useAppData } from '../state/useAppData'
 export function DashboardPage() {
   const [isModalOpen, setModalOpen] = useState(false)
   const [feedback, setFeedback] = useState('')
-  const { getMainFolderItems, getPinnedNoteItems, getSubfolderItems } = useAppData()
+  const { createFolder, createNote, getMainFolderItems, getPinnedNoteItems, getSubfolderItems } =
+    useAppData()
 
   const pinnedNotes = getPinnedNoteItems()
   const rootFolders = getMainFolderItems()
 
   return (
     <>
-      <main className="mx-auto min-h-screen w-full max-w-xl bg-slate-50 px-4 pb-28 pt-6 text-slate-900">
+      <main className="mx-auto min-h-screen w-full max-w-xl bg-slate-50 px-4 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-6 text-slate-900">
         <header className="rounded-3xl bg-gradient-to-br from-slate-900 to-slate-800 p-5 text-white shadow-sm">
           <div className="flex items-start justify-between">
             <div>
@@ -32,7 +33,7 @@ export function DashboardPage() {
             </button>
           </div>
           <p className="mt-3 text-sm text-slate-200">
-            Ruhige UI-Shell als Phase 2, ohne Backend und ohne Persistenz.
+            Notizen und Ordner werden jetzt ueber Supabase geladen.
           </p>
         </header>
 
@@ -86,15 +87,33 @@ export function DashboardPage() {
         </section>
       </main>
 
-      <BottomNavigation />
+      <BottomNavigation active="team" />
 
       {isModalOpen ? (
         <CreateItemModal
           title="Neu erstellen"
           options={['Ordner', 'Notiz/Projekt']}
           onClose={() => setModalOpen(false)}
-          onSubmit={({ type, name }) => {
-            setFeedback(`${type} "${name}" wurde als Demo-Aktion ausgelöst.`)
+          onSubmit={async ({ type, name }) => {
+            if (type === 'Ordner') {
+              const createdFolder = await createFolder(name)
+              if (createdFolder) {
+                setFeedback(`Ordner "${createdFolder.name}" wurde erstellt.`)
+              }
+            } else {
+              const targetFolder = rootFolders[0]
+              if (!targetFolder) {
+                setFeedback('Lege zuerst einen Ordner an, damit eine Notiz erstellt werden kann.')
+                setModalOpen(false)
+                return
+              }
+
+              const createdNote = await createNote(targetFolder.id, name)
+              if (createdNote) {
+                setFeedback(`Notiz "${createdNote.title}" wurde in "${targetFolder.name}" erstellt.`)
+              }
+            }
+
             setModalOpen(false)
           }}
         />

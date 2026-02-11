@@ -1,9 +1,28 @@
 import { createContext } from 'react'
-import type { FolderItem, NoteItem } from '../data/mockData'
+import type { AccessType, FolderItem, NoteItem } from '../data/mockData'
+
+export interface TrashFolderItem extends FolderItem {
+  deletedAt: string
+}
+
+export interface TrashNoteItem extends NoteItem {
+  deletedAt: string
+}
 
 export interface AppDataContextValue {
   folders: FolderItem[]
   notes: NoteItem[]
+  trash: {
+    folders: TrashFolderItem[]
+    notes: TrashNoteItem[]
+  }
+  createFolder: (
+    title: string,
+    options?: { pinned?: boolean; parentId?: string | null; access?: AccessType },
+  ) => Promise<FolderItem | null>
+  createNote: (folderId: string, title: string) => Promise<NoteItem | null>
+  moveFolderToParent: (folderId: string, parentId: string | null) => Promise<void>
+  loadNotesForFolder: (folderId: string) => Promise<void>
   findFolderById: (folderId: string) => FolderItem | undefined
   findNoteById: (noteId: string) => NoteItem | undefined
   getPinnedNoteItems: () => NoteItem[]
@@ -11,10 +30,14 @@ export interface AppDataContextValue {
   getSubfolderItems: (folderId: string) => FolderItem[]
   getFolderNoteItems: (folderId: string) => NoteItem[]
   getFolderPathItems: (folderId: string) => FolderItem[]
-  renameFolder: (folderId: string, name: string) => void
-  updateNoteTitle: (noteId: string, title: string) => void
-  updateNoteContent: (noteId: string, content: string) => void
-  toggleNotePinned: (noteId: string) => void
+  renameFolder: (folderId: string, name: string) => Promise<void>
+  updateNoteTitle: (noteId: string, title: string) => Promise<void>
+  updateNoteContent: (noteId: string, content: string) => Promise<void>
+  toggleNotePinned: (noteId: string) => Promise<void>
+  moveFolderToTrash: (folderId: string) => Promise<void>
+  moveNoteToTrash: (noteId: string) => Promise<void>
+  restoreFolderFromTrash: (folderId: string) => Promise<void>
+  restoreNoteFromTrash: (noteId: string) => Promise<void>
 }
 
 export const AppDataContext = createContext<AppDataContextValue | undefined>(undefined)

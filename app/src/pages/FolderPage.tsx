@@ -18,6 +18,10 @@ export function FolderPage() {
     getFolderPathItems,
     getFolderNoteItems,
     getSubfolderItems,
+    createFolder,
+    createNote,
+    loadNotesForFolder,
+    moveFolderToTrash,
     renameFolder,
   } = useAppData()
 
@@ -25,6 +29,15 @@ export function FolderPage() {
   const path = folder ? getFolderPathItems(folder.id) : []
   const subfolders = folder ? getSubfolderItems(folder.id) : []
   const folderNotes = folder ? getFolderNoteItems(folder.id) : []
+  const rootFolderId = path[0]?.id
+  const activeNav =
+    rootFolderId === 'projects'
+      ? 'projects'
+      : rootFolderId === 'private-space'
+        ? 'private'
+        : rootFolderId === 'archive' || rootFolderId === 'read-only'
+          ? 'archive'
+          : 'team'
 
   useEffect(() => {
     if (!isActionsMenuOpen) return
@@ -45,6 +58,11 @@ export function FolderPage() {
       document.removeEventListener('touchstart', handleOutsidePointer)
     }
   }, [isActionsMenuOpen])
+
+  useEffect(() => {
+    if (!folder) return
+    void loadNotesForFolder(folder.id)
+  }, [folder, loadNotesForFolder])
 
   if (!folder) {
     return (
@@ -75,14 +93,14 @@ export function FolderPage() {
     if (!folder) return
     const cleanName = renameValue.trim()
     if (!cleanName) return
-    renameFolder(folder.id, cleanName)
+    void renameFolder(folder.id, cleanName)
     setFeedback(`Ordner wurde umbenannt in "${cleanName}".`)
     setRenameMode(false)
   }
 
   return (
     <>
-      <main className="mx-auto min-h-screen w-full max-w-xl bg-slate-50 px-4 pb-28 pt-5 text-slate-900">
+      <main className="mx-auto min-h-screen w-full max-w-xl bg-slate-50 px-4 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-5 text-slate-900">
         <header className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
@@ -116,6 +134,17 @@ export function FolderPage() {
                       className="flex h-11 w-full items-center rounded-xl px-3 text-left text-sm text-slate-700 hover:bg-slate-100"
                     >
                       Umbenennen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await moveFolderToTrash(folder.id)
+                        setActionsMenuOpen(false)
+                        setFeedback('Ordner wurde in den Papierkorb verschoben.')
+                      }}
+                      className="flex h-11 w-full items-center rounded-xl px-3 text-left text-sm text-rose-600 hover:bg-rose-50"
+                    >
+                      In Papierkorb
                     </button>
                     <button
                       type="button"
@@ -235,15 +264,28 @@ export function FolderPage() {
         </section>
       </main>
 
-      <BottomNavigation activeFolderId={folder.id} />
+      <BottomNavigation active={activeNav} />
 
       {isModalOpen ? (
         <CreateItemModal
           title="Im Ordner erstellen"
           options={['Unterordner', 'Notiz/Projekt']}
           onClose={() => setModalOpen(false)}
-          onSubmit={({ type, name }) => {
-            setFeedback(`${type} "${name}" wurde als Demo-Aktion ausgelöst.`)
+          onSubmit={async ({ type, name }) => {
+            if (type === 'Notiz/Projekt') {
+              const createdNote = await createNote(folder.id, name)
+              if (createdNote) {
+                setFeedback(`Notiz "${createdNote.title}" wurde erstellt.`)
+              }
+            } else {
+              const createdFolder = await createFolder(name, {
+                parentId: folder.id,
+                access: folder.access,
+              })
+              if (createdFolder) {
+                setFeedback(`Ordner "${createdFolder.name}" wurde erstellt.`)
+              }
+            }
             setModalOpen(false)
           }}
         />

@@ -5,6 +5,7 @@ export interface FolderItem {
   name: string
   parentId: string | null
   access: AccessType
+  pinned: boolean
 }
 
 export interface NoteItem {
@@ -18,19 +19,20 @@ export interface NoteItem {
 }
 
 export const initialFolders: FolderItem[] = [
-  { id: 'team-hub', name: 'Team Hub', parentId: null, access: 'team' },
-  { id: 'projects', name: 'Projekte', parentId: null, access: 'team' },
-  { id: 'private-space', name: 'Privat', parentId: null, access: 'private' },
-  { id: 'read-only', name: 'Read-only', parentId: null, access: 'readonly' },
-  { id: 'archive', name: 'Archiv', parentId: null, access: 'readonly' },
-  { id: 'roadmap', name: 'Roadmap 2026', parentId: 'projects', access: 'team' },
-  { id: 'mobile', name: 'Mobile UX', parentId: 'projects', access: 'team' },
-  { id: 'weekly', name: 'Weekly Notizen', parentId: 'team-hub', access: 'team' },
+  { id: 'team-hub', name: 'Team Hub', parentId: null, access: 'team', pinned: false },
+  { id: 'projects', name: 'Projekte', parentId: null, access: 'team', pinned: false },
+  { id: 'private-space', name: 'Privat', parentId: null, access: 'private', pinned: false },
+  { id: 'read-only', name: 'Read-only', parentId: null, access: 'readonly', pinned: false },
+  { id: 'archive', name: 'Archiv', parentId: null, access: 'readonly', pinned: false },
+  { id: 'roadmap', name: 'Roadmap 2026', parentId: 'projects', access: 'team', pinned: true },
+  { id: 'mobile', name: 'Mobile UX', parentId: 'projects', access: 'team', pinned: false },
+  { id: 'weekly', name: 'Weekly Notizen', parentId: 'team-hub', access: 'team', pinned: false },
   {
     id: 'private-brainstorm',
     name: 'Brainstorm privat',
     parentId: 'private-space',
     access: 'private',
+    pinned: false,
   },
 ]
 

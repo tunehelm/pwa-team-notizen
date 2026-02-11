@@ -72,7 +72,7 @@ export function CreateItemModal({
             type="submit"
             className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
           >
-            Erstellen (nur UI)
+            Erstellen
           </button>
         </form>
       </div>

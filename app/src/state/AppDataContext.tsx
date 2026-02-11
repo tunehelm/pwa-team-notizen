@@ -1,4 +1,19 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  createFolder as createFolderApi,
+  createNote as createNoteApi,
+  deleteFolderToTrash as deleteFolderToTrashApi,
+  deleteNoteToTrash as deleteNoteToTrashApi,
+  fetchFolders,
+  fetchNotes,
+  fetchTrashFolders,
+  fetchTrashNotes,
+  moveFolderToParent as moveFolderToParentApi,
+  renameFolder as renameFolderApi,
+  restoreFolderFromTrash as restoreFolderFromTrashApi,
+  restoreNoteFromTrash as restoreNoteFromTrashApi,
+  updateNote as updateNoteApi,
+} from '../lib/api'
 import {
   getFolderById,
   getFolderPath,
@@ -12,39 +27,157 @@ import {
   type FolderItem,
   type NoteItem,
 } from '../data/mockData'
-import { AppDataContext, type AppDataContextValue } from './appDataStore'
+import { AppDataContext, type AppDataContextValue, type TrashFolderItem, type TrashNoteItem } from './appDataStore'
 
-const STORAGE_KEY = 'pwa-team-notizen:v1'
-const STORAGE_VERSION = 1
-const WRITE_DEBOUNCE_MS = 300
+const CONTENT_SAVE_DEBOUNCE_MS = 450
 
-interface PersistedAppData {
-  folders: FolderItem[]
-  notes: NoteItem[]
-  meta: {
-    savedAt: string
-    version: number
-  }
-}
+export function AppDataProvider({ children, userId }: { children: ReactNode; userId?: string | null }) {
+  const [folders, setFolders] = useState<FolderItem[]>([])
+  const [notes, setNotes] = useState<NoteItem[]>([])
+  const [trash, setTrash] = useState<{ folders: TrashFolderItem[]; notes: TrashNoteItem[] }>({
+    folders: [],
+    notes: [],
+  })
+  const contentSaveTimersRef = useRef<Map<string, number>>(new Map())
 
-let initialDataCache: Pick<PersistedAppData, 'folders' | 'notes'> | null = null
+  const showApiError = useCallback((message: string, error: unknown) => {
+    console.error(error)
 
-export function AppDataProvider({ children }: { children: ReactNode }) {
-  const [folders, setFolders] = useState<FolderItem[]>(() => getInitialAppData().folders)
-  const [notes, setNotes] = useState<NoteItem[]>(() => getInitialAppData().notes)
+    const status =
+      error && typeof error === 'object' && 'status' in error
+        ? Number((error as { status?: unknown }).status)
+        : undefined
+    const authHint =
+      status === 401 || status === 403
+        ? 'Keine Rechte / nicht eingeloggt. Bitte neu einloggen.'
+        : null
+
+    if (typeof window !== 'undefined') {
+      window.alert(authHint ?? message)
+    }
+  }, [])
+
+  const replaceFolderNotes = useCallback((folderId: string, nextNotes: NoteItem[]) => {
+    setNotes((prev) => {
+      const keep = prev.filter((item) => item.folderId !== folderId)
+      return [...keep, ...nextNotes]
+    })
+  }, [])
+
+  const loadFoldersAndNotes = useCallback(async () => {
+    try {
+      const loadedFolders = await fetchFolders()
+      console.log('[AppDataContext] loadFoldersAndNotes folders', loadedFolders)
+      setFolders(loadedFolders)
+
+      const notesByFolder = await Promise.all(loadedFolders.map((folder) => fetchNotes(folder.id)))
+      console.log('[AppDataContext] loadFoldersAndNotes notesByFolder', notesByFolder)
+      setNotes(notesByFolder.flat())
+
+      const [trashFolders, trashNotes] = await Promise.all([fetchTrashFolders(), fetchTrashNotes()])
+      console.log('[AppDataContext] loadFoldersAndNotes trash', { trashFolders, trashNotes })
+      setTrash({
+        folders: trashFolders,
+        notes: trashNotes,
+      })
+    } catch (error) {
+      showApiError(
+        'Supabase-Laden fehlgeschlagen. Bitte pruefe Login, Policies und Netzwerk.',
+        error,
+      )
+
+      if (import.meta.env.DEV) {
+        setFolders(initialFolders)
+        setNotes(initialNotes)
+        setTrash({ folders: [], notes: [] })
+      }
+    }
+  }, [showApiError])
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      persistAppData({ folders, notes })
-    }, WRITE_DEBOUNCE_MS)
+    if (!userId) return
 
-    return () => window.clearTimeout(timeout)
-  }, [folders, notes])
+    const timeoutId = window.setTimeout(() => {
+      void loadFoldersAndNotes()
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [loadFoldersAndNotes, userId])
+
+  useEffect(() => {
+    const timers = contentSaveTimersRef.current
+    return () => {
+      for (const timeoutId of timers.values()) {
+        window.clearTimeout(timeoutId)
+      }
+      timers.clear()
+    }
+  }, [])
 
   const value = useMemo<AppDataContextValue>(
     () => ({
       folders,
       notes,
+      trash,
+      createFolder: async (title, options) => {
+        const cleanTitle = title.trim()
+        if (!cleanTitle) return null
+
+        try {
+          const created = await createFolderApi(cleanTitle, options)
+          setFolders((prev) => [...prev, created])
+          return created
+        } catch (error) {
+          showApiError('Ordner konnte nicht erstellt werden.', error)
+          return null
+        }
+      },
+      createNote: async (folderId, title) => {
+        const cleanTitle = title.trim()
+        if (!cleanTitle) return null
+
+        console.log('[AppDataContext] createNote before', { folderId, title: cleanTitle })
+        try {
+          const created = await createNoteApi(folderId, cleanTitle)
+          console.log('[AppDataContext] createNote after', { created })
+          setNotes((prev) => [created, ...prev])
+          return created
+        } catch (error) {
+          console.log('[AppDataContext] createNote error', { folderId, title: cleanTitle, error })
+          showApiError('Notiz konnte nicht erstellt werden.', error)
+          return null
+        }
+      },
+      moveFolderToParent: async (folderId, parentId) => {
+        const previous = folders
+        setFolders((prev) =>
+          prev.map((folder) =>
+            folder.id === folderId
+              ? {
+                  ...folder,
+                  parentId,
+                }
+              : folder,
+          ),
+        )
+
+        try {
+          await moveFolderToParentApi(folderId, parentId)
+        } catch (error) {
+          setFolders(previous)
+          showApiError('Ordner konnte nicht verschoben werden.', error)
+        }
+      },
+      loadNotesForFolder: async (folderId) => {
+        try {
+          const loaded = await fetchNotes(folderId)
+          replaceFolderNotes(folderId, loaded)
+        } catch (error) {
+          showApiError('Notizen konnten nicht geladen werden.', error)
+        }
+      },
       findFolderById: (folderId) => getFolderById(folders, folderId),
       findNoteById: (noteId) => getNoteById(notes, noteId),
       getPinnedNoteItems: () => getPinnedNotes(notes),
@@ -52,10 +185,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       getSubfolderItems: (folderId) => getSubfolders(folders, folderId),
       getFolderNoteItems: (folderId) => getNotesByFolder(notes, folderId),
       getFolderPathItems: (folderId) => getFolderPath(folders, folderId),
-      renameFolder: (folderId, name) => {
+      renameFolder: async (folderId, name) => {
         const cleanName = name.trim()
         if (!cleanName) return
 
+        const previous = folders
         setFolders((prev) =>
           prev.map((folder) =>
             folder.id === folderId
@@ -66,8 +200,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
               : folder,
           ),
         )
+
+        try {
+          await renameFolderApi(folderId, cleanName)
+        } catch (error) {
+          setFolders(previous)
+          showApiError('Ordner konnte nicht umbenannt werden.', error)
+        }
       },
-      updateNoteTitle: (noteId, title) => {
+      updateNoteTitle: async (noteId, title) => {
+        const previous = notes
         setNotes((prev) =>
           prev.map((note) =>
             note.id === noteId
@@ -78,8 +220,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
               : note,
           ),
         )
+
+        try {
+          const updated = await updateNoteApi(noteId, { title })
+          setNotes((prev) => prev.map((note) => (note.id === noteId ? updated : note)))
+        } catch (error) {
+          setNotes(previous)
+          showApiError('Notiztitel konnte nicht gespeichert werden.', error)
+        }
       },
-      updateNoteContent: (noteId, content) => {
+      updateNoteContent: async (noteId, content) => {
         setNotes((prev) =>
           prev.map((note) =>
             note.id === noteId
@@ -90,129 +240,113 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
               : note,
           ),
         )
+
+        const existingTimer = contentSaveTimersRef.current.get(noteId)
+        if (existingTimer) {
+          window.clearTimeout(existingTimer)
+        }
+
+        const timeoutId = window.setTimeout(() => {
+          void updateNoteApi(noteId, { content }).catch((error) => {
+            showApiError('Notizinhalte konnten nicht gespeichert werden.', error)
+          })
+        }, CONTENT_SAVE_DEBOUNCE_MS)
+
+        contentSaveTimersRef.current.set(noteId, timeoutId)
       },
-      toggleNotePinned: (noteId) => {
+      toggleNotePinned: async (noteId) => {
+        const previous = notes
+        const target = notes.find((item) => item.id === noteId)
+        if (!target) return
+
+        const nextPinned = !target.pinned
         setNotes((prev) =>
           prev.map((note) =>
             note.id === noteId
               ? {
                   ...note,
-                  pinned: !note.pinned,
+                  pinned: nextPinned,
                 }
               : note,
           ),
         )
+
+        try {
+          const updated = await updateNoteApi(noteId, { pinned: nextPinned })
+          setNotes((prev) => prev.map((note) => (note.id === noteId ? updated : note)))
+        } catch (error) {
+          setNotes(previous)
+          showApiError('Pin-Status konnte nicht gespeichert werden.', error)
+        }
+      },
+      moveFolderToTrash: async (folderId) => {
+        const previousFolders = folders
+        const previousNotes = notes
+        const previousTrash = trash
+
+        setFolders((prev) => prev.filter((item) => item.id !== folderId))
+        setNotes((prev) => prev.filter((item) => item.folderId !== folderId))
+
+        try {
+          const moved = await deleteFolderToTrashApi(folderId)
+          setTrash((prev) => ({
+            folders: [moved, ...prev.folders.filter((item) => item.id !== moved.id)],
+            notes: prev.notes,
+          }))
+        } catch (error) {
+          setFolders(previousFolders)
+          setNotes(previousNotes)
+          setTrash(previousTrash)
+          showApiError('Ordner konnte nicht in den Papierkorb verschoben werden.', error)
+        }
+      },
+      moveNoteToTrash: async (noteId) => {
+        const previousNotes = notes
+        const previousTrash = trash
+
+        setNotes((prev) => prev.filter((item) => item.id !== noteId))
+
+        try {
+          const moved = await deleteNoteToTrashApi(noteId)
+          setTrash((prev) => ({
+            folders: prev.folders,
+            notes: [moved, ...prev.notes.filter((item) => item.id !== moved.id)],
+          }))
+        } catch (error) {
+          setNotes(previousNotes)
+          setTrash(previousTrash)
+          showApiError('Notiz konnte nicht in den Papierkorb verschoben werden.', error)
+        }
+      },
+      restoreFolderFromTrash: async (folderId) => {
+        try {
+          const restoredFolder = await restoreFolderFromTrashApi(folderId)
+          setTrash((prev) => ({
+            folders: prev.folders.filter((item) => item.id !== folderId),
+            notes: prev.notes.filter((item) => item.folderId !== folderId),
+          }))
+          setFolders((prev) => [...prev.filter((item) => item.id !== restoredFolder.id), restoredFolder])
+          const restoredNotes = await fetchNotes(restoredFolder.id)
+          replaceFolderNotes(restoredFolder.id, restoredNotes)
+        } catch (error) {
+          showApiError('Ordner konnte nicht aus dem Papierkorb wiederhergestellt werden.', error)
+        }
+      },
+      restoreNoteFromTrash: async (noteId) => {
+        try {
+          const restoredNote = await restoreNoteFromTrashApi(noteId)
+          setTrash((prev) => ({
+            folders: prev.folders,
+            notes: prev.notes.filter((item) => item.id !== noteId),
+          }))
+          setNotes((prev) => [restoredNote, ...prev.filter((item) => item.id !== restoredNote.id)])
+        } catch (error) {
+          showApiError('Notiz konnte nicht aus dem Papierkorb wiederhergestellt werden.', error)
+        }
       },
     }),
-    [folders, notes],
+    [folders, notes, replaceFolderNotes, showApiError, trash],
   )
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>
-}
-
-function getInitialAppData() {
-  if (!initialDataCache) {
-    initialDataCache = loadInitialAppData()
-  }
-
-  return initialDataCache
-}
-
-function loadInitialAppData(): Pick<PersistedAppData, 'folders' | 'notes'> {
-  if (typeof window === 'undefined') {
-    return {
-      folders: initialFolders,
-      notes: initialNotes,
-    }
-  }
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) {
-      return {
-        folders: initialFolders,
-        notes: initialNotes,
-      }
-    }
-
-    const parsed = JSON.parse(raw) as unknown
-
-    if (isPersistedAppData(parsed)) {
-      return {
-        folders: parsed.folders,
-        notes: parsed.notes,
-      }
-    }
-  } catch {
-    // Ignore invalid localStorage and fall back to defaults.
-  }
-
-  return {
-    folders: initialFolders,
-    notes: initialNotes,
-  }
-}
-
-function persistAppData(data: Pick<PersistedAppData, 'folders' | 'notes'>) {
-  if (typeof window === 'undefined') return
-
-  const payload: PersistedAppData = {
-    folders: data.folders,
-    notes: data.notes,
-    meta: {
-      savedAt: new Date().toISOString(),
-      version: STORAGE_VERSION,
-    },
-  }
-
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-  } catch {
-    // Ignore storage write failures (quota/private mode).
-  }
-}
-
-function isPersistedAppData(value: unknown): value is PersistedAppData {
-  if (!value || typeof value !== 'object') return false
-
-  const candidate = value as Partial<PersistedAppData>
-  if (!Array.isArray(candidate.folders) || !Array.isArray(candidate.notes)) return false
-
-  if (!candidate.meta || typeof candidate.meta !== 'object') return false
-  if (candidate.meta.version !== STORAGE_VERSION) return false
-  if (typeof candidate.meta.savedAt !== 'string') return false
-
-  return candidate.folders.every(isFolderItem) && candidate.notes.every(isNoteItem)
-}
-
-function isFolderItem(value: unknown): value is FolderItem {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<FolderItem>
-
-  const access =
-    candidate.access === 'team' ||
-    candidate.access === 'private' ||
-    candidate.access === 'readonly'
-
-  return (
-    typeof candidate.id === 'string' &&
-    typeof candidate.name === 'string' &&
-    (typeof candidate.parentId === 'string' || candidate.parentId === null) &&
-    access
-  )
-}
-
-function isNoteItem(value: unknown): value is NoteItem {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<NoteItem>
-
-  return (
-    typeof candidate.id === 'string' &&
-    typeof candidate.folderId === 'string' &&
-    typeof candidate.title === 'string' &&
-    typeof candidate.excerpt === 'string' &&
-    typeof candidate.content === 'string' &&
-    typeof candidate.updatedLabel === 'string' &&
-    typeof candidate.pinned === 'boolean'
-  )
 }

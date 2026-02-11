@@ -1,4 +1,5 @@
 import {
+  type CSSProperties,
   useCallback,
   useEffect,
   useRef,
@@ -6,14 +7,37 @@ import {
   type MouseEvent,
   type TouchEvent,
 } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { BottomNavigation, type BottomNavigationActive } from '../components/BottomNavigation'
 import { type NoteItem } from '../data/mockData'
 import { useAppData } from '../state/useAppData'
 
 export function NotePage() {
   const { id = '' } = useParams()
-  const { findNoteById, toggleNotePinned, updateNoteTitle, updateNoteContent } = useAppData()
+  const navigate = useNavigate()
+  const {
+    findNoteById,
+    getFolderPathItems,
+    moveNoteToTrash,
+    toggleNotePinned,
+    updateNoteTitle,
+    updateNoteContent,
+  } = useAppData()
   const note = findNoteById(id)
+  useEffect(() => {
+    console.log('[NotePage] open before', { noteId: id })
+    console.log('[NotePage] open after', { noteId: id, found: Boolean(note), note })
+  }, [id, note])
+
+  const noteFolderRootId = note ? getFolderPathItems(note.folderId)[0]?.id : undefined
+  const activeNav: BottomNavigationActive =
+    noteFolderRootId === 'projects'
+      ? 'projects'
+      : noteFolderRootId === 'private-space'
+        ? 'private'
+        : noteFolderRootId === 'archive' || noteFolderRootId === 'read-only'
+          ? 'archive'
+          : 'team'
 
   return (
     <NoteEditor
@@ -30,8 +54,13 @@ export function NotePage() {
       isPinned={Boolean(note?.pinned)}
       onTogglePinned={() => {
         if (!note) return
-        toggleNotePinned(note.id)
+        void toggleNotePinned(note.id)
       }}
+      onDeleteNote={() => {
+        if (!note) return
+        void moveNoteToTrash(note.id).then(() => navigate('/'))
+      }}
+      activeNav={activeNav}
     />
   )
 }
@@ -42,6 +71,8 @@ interface NoteEditorProps {
   onContentChange: (content: string) => void
   isPinned: boolean
   onTogglePinned: () => void
+  onDeleteNote: () => void
+  activeNav: BottomNavigationActive
 }
 
 function NoteEditor({
@@ -50,6 +81,8 @@ function NoteEditor({
   onContentChange,
   isPinned,
   onTogglePinned,
+  onDeleteNote,
+  activeNav,
 }: NoteEditorProps) {
   const [titleValue, setTitleValue] = useState(note?.title ?? 'Neue Notiz')
   const editorRef = useRef<HTMLDivElement>(null)
@@ -59,6 +92,7 @@ function NoteEditor({
     stripHtmlText(note?.content ?? '') === '',
   )
   const [isNoteMenuOpen, setNoteMenuOpen] = useState(false)
+  const [isKeyboardFieldFocused, setKeyboardFieldFocused] = useState(false)
   const [formatState, setFormatState] = useState({
     bold: false,
     italic: false,
@@ -159,11 +193,12 @@ function NoteEditor({
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-3xl bg-white text-slate-900">
-      <header
-        className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-3 pb-3 backdrop-blur"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' }}
-      >
+    <>
+      <main className="mx-auto min-h-screen w-full max-w-3xl bg-white pb-[calc(env(safe-area-inset-bottom)+7rem)] text-slate-900">
+        <header
+          className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-3 pb-3 backdrop-blur"
+          style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' } as CSSProperties}
+        >
         <div className="flex items-center justify-between gap-2">
           <Link
             to="/"
@@ -192,6 +227,16 @@ function NoteEditor({
                 >
                   {isPinned ? 'Fixierung lösen' : 'Fixieren'}
                 </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDeleteNote()
+                      setNoteMenuOpen(false)
+                    }}
+                    className="mt-1 flex h-11 w-full items-center rounded-xl px-3 text-left text-sm text-rose-600 hover:bg-rose-50"
+                  >
+                    In Papierkorb
+                  </button>
               </div>
             ) : null}
           </div>
@@ -259,9 +304,9 @@ function NoteEditor({
             U
           </button>
         </div>
-      </header>
+        </header>
 
-      <section className="px-4 pb-10 pt-5">
+        <section className="px-4 pb-10 pt-5">
         {note ? (
           <p className="mb-3 text-xs text-slate-500">Zuletzt aktualisiert: {note.updatedLabel}</p>
         ) : (
@@ -277,8 +322,10 @@ function NoteEditor({
           onChange={(event) => {
             const nextTitle = event.target.value
             setTitleValue(nextTitle)
-            onTitleChange(nextTitle)
+            void onTitleChange(nextTitle)
           }}
+          onFocus={() => setKeyboardFieldFocused(true)}
+          onBlur={() => setKeyboardFieldFocused(false)}
           className="w-full border-0 bg-transparent text-3xl font-semibold leading-tight text-slate-900 placeholder:text-slate-300 focus:outline-none"
           placeholder="Titel"
         />
@@ -295,12 +342,18 @@ function NoteEditor({
             suppressContentEditableWarning
             onBlur={syncEditorContent}
             onInput={syncEditorContent}
-            onFocus={updateFormatState}
+            onFocus={() => {
+              updateFormatState()
+              setKeyboardFieldFocused(true)
+            }}
+            onBlurCapture={() => setKeyboardFieldFocused(false)}
             className="min-h-[40vh] w-full rounded-2xl border border-slate-200 bg-white p-4 text-base leading-7 text-slate-700 outline-none focus:border-slate-400"
           />
         </div>
-      </section>
-    </main>
+        </section>
+      </main>
+      {!isKeyboardFieldFocused ? <BottomNavigation active={activeNav} /> : null}
+    </>
   )
 }
 

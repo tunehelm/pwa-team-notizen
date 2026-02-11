@@ -2,17 +2,27 @@ import { Link } from 'react-router-dom'
 import { mainNavigationFolderIds } from '../data/mockData'
 import { useAppData } from '../state/useAppData'
 
+export type BottomNavigationActive = 'team' | 'projects' | 'private' | 'archive'
+
 interface BottomNavigationProps {
-  activeFolderId?: string
+  active?: BottomNavigationActive
 }
 
-export function BottomNavigation({ activeFolderId }: BottomNavigationProps) {
+const activeToFolderId: Record<BottomNavigationActive, string> = {
+  team: 'team-hub',
+  projects: 'projects',
+  private: 'private-space',
+  archive: 'archive',
+}
+
+export function BottomNavigation({ active }: BottomNavigationProps) {
   const { findFolderById } = useAppData()
+  const activeFolderId = active ? activeToFolderId[active] : undefined
 
   return (
     <nav
       aria-label="Hauptordner"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] pt-3 backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] pt-3 backdrop-blur"
     >
       <ul className="mx-auto grid w-full max-w-xl grid-cols-4 gap-3">
         {mainNavigationFolderIds.map((folderId) => {
@@ -31,7 +41,10 @@ export function BottomNavigation({ activeFolderId }: BottomNavigationProps) {
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
-                <span className="h-6 w-6 shrink-0" aria-hidden="true">
+                <span
+                  className={`${folder.id === 'team-hub' ? 'h-5 w-5' : 'h-6 w-6'} shrink-0`}
+                  aria-hidden="true"
+                >
                   <FolderIcon folderId={folder.id} />
                 </span>
                 <span className="mt-1 max-w-[72px] truncate whitespace-nowrap text-[11px] font-medium leading-none">
