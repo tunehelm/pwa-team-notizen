@@ -485,57 +485,93 @@ export async function deleteFolderToTrash(folderId: string): Promise<TrashFolder
 export async function restoreFolderFromTrash(folderId: string): Promise<FolderItem> {
   const row = await selectTrashFolderById(folderId)
 
-  const { data: trashedNotes, error: trashedNotesError } = await supabase
-    .from('trash_notes')
-    .select(TRASH_NOTE_COLUMNS)
-    .eq('folder_id', folderId)
+  // Find all trashed subfolders that belonged to this folder (by parent_id or same deleted_at batch)
+  const allTrashFolders = await selectAllTrashFolders()
+  
+  // Collect this folder + all its trashed descendants
+  const foldersToRestore: TrashFolderRow[] = [row]
+  function collectChildren(parentId: string) {
+    const children = allTrashFolders.filter((f) => f.parent_id === parentId)
+    for (const child of children) {
+      if (!foldersToRestore.some((f) => f.id === child.id)) {
+        foldersToRestore.push(child)
+        collectChildren(child.id)
+      }
+    }
+  }
+  collectChildren(folderId)
 
-  if (trashedNotesError) throw trashedNotesError
-
-  const { error: restoreFolderError } = await supabase.from('folders').upsert(
-    {
-      id: row.id,
-      title: row.title,
-      pinned: row.pinned,
-      created_at: row.created_at,
-      owner_id: row.owner_id,
-      parent_id: row.parent_id,
-      kind: row.kind ?? 'team',
-    },
-    { onConflict: 'id' },
-  )
-  if (restoreFolderError) throw restoreFolderError
-
-  const trashNotesRows = (trashedNotes ?? []) as TrashNoteRow[]
-  if (trashNotesRows.length > 0) {
-    const { error: restoreNotesError } = await supabase.from('notes').upsert(
-      trashNotesRows.map((note) => ({
-        id: note.id,
-        folder_id: note.folder_id ?? null,
-        title: note.title,
-        content: typeof note.content === 'string' ? note.content : '',
-        pinned: note.pinned,
-        created_at: note.created_at,
-        updated_at: note.updated_at,
-        owner_id: note.owner_id,
-      })),
+  // Restore all folders (parent first, children after – so parent_id FK is satisfied)
+  for (const folder of foldersToRestore) {
+    const { error: restoreError } = await supabase.from('folders').upsert(
+      {
+        id: folder.id,
+        title: folder.title,
+        pinned: folder.pinned,
+        created_at: folder.created_at,
+        owner_id: folder.owner_id,
+        parent_id: folder.parent_id,
+        kind: folder.kind ?? 'team',
+      },
       { onConflict: 'id' },
     )
-
-    if (restoreNotesError) throw restoreNotesError
-
-    const { error: deleteTrashNotesError } = await supabase
-      .from('trash_notes')
-      .delete()
-      .eq('folder_id', folderId)
-    if (deleteTrashNotesError) throw deleteTrashNotesError
+    if (restoreError) {
+      console.warn('[restoreFolderFromTrash] restore folder failed', folder.id, restoreError)
+    }
   }
 
-  const { error: deleteTrashFolderError } = await supabase
-    .from('trash_folders')
-    .delete()
-    .eq('id', folderId)
-  if (deleteTrashFolderError) throw deleteTrashFolderError
+  // Restore all notes from all restored folders
+  const allFolderIds = foldersToRestore.map((f) => f.id)
+  for (const fId of allFolderIds) {
+    const { data: trashedNotes, error: trashedNotesError } = await supabase
+      .from('trash_notes')
+      .select(TRASH_NOTE_COLUMNS)
+      .eq('folder_id', fId)
+
+    if (trashedNotesError) {
+      console.warn('[restoreFolderFromTrash] fetch trashed notes failed', fId, trashedNotesError)
+      continue
+    }
+
+    const trashNotesRows = (trashedNotes ?? []) as TrashNoteRow[]
+    if (trashNotesRows.length > 0) {
+      const { error: restoreNotesError } = await supabase.from('notes').upsert(
+        trashNotesRows.map((note) => ({
+          id: note.id,
+          folder_id: note.folder_id ?? null,
+          title: note.title,
+          content: typeof note.content === 'string' ? note.content : '',
+          pinned: note.pinned,
+          created_at: note.created_at,
+          updated_at: note.updated_at,
+          owner_id: note.owner_id,
+        })),
+        { onConflict: 'id' },
+      )
+      if (restoreNotesError) {
+        console.warn('[restoreFolderFromTrash] restore notes failed', fId, restoreNotesError)
+      }
+
+      const { error: deleteTrashNotesError } = await supabase
+        .from('trash_notes')
+        .delete()
+        .eq('folder_id', fId)
+      if (deleteTrashNotesError) {
+        console.warn('[restoreFolderFromTrash] delete trashed notes failed', fId, deleteTrashNotesError)
+      }
+    }
+  }
+
+  // Delete all restored folders from trash
+  for (const folder of foldersToRestore) {
+    const { error: deleteTrashError } = await supabase
+      .from('trash_folders')
+      .delete()
+      .eq('id', folder.id)
+    if (deleteTrashError) {
+      console.warn('[restoreFolderFromTrash] delete trash folder failed', folder.id, deleteTrashError)
+    }
+  }
 
   return mapFolderRow(row)
 }
