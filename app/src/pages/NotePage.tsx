@@ -140,7 +140,7 @@ function NoteEditor({
   const [isNoteMenuOpen, setNoteMenuOpen] = useState(false)
   const [saveIndicator, setSaveIndicator] = useState<'saved' | 'saving'>('saved')
   const [activePanel, setActivePanel] = useState<ToolbarPanel>('none')
-  const [formatState, setFormatState] = useState({ bold: false, italic: false, underline: false })
+  const [formatState, setFormatState] = useState({ bold: false, italic: false, underline: false, strikeThrough: false, block: 'p' as string, list: '' as string })
 
   // Link-Dialog state
   const [linkUrl, setLinkUrl] = useState('')
@@ -180,17 +180,53 @@ function NoteEditor({
     const anchorNode = selection?.anchorNode
     if (!selection || !anchorNode || !editorRef.current.contains(anchorNode)) {
       setFormatState((prev) =>
-        prev.bold || prev.italic || prev.underline ? { bold: false, italic: false, underline: false } : prev,
+        prev.bold || prev.italic || prev.underline || prev.strikeThrough || prev.block !== 'p' || prev.list !== ''
+          ? { bold: false, italic: false, underline: false, strikeThrough: false, block: 'p', list: '' }
+          : prev,
       )
       return
     }
+
+    // Detect current block format by walking up from anchor node
+    let blockTag = 'p'
+    let node: Node | null = anchorNode
+    while (node && node !== editorRef.current) {
+      if (node instanceof HTMLElement) {
+        const tag = node.tagName.toLowerCase()
+        if (['h1', 'h2', 'h3', 'blockquote'].includes(tag)) {
+          blockTag = tag
+          break
+        }
+        if (tag === 'p' || tag === 'div') {
+          blockTag = 'p'
+          break
+        }
+      }
+      node = node.parentNode
+    }
+
+    // Detect list state
+    let listType = ''
+    if (document.queryCommandState('insertUnorderedList')) listType = 'ul'
+    else if (document.queryCommandState('insertOrderedList')) listType = 'ol'
+
     const next = {
       bold: document.queryCommandState('bold'),
       italic: document.queryCommandState('italic'),
       underline: document.queryCommandState('underline'),
+      strikeThrough: document.queryCommandState('strikeThrough'),
+      block: blockTag,
+      list: listType,
     }
     setFormatState((prev) =>
-      prev.bold === next.bold && prev.italic === next.italic && prev.underline === next.underline ? prev : next,
+      prev.bold === next.bold &&
+      prev.italic === next.italic &&
+      prev.underline === next.underline &&
+      prev.strikeThrough === next.strikeThrough &&
+      prev.block === next.block &&
+      prev.list === next.list
+        ? prev
+        : next,
     )
   }, [])
 
@@ -777,7 +813,7 @@ function NoteEditor({
           <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('bold')} className={`${tbtn} ${formatState.bold ? tbtnActive : tbtnDefault} font-bold`} aria-label="Fett">B</button>
           <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('italic')} className={`${tbtn} ${formatState.italic ? tbtnActive : tbtnDefault} italic`} aria-label="Kursiv">I</button>
           <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('underline')} className={`${tbtn} ${formatState.underline ? tbtnActive : tbtnDefault} underline`} aria-label="Unterstrichen">U</button>
-          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('strikeThrough')} className={`${tbtn} ${tbtnDefault} line-through`} aria-label="Durchgestrichen">S</button>
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('strikeThrough')} className={`${tbtn} ${formatState.strikeThrough ? tbtnActive : tbtnDefault} line-through`} aria-label="Durchgestrichen">S</button>
 
           <div className="h-6 w-px shrink-0" style={{ backgroundColor: 'var(--color-border)' }} />
 
@@ -873,16 +909,16 @@ function NoteEditor({
         {/* ── Format sub-panel ── */}
         {activePanel === 'format' ? (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<h1>')} className={`${tbtn} ${tbtnDefault} text-xs`}>H1</button>
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<h2>')} className={`${tbtn} ${tbtnDefault} text-xs`}>H2</button>
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<h3>')} className={`${tbtn} ${tbtnDefault} text-xs`}>H3</button>
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<p>')} className={`${tbtn} ${tbtnDefault} text-xs`}>Text</button>
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<blockquote>')} className={`${tbtn} ${tbtnDefault} text-xs`}>Zitat</button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<h1>')} className={`${tbtn} ${formatState.block === 'h1' ? tbtnActive : tbtnDefault} text-xs`}>H1</button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<h2>')} className={`${tbtn} ${formatState.block === 'h2' ? tbtnActive : tbtnDefault} text-xs`}>H2</button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<h3>')} className={`${tbtn} ${formatState.block === 'h3' ? tbtnActive : tbtnDefault} text-xs`}>H3</button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<p>')} className={`${tbtn} ${formatState.block === 'p' && formatState.list === '' ? tbtnActive : tbtnDefault} text-xs`}>Text</button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<blockquote>')} className={`${tbtn} ${formatState.block === 'blockquote' ? tbtnActive : tbtnDefault} text-xs`}>Zitat</button>
             <div className="h-6 w-px shrink-0" style={{ backgroundColor: 'var(--color-border)' }} />
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('insertUnorderedList')} className={`${tbtn} ${tbtnDefault}`} aria-label="Aufzählung">
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('insertUnorderedList')} className={`${tbtn} ${formatState.list === 'ul' ? tbtnActive : tbtnDefault}`} aria-label="Aufzählung">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><circle cx="4" cy="6" r="1" fill="currentColor" /><circle cx="4" cy="12" r="1" fill="currentColor" /><circle cx="4" cy="18" r="1" fill="currentColor" /></svg>
             </button>
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('insertOrderedList')} className={`${tbtn} ${tbtnDefault}`} aria-label="Nummerierung">
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('insertOrderedList')} className={`${tbtn} ${formatState.list === 'ol' ? tbtnActive : tbtnDefault}`} aria-label="Nummerierung">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><line x1="10" y1="6" x2="21" y2="6" /><line x1="10" y1="12" x2="21" y2="12" /><line x1="10" y1="18" x2="21" y2="18" /><text x="2" y="7" fontSize="7" fill="currentColor" stroke="none" fontFamily="system-ui">1</text><text x="2" y="13" fontSize="7" fill="currentColor" stroke="none" fontFamily="system-ui">2</text><text x="2" y="19" fontSize="7" fill="currentColor" stroke="none" fontFamily="system-ui">3</text></svg>
             </button>
             <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('indent')} className={`${tbtn} ${tbtnDefault}`} aria-label="Einrücken">
