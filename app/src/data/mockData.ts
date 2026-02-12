@@ -127,7 +127,14 @@ export function getPinnedFolders(folders: FolderItem[]) {
 }
 
 export function getMainFolders(folders: FolderItem[]) {
-  return folders.filter((folder) => folder.parentId === null && folder.access !== 'private')
+  return folders
+    .filter((folder) => folder.parentId === null && folder.access !== 'private')
+    .sort((a, b) => {
+      // Nur-Lesen Ordner immer zuerst
+      if (a.access === 'readonly' && b.access !== 'readonly') return -1
+      if (a.access !== 'readonly' && b.access === 'readonly') return 1
+      return 0
+    })
 }
 
 export function getSubfolders(folders: FolderItem[], folderId: string) {
