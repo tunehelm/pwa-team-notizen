@@ -256,7 +256,6 @@ function NoteEditor({
     let selectedImg: HTMLImageElement | null = null
     let resizeHandle: HTMLDivElement | null = null
     let startX = 0
-    let startY = 0
     let startW = 0
     let startH = 0
 
@@ -299,7 +298,6 @@ function NoteEditor({
       e.preventDefault()
       e.stopPropagation()
       startX = e.clientX
-      startY = e.clientY
       startW = selectedImg.offsetWidth
       startH = selectedImg.offsetHeight
       document.addEventListener('pointermove', onResizeMove)
@@ -309,7 +307,6 @@ function NoteEditor({
     function onResizeMove(e: PointerEvent) {
       if (!selectedImg) return
       const dx = e.clientX - startX
-      const dy = e.clientY - startY
       // Keep aspect ratio
       const newW = Math.max(50, startW + dx)
       const ratio = startH / startW

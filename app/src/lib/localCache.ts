@@ -7,7 +7,7 @@
  * - On save: Write to local cache immediately, then push to Supabase
  * - If offline: Use local cache, queue changes for later sync
  */
-import { get, set, del, keys } from 'idb-keyval'
+import { get, set, del } from 'idb-keyval'
 import type { FolderItem, NoteItem } from '../data/mockData'
 
 const CACHE_KEYS = {
