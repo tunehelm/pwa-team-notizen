@@ -201,8 +201,9 @@ async function selectAllTrashFolders(): Promise<TrashFolderRow[]> {
 
 async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
   const userId = await requireUserId()
+  const folderAccess = sourceFolder.kind ?? 'team'
 
-  // Try with all columns including 'name' (some trash_folders tables use 'name' instead of 'title')
+  // Try with all possible column names (trash_folders may use 'name'/'access' instead of 'title'/'kind')
   const full = await supabase.from('trash_folders').upsert(
     {
       id: sourceFolder.id,
@@ -213,7 +214,8 @@ async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
       owner_id: sourceFolder.owner_id,
       user_id: userId,
       parent_id: sourceFolder.parent_id,
-      kind: sourceFolder.kind ?? 'team',
+      kind: folderAccess,
+      access: folderAccess,
       deleted_at: deletedAt,
     },
     { onConflict: 'id' },
@@ -222,36 +224,29 @@ async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
   console.log('[api.upsertTrashFolder] full response', { error: full.error })
   if (!full.error) return
 
-  // Fallback: try without columns that might not exist
+  if (!isMissingColumnError(full.error)) {
+    throw full.error
+  }
+
+  // Fallback without parent_id / icon columns
   const fallback = await supabase.from('trash_folders').upsert(
     {
       id: sourceFolder.id,
+      title: sourceFolder.title,
       name: sourceFolder.title,
       pinned: sourceFolder.pinned,
       created_at: sourceFolder.created_at,
       owner_id: sourceFolder.owner_id,
       user_id: userId,
+      kind: folderAccess,
+      access: folderAccess,
       deleted_at: deletedAt,
     },
     { onConflict: 'id' },
   )
 
   console.log('[api.upsertTrashFolder] fallback response', { error: fallback.error })
-  if (fallback.error) {
-    // Last attempt: minimal columns
-    const minimal = await supabase.from('trash_folders').upsert(
-      {
-        id: sourceFolder.id,
-        title: sourceFolder.title,
-        name: sourceFolder.title,
-        user_id: userId,
-        owner_id: sourceFolder.owner_id,
-        deleted_at: deletedAt,
-      },
-      { onConflict: 'id' },
-    )
-    if (minimal.error) throw minimal.error
-  }
+  if (fallback.error) throw fallback.error
 }
 
 function mapTrashNoteRow(row: TrashNoteRow): TrashNoteItem {
