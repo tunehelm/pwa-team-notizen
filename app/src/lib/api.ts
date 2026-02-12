@@ -472,6 +472,7 @@ export async function createNote(folderId: string, title: string): Promise<NoteI
       updated_label: 'gerade eben',
       pinned: false,
       user_id: ownerId,
+      owner_id: ownerId,
       created_at: now,
       updated_at: now,
     })
@@ -495,6 +496,7 @@ export async function updateNote(
   }
   if (typeof patch.pinned === 'boolean') payload.pinned = patch.pinned
   payload.updated_label = 'gerade eben'
+  payload.updated_at = new Date().toISOString()
 
   if (Object.keys(payload).length === 0) {
     const { data, error } = await supabase.from('notes').select(NOTE_COLUMNS).eq('id', noteId).single()
@@ -507,10 +509,26 @@ export async function updateNote(
     .update(payload)
     .eq('id', noteId)
     .select(NOTE_COLUMNS)
-    .single()
 
   if (error) throw error
-  return mapNoteRow(data as NoteRow)
+
+  // data is an array – should contain exactly one row if update succeeded
+  const rows = (data ?? []) as NoteRow[]
+  if (rows.length === 0) {
+    // RLS might block the update – try a direct select to check if the note exists
+    const { data: existing } = await supabase
+      .from('notes')
+      .select(NOTE_COLUMNS)
+      .eq('id', noteId)
+      .maybeSingle()
+    if (existing) {
+      // Note exists but could not be updated (RLS policy) – return existing data
+      console.warn('[api.updateNote] Update returned 0 rows, returning existing data for', noteId)
+      return mapNoteRow(existing as NoteRow)
+    }
+    throw new Error('Notiz konnte nicht aktualisiert werden.')
+  }
+  return mapNoteRow(rows[0])
 }
 
 export async function moveNoteToFolder(noteId: string, targetFolderId: string): Promise<NoteItem> {

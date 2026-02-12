@@ -2,14 +2,12 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { BottomNavigation } from './BottomNavigation'
-import { CreateItemModal } from './CreateItemModal'
-import { useAppData } from '../state/useAppData'
 
 interface SidebarLayoutProps {
   children: ReactNode
   /** Titel im Header */
   title?: string
-  /** Ob der + Button angezeigt werden soll */
+  /** @deprecated – Plus-Button wurde entfernt */
   showCreate?: boolean
 }
 
@@ -18,18 +16,12 @@ function isDesktop() {
   return typeof window !== 'undefined' && window.innerWidth >= 1024
 }
 
-export function SidebarLayout({ children, title, showCreate = true }: SidebarLayoutProps) {
+export function SidebarLayout({ children, title }: SidebarLayoutProps) {
   // Auf Desktop standardmäßig offen, auf Mobile standardmäßig geschlossen
   const [sidebarOpen, setSidebarOpen] = useState(() => isDesktop())
-  const [isModalOpen, setModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const navigate = useNavigate()
-  const { currentUserEmail, createFolder, createNote, getMainFolderItems } = useAppData()
-
-  const rootFolders = getMainFolderItems()
-  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined
-  const isAdmin = Boolean(adminEmail && currentUserEmail && currentUserEmail === adminEmail)
 
   // Sidebar automatisch ein-/ausblenden bei Resize
   useEffect(() => {
@@ -112,34 +104,17 @@ export function SidebarLayout({ children, title, showCreate = true }: SidebarLay
               </button>
             </form>
           ) : (
-            <div className="flex items-center gap-1">
-              {/* Search Icon */}
-              <button
-                type="button"
-                onClick={() => setShowSearch(true)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
-                style={{ color: 'var(--color-sidebar-text-muted)' }}
-                aria-label="Suche"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4.5 w-4.5">
-                  <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-                </svg>
-              </button>
-
-              {/* Create Button */}
-              {showCreate ? (
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(true)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-white shadow-sm transition-all hover:bg-blue-600 active:scale-95"
-                  aria-label="Neu erstellen"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                </button>
-              ) : null}
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowSearch(true)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
+              style={{ color: 'var(--color-sidebar-text-muted)' }}
+              aria-label="Suche"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4.5 w-4.5">
+                <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+              </svg>
+            </button>
           )}
         </header>
 
@@ -154,30 +129,6 @@ export function SidebarLayout({ children, title, showCreate = true }: SidebarLay
         </div>
       </div>
 
-      {/* Create Modal */}
-      {isModalOpen ? (
-        <CreateItemModal
-          title="Neu erstellen"
-          options={isAdmin ? ['Ordner', 'Nur-Lesen Ordner', 'Notiz/Projekt'] : ['Ordner', 'Notiz/Projekt']}
-          onClose={() => setModalOpen(false)}
-          onSubmit={async ({ type, name, icon }) => {
-            if (type === 'Ordner') {
-              await createFolder(name, { icon })
-            } else if (type === 'Nur-Lesen Ordner') {
-              await createFolder(name, { access: 'readonly' })
-            } else {
-              const targetFolder = rootFolders[0]
-              if (targetFolder) {
-                const createdNote = await createNote(targetFolder.id, name)
-                if (createdNote) {
-                  navigate(`/note/${createdNote.id}`)
-                }
-              }
-            }
-            setModalOpen(false)
-          }}
-        />
-      ) : null}
     </div>
   )
 }

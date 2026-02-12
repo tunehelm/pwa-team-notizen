@@ -138,6 +138,7 @@ function NoteEditor({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isEditorEmpty, setEditorEmpty] = useState(stripHtmlText(note?.content ?? '') === '')
   const [isNoteMenuOpen, setNoteMenuOpen] = useState(false)
+  const [saveIndicator, setSaveIndicator] = useState<'saved' | 'saving'>('saved')
   const [activePanel, setActivePanel] = useState<ToolbarPanel>('none')
   const [formatState, setFormatState] = useState({ bold: false, italic: false, underline: false })
 
@@ -170,7 +171,7 @@ function NoteEditor({
   function syncEditorContent() {
     const html = editorRef.current?.innerHTML ?? ''
     setEditorEmpty(stripHtmlText(html) === '')
-    onContentChange(html)
+    trackedContentChange(html)
   }
 
   const updateFormatState = useCallback(() => {
@@ -193,6 +194,39 @@ function NoteEditor({
     )
   }, [])
 
+  // Track latest content so we can flush on unmount
+  const latestContentRef = useRef(note?.content ?? '')
+  const hasPendingChangeRef = useRef(false)
+  const originalOnContentChange = onContentChange
+
+  // Wrap onContentChange to track pending saves + visual feedback
+  const saveTimeoutRef = useRef<number | null>(null)
+  const trackedContentChange = useCallback(
+    (html: string) => {
+      latestContentRef.current = html
+      hasPendingChangeRef.current = true
+      setSaveIndicator('saving')
+      originalOnContentChange(html)
+      // Show "saved" after debounce+buffer
+      if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = window.setTimeout(() => setSaveIndicator('saved'), 900)
+    },
+    [originalOnContentChange],
+  )
+
+  // Flush pending content on unmount (before navigation)
+  useEffect(() => {
+    return () => {
+      // Content change callback is debounced in AppDataContext,
+      // but we want the latest content to go through immediately.
+      // The debounce mechanism in context will handle deduplication.
+      if (hasPendingChangeRef.current) {
+        originalOnContentChange(latestContentRef.current)
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     const handler = () => updateFormatState()
     document.addEventListener('selectionchange', handler)
@@ -213,6 +247,112 @@ function NoteEditor({
       document.removeEventListener('touchstart', handleOutside)
     }
   }, [isNoteMenuOpen])
+
+  /* ── Image Resize Handler ── */
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    let selectedImg: HTMLImageElement | null = null
+    let resizeHandle: HTMLDivElement | null = null
+    let startX = 0
+    let startY = 0
+    let startW = 0
+    let startH = 0
+
+    function positionHandle() {
+      if (!selectedImg || !resizeHandle || !editor) return
+      const editorRect = editor.getBoundingClientRect()
+      const imgRect = selectedImg.getBoundingClientRect()
+      resizeHandle.style.left = `${imgRect.right - editorRect.left - 7 + editor.scrollLeft}px`
+      resizeHandle.style.top = `${imgRect.bottom - editorRect.top - 7 + editor.scrollTop}px`
+    }
+
+    function removeHandle() {
+      if (selectedImg) {
+        selectedImg.classList.remove('img-selected')
+        selectedImg = null
+      }
+      if (resizeHandle) {
+        resizeHandle.remove()
+        resizeHandle = null
+      }
+    }
+
+    function selectImage(img: HTMLImageElement) {
+      removeHandle()
+      selectedImg = img
+      img.classList.add('img-selected')
+
+      resizeHandle = document.createElement('div')
+      resizeHandle.className = 'img-resize-handle'
+      // We position relative to the editor which is position:relative
+      editor!.style.position = 'relative'
+      editor!.appendChild(resizeHandle)
+      positionHandle()
+
+      resizeHandle.addEventListener('pointerdown', onResizeStart)
+    }
+
+    function onResizeStart(e: PointerEvent) {
+      if (!selectedImg) return
+      e.preventDefault()
+      e.stopPropagation()
+      startX = e.clientX
+      startY = e.clientY
+      startW = selectedImg.offsetWidth
+      startH = selectedImg.offsetHeight
+      document.addEventListener('pointermove', onResizeMove)
+      document.addEventListener('pointerup', onResizeEnd)
+    }
+
+    function onResizeMove(e: PointerEvent) {
+      if (!selectedImg) return
+      const dx = e.clientX - startX
+      const dy = e.clientY - startY
+      // Keep aspect ratio
+      const newW = Math.max(50, startW + dx)
+      const ratio = startH / startW
+      const newH = Math.max(50, newW * ratio)
+      selectedImg.style.width = `${newW}px`
+      selectedImg.style.height = `${newH}px`
+      positionHandle()
+    }
+
+    function onResizeEnd() {
+      document.removeEventListener('pointermove', onResizeMove)
+      document.removeEventListener('pointerup', onResizeEnd)
+      // Save after resize
+      syncEditorContent()
+      positionHandle()
+    }
+
+    function handleClick(e: Event) {
+      const target = e.target as HTMLElement
+      if (target instanceof HTMLImageElement && editor!.contains(target)) {
+        e.preventDefault()
+        selectImage(target)
+      } else if (target !== resizeHandle) {
+        removeHandle()
+      }
+    }
+
+    editor.addEventListener('click', handleClick)
+    // Also deselect when clicking outside editor
+    function handleOutsideClick(e: Event) {
+      if (!editor!.contains(e.target as Node) && (e.target as HTMLElement) !== resizeHandle) {
+        removeHandle()
+      }
+    }
+    document.addEventListener('click', handleOutsideClick)
+
+    return () => {
+      editor.removeEventListener('click', handleClick)
+      document.removeEventListener('click', handleOutsideClick)
+      removeHandle()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* ── Commands ── */
 
@@ -258,6 +398,46 @@ function NoteEditor({
   function runFormatBlock(tag: string) {
     if (!editorRef.current) return
     editorRef.current.focus()
+
+    // Check if user has a partial selection within a block
+    const selection = document.getSelection()
+    if (selection && !selection.isCollapsed) {
+      const range = selection.getRangeAt(0)
+      const container = range.commonAncestorContainer
+      const blockNode = container instanceof HTMLElement ? container : container.parentElement
+      // If the selection doesn't cover the entire block text, use inline font-size instead
+      if (blockNode && editorRef.current.contains(blockNode)) {
+        const blockText = (blockNode.closest('p, h1, h2, h3, div, blockquote') || blockNode).textContent || ''
+        const selText = selection.toString()
+        if (selText.length > 0 && selText.length < blockText.trim().length) {
+          // Inline font-size for partial selections
+          const sizeMap: Record<string, string> = {
+            '<h1>': '1.75em',
+            '<h2>': '1.375em',
+            '<h3>': '1.125em',
+            '<p>': '1em',
+          }
+          const weightMap: Record<string, string> = {
+            '<h1>': '700',
+            '<h2>': '600',
+            '<h3>': '600',
+            '<p>': '400',
+          }
+          const size = sizeMap[tag]
+          const weight = weightMap[tag]
+          if (size) {
+            const span = document.createElement('span')
+            span.style.fontSize = size
+            if (weight) span.style.fontWeight = weight
+            range.surroundContents(span)
+            syncEditorContent()
+            updateFormatState()
+            return
+          }
+        }
+      }
+    }
+
     document.execCommand('formatBlock', false, tag)
     // Reset italic if it was not explicitly on
     if (document.queryCommandState('italic') && !formatState.italic) {
@@ -363,7 +543,7 @@ function NoteEditor({
     document.execCommand(
       'insertHTML',
       false,
-      `<img src="${dataUrl}" alt="Zeichnung" style="max-width:100%;width:300px;border-radius:12px;margin:8px 0;cursor:nwse-resize;resize:both;overflow:hidden;display:inline-block" /><p><br></p>`,
+      `<img src="${dataUrl}" alt="Zeichnung" style="max-width:100%;width:300px;border-radius:12px;margin:8px 0" /><p><br></p>`,
     )
     syncEditorContent()
     setIsDrawing(false)
@@ -386,7 +566,7 @@ function NoteEditor({
           editorRef.current?.focus()
           const tag = file.type.startsWith('video/')
             ? `<video src="${reader.result as string}" controls style="max-width:100%;border-radius:12px;margin:8px 0"></video>`
-            : `<img src="${reader.result as string}" alt="${file.name}" style="max-width:100%;width:400px;border-radius:12px;margin:8px 0;cursor:nwse-resize;resize:both;overflow:hidden;display:inline-block" />`
+            : `<img src="${reader.result as string}" alt="${file.name}" style="max-width:100%;width:400px;border-radius:12px;margin:8px 0" />`
           document.execCommand('insertHTML', false, `${tag}<p><br></p>`)
           syncEditorContent()
         }
@@ -499,8 +679,10 @@ function NoteEditor({
           <Link to={backPath} className="h-11 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-[var(--color-bg-card)]" style={{ color: 'var(--color-text-primary)' }}>
             ← Zurück
           </Link>
-          <p className={`text-xs font-medium ${readOnly ? 'text-amber-500' : 'text-emerald-600'}`}>
-            {readOnly ? 'Nur Lesen' : 'Gespeichert'}
+          <p
+            className={`text-xs font-medium transition-opacity duration-300 ${readOnly ? 'text-amber-500' : saveIndicator === 'saving' ? 'text-blue-400' : 'text-emerald-600'}`}
+          >
+            {readOnly ? 'Nur Lesen' : saveIndicator === 'saving' ? 'Speichert...' : 'Gespeichert'}
           </p>
           <div className="relative" ref={noteMenuRef}>
             <button
@@ -667,7 +849,18 @@ function NoteEditor({
                   if (c.value) {
                     runCommand('foreColor', c.value)
                   } else {
-                    runCommand('removeFormat')
+                    // Reset to default text color – use a computed color
+                    // We use removeFormat only for color by wrapping in a workaround:
+                    // First set a known color, then remove the font element
+                    const editor = editorRef.current
+                    if (editor) {
+                      editor.focus()
+                      // Get the computed default text color
+                      const defaultColor = getComputedStyle(editor).color
+                      document.execCommand('foreColor', false, defaultColor)
+                      syncEditorContent()
+                      updateFormatState()
+                    }
                   }
                   setActivePanel('none')
                 }}

@@ -16,12 +16,20 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     folders: allFolders,
     getMainFolderItems,
     getPinnedFolderItems,
+    findNoteById,
   } = useAppData()
 
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [manualExpandedIds, setManualExpandedIds] = useState<Set<string>>(new Set())
+  const [manualCollapsedIds, setManualCollapsedIds] = useState<Set<string>>(new Set())
 
   const toggleExpand = useCallback((folderId: string) => {
-    setExpandedIds((prev) => {
+    setManualExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(folderId)) next.delete(folderId)
+      else next.add(folderId)
+      return next
+    })
+    setManualCollapsedIds((prev) => {
       const next = new Set(prev)
       if (next.has(folderId)) next.delete(folderId)
       else next.add(folderId)
@@ -34,10 +42,43 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const userName = currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'Team')
 
-  // Aktiver Ordner aus URL ermitteln
-  const activeFolderId = location.pathname.startsWith('/folder/')
-    ? location.pathname.split('/folder/')[1]
-    : null
+  // Aktiver Ordner aus URL ermitteln – auch für Notizseiten den Elternordner finden
+  let activeFolderId: string | null = null
+  if (location.pathname.startsWith('/folder/')) {
+    activeFolderId = location.pathname.split('/folder/')[1]?.split('/')[0] || null
+  } else if (location.pathname.startsWith('/note/')) {
+    // Notiz-Seite: Finde den Ordner der Notiz
+    const noteId = location.pathname.split('/note/')[1]?.split('/')[0]
+    if (noteId) {
+      const note = findNoteById(noteId)
+      if (note?.folderId) {
+        activeFolderId = note.folderId
+      }
+    }
+  }
+
+  // Berechne welche Ordner IDs in der Hierarchie des aktiven Ordners sind
+  const activeAncestorIds = new Set<string>()
+  if (activeFolderId) {
+    let current = allFolders.find((f) => f.id === activeFolderId)
+    while (current?.parentId) {
+      activeAncestorIds.add(current.parentId)
+      current = allFolders.find((f) => f.id === current!.parentId)
+    }
+  }
+
+  // Ein Ordner ist expanded wenn:
+  // 1. Er manuell expanded wurde, ODER
+  // 2. Er ein Vorfahre des aktiven Ordners ist (und nicht manuell collapsed)
+  function isFolderExpanded(folderId: string): boolean {
+    if (manualCollapsedIds.has(folderId) && !activeAncestorIds.has(folderId)) return false
+    if (manualExpandedIds.has(folderId)) return true
+    if (activeAncestorIds.has(folderId)) return true
+    // Auch expandieren wenn ein Kind aktiv ist
+    const children = allFolders.filter((f) => f.parentId === folderId)
+    if (children.some((c) => c.id === activeFolderId)) return true
+    return false
+  }
 
   return (
     <>
@@ -137,9 +178,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 : FOLDER_COLOR_CYCLE[idx % FOLDER_COLOR_CYCLE.length]
               const isActive = activeFolderId === folder.id
               const children = allFolders.filter((f) => f.parentId === folder.id)
-              const isFolderExpanded = expandedIds.has(folder.id)
-              // Auch aktiv wenn ein Unterordner aktiv ist
-              const isChildActive = children.some((c) => c.id === activeFolderId)
+              const expanded = isFolderExpanded(folder.id)
               return (
                 <div key={folder.id}>
                   <div className="flex items-center">
@@ -156,7 +195,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                           fill="none"
                           stroke="currentColor"
                           strokeWidth="2"
-                          className={`h-3 w-3 transition-transform ${isFolderExpanded || isChildActive ? 'rotate-90' : ''}`}
+                          className={`h-3 w-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
                         >
                           <path d="M9 6l6 6-6 6" />
                         </svg>
@@ -184,7 +223,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     </Link>
                   </div>
                   {/* Unterordner */}
-                  {(isFolderExpanded || isChildActive) && children.length > 0 ? (
+                  {expanded && children.length > 0 ? (
                     <div className="ml-6">
                       {children.map((child, childIdx) => {
                         const cIsRo = child.access === 'readonly'
@@ -195,8 +234,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         const cIsActive = activeFolderId === child.id
                         // Dritte Ebene
                         const grandchildren = allFolders.filter((f) => f.parentId === child.id)
-                        const isGrandchildActive = grandchildren.some((g) => g.id === activeFolderId)
-                        const cIsExpanded = expandedIds.has(child.id)
+                        const cIsExpanded = isFolderExpanded(child.id)
                         return (
                           <div key={child.id}>
                             <div className="flex items-center">
@@ -212,7 +250,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                     fill="none"
                                     stroke="currentColor"
                                     strokeWidth="2"
-                                    className={`h-2.5 w-2.5 transition-transform ${cIsExpanded || isGrandchildActive ? 'rotate-90' : ''}`}
+                                    className={`h-2.5 w-2.5 transition-transform ${cIsExpanded ? 'rotate-90' : ''}`}
                                   >
                                     <path d="M9 6l6 6-6 6" />
                                   </svg>
@@ -235,7 +273,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                               </Link>
                             </div>
                             {/* Grandchildren */}
-                            {(cIsExpanded || isGrandchildActive) && grandchildren.length > 0 ? (
+                            {cIsExpanded && grandchildren.length > 0 ? (
                               <div className="ml-5">
                                 {grandchildren.map((gc, gcIdx) => {
                                   const gcIsRo = gc.access === 'readonly'

@@ -19,6 +19,17 @@ import {
 } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import {
+  cacheFolders,
+  cacheNotes,
+  loadCachedFolders,
+  loadCachedNotes,
+  addPendingChange,
+  getPendingChanges,
+  clearPendingChanges,
+  setLastSync,
+  isOnline,
+} from '../lib/localCache'
+import {
   getFolderById,
   getFolderPath,
   getMainFolders,
@@ -91,6 +102,51 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
   }, [])
 
   const loadFoldersAndNotes = useCallback(async () => {
+    // 1) Load from local cache first (instant)
+    const [cachedFolders, cachedNotes] = await Promise.all([
+      loadCachedFolders(),
+      loadCachedNotes(),
+    ])
+    if (cachedFolders && cachedFolders.length > 0) {
+      console.log('[AppDataContext] Using cached folders', cachedFolders.length)
+      setFolders(cachedFolders)
+    }
+    if (cachedNotes && cachedNotes.length > 0) {
+      console.log('[AppDataContext] Using cached notes', cachedNotes.length)
+      setNotes(cachedNotes)
+    }
+
+    // 2) If offline, stop here
+    if (!isOnline()) {
+      console.log('[AppDataContext] Offline – using cached data only')
+      return
+    }
+
+    // 3) Sync pending changes before fetching
+    try {
+      const pending = await getPendingChanges()
+      if (pending.length > 0) {
+        console.log('[AppDataContext] Syncing', pending.length, 'pending changes')
+        for (const change of pending) {
+          try {
+            if (change.type === 'updateNote') {
+              await updateNoteApi(change.noteId, { content: change.payload.content as string })
+            } else if (change.type === 'updateTitle') {
+              await updateNoteApi(change.noteId, { title: change.payload.title as string })
+            } else if (change.type === 'togglePin') {
+              await updateNoteApi(change.noteId, { pinned: change.payload.pinned as boolean })
+            }
+          } catch (e) {
+            console.warn('[AppDataContext] Failed to sync pending change', change, e)
+          }
+        }
+        await clearPendingChanges()
+      }
+    } catch {
+      // ignore sync errors
+    }
+
+    // 4) Fetch fresh data from Supabase
     try {
       const loadedFolders = await fetchFolders()
       console.log('[AppDataContext] loadFoldersAndNotes folders', loadedFolders)
@@ -98,7 +154,8 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
 
       const notesByFolder = await Promise.all(loadedFolders.map((folder: FolderItem) => fetchNotes(folder.id)))
       console.log('[AppDataContext] loadFoldersAndNotes notesByFolder', notesByFolder)
-      setNotes(notesByFolder.flat())
+      const allNotes = notesByFolder.flat()
+      setNotes(allNotes)
 
       const [trashFolders, trashNotes] = await Promise.all([fetchTrashFolders(), fetchTrashNotes()])
       console.log('[AppDataContext] loadFoldersAndNotes trash', { trashFolders, trashNotes })
@@ -106,16 +163,28 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
         folders: trashFolders,
         notes: trashNotes,
       })
-    } catch (error) {
-      showApiError(
-        'Supabase-Laden fehlgeschlagen. Bitte pruefe Login, Policies und Netzwerk.',
-        error,
-      )
 
-      if (import.meta.env.DEV) {
-        setFolders(initialFolders)
-        setNotes(initialNotes)
-        setTrash({ folders: [], notes: [] })
+      // 5) Update local cache
+      await Promise.all([
+        cacheFolders(loadedFolders),
+        cacheNotes(allNotes),
+        setLastSync(),
+      ])
+    } catch (error) {
+      // If we already have cached data, don't show error – just warn
+      if (cachedFolders && cachedFolders.length > 0) {
+        console.warn('[AppDataContext] Failed to fetch from Supabase, using cache', error)
+      } else {
+        showApiError(
+          'Supabase-Laden fehlgeschlagen. Bitte pruefe Login, Policies und Netzwerk.',
+          error,
+        )
+
+        if (import.meta.env.DEV) {
+          setFolders(initialFolders)
+          setNotes(initialNotes)
+          setTrash({ folders: [], notes: [] })
+        }
       }
     }
   }, [showApiError])
@@ -131,6 +200,16 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
       window.clearTimeout(timeoutId)
     }
   }, [loadFoldersAndNotes, userId])
+
+  // Re-sync when coming back online
+  useEffect(() => {
+    function handleOnline() {
+      console.log('[AppDataContext] Back online – re-syncing')
+      void loadFoldersAndNotes()
+    }
+    window.addEventListener('online', handleOnline)
+    return () => window.removeEventListener('online', handleOnline)
+  }, [loadFoldersAndNotes])
 
   useEffect(() => {
     const timers = contentSaveTimersRef.current
@@ -290,23 +369,26 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
 
         try {
           const updated = await updateNoteApi(noteId, { title })
-          setNotes((prev) => prev.map((note) => (note.id === noteId ? updated : note)))
+          // Merge server response but keep local title (user may have kept typing)
+          setNotes((prev) =>
+            prev.map((note) =>
+              note.id === noteId ? { ...updated, title: note.title } : note,
+            ),
+          )
         } catch (error) {
           setNotes(previous)
           showApiError('Notiztitel konnte nicht gespeichert werden.', error)
         }
       },
       updateNoteContent: async (noteId, content) => {
-        setNotes((prev) =>
-          prev.map((note) =>
-            note.id === noteId
-              ? {
-                  ...note,
-                  content,
-                }
-              : note,
-          ),
-        )
+        setNotes((prev) => {
+          const next = prev.map((note) =>
+            note.id === noteId ? { ...note, content } : note,
+          )
+          // Update local cache in background
+          void cacheNotes(next)
+          return next
+        })
 
         const existingTimer = contentSaveTimersRef.current.get(noteId)
         if (existingTimer) {
@@ -314,9 +396,27 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
         }
 
         const timeoutId = window.setTimeout(() => {
-          void updateNoteApi(noteId, { content }).catch((error: unknown) => {
-            showApiError('Notizinhalte konnten nicht gespeichert werden.', error)
-          })
+          if (!isOnline()) {
+            // Queue for later sync
+            void addPendingChange({ type: 'updateNote', noteId, payload: { content } })
+            return
+          }
+          void updateNoteApi(noteId, { content })
+            .then((updated: NoteItem) => {
+              // Update with server response but keep the local content (may have changed since)
+              setNotes((prev) =>
+                prev.map((note) =>
+                  note.id === noteId
+                    ? { ...updated, content: note.content }
+                    : note,
+                ),
+              )
+            })
+            .catch((error: unknown) => {
+              // Save to pending queue so it can sync later
+              void addPendingChange({ type: 'updateNote', noteId, payload: { content } })
+              showApiError('Notizinhalte konnten nicht gespeichert werden.', error)
+            })
         }, CONTENT_SAVE_DEBOUNCE_MS)
 
         contentSaveTimersRef.current.set(noteId, timeoutId)
@@ -340,7 +440,20 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
 
         try {
           const updated = await updateNoteApi(noteId, { pinned: nextPinned })
-          setNotes((prev) => prev.map((note) => (note.id === noteId ? updated : note)))
+          // Only apply server response if pinned matches what we wanted
+          if (updated.pinned === nextPinned) {
+            setNotes((prev) => prev.map((note) => (note.id === noteId ? updated : note)))
+          } else {
+            // Server didn't persist the change – keep optimistic state but warn
+            console.warn('[AppDataContext] toggleNotePinned: Server returned different pinned state', {
+              expected: nextPinned,
+              got: updated.pinned,
+            })
+            showApiError(
+              'Pin-Status konnte auf dem Server nicht gespeichert werden. Bitte Supabase RLS-Policies für die Notes-Tabelle prüfen (UPDATE muss für den eingeloggten User erlaubt sein).',
+              new Error('RLS policy may be blocking UPDATE on notes table'),
+            )
+          }
         } catch (error) {
           setNotes(previous)
           showApiError('Pin-Status konnte nicht gespeichert werden.', error)

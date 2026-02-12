@@ -151,16 +151,26 @@ body {
   margin: 12px 0;
 }
 
-/* Resizable images in editor */
+/* Selectable images in editor */
 .note-editor img {
-  cursor: nwse-resize;
-  resize: both;
-  overflow: hidden;
   display: inline-block;
+  cursor: pointer;
 }
-.note-editor img:active {
+.note-editor img.img-selected {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+/* Resize handle (positioned by JS) */
+.img-resize-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: var(--color-accent);
+  border: 2px solid #fff;
+  border-radius: 2px;
+  cursor: nwse-resize;
+  z-index: 10;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
 }
 
 /* Caret color for editor */
