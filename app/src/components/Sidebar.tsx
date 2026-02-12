@@ -362,6 +362,22 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </svg>
             Team
           </Link>
+          <Link
+            to="/trash"
+            onClick={onClose}
+            className={`flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm transition-colors ${
+              location.pathname === '/trash'
+                ? 'bg-blue-500/20 text-blue-400 font-medium'
+                : ''
+            }`}
+            style={location.pathname === '/trash' ? undefined : { color: 'var(--color-sidebar-text-muted)' }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+              <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+            </svg>
+            Papierkorb
+          </Link>
         </div>
       </aside>
     </>

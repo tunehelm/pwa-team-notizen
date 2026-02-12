@@ -624,3 +624,43 @@ export async function fetchTrashNotes(): Promise<TrashNoteItem[]> {
   if (error) throw error
   return ((data ?? []) as TrashNoteRow[]).map(mapTrashNoteRow)
 }
+
+/** Permanently delete a folder from trash */
+export async function permanentlyDeleteFolder(folderId: string): Promise<void> {
+  // Also delete any associated trash notes
+  const { error: notesError } = await supabase
+    .from('trash_notes')
+    .delete()
+    .eq('folder_id', folderId)
+  if (notesError) throw notesError
+
+  const { error } = await supabase
+    .from('trash_folders')
+    .delete()
+    .eq('id', folderId)
+  if (error) throw error
+}
+
+/** Permanently delete a note from trash */
+export async function permanentlyDeleteNote(noteId: string): Promise<void> {
+  const { error } = await supabase
+    .from('trash_notes')
+    .delete()
+    .eq('id', noteId)
+  if (error) throw error
+}
+
+/** Empty entire trash */
+export async function emptyTrash(): Promise<void> {
+  const { error: notesError } = await supabase
+    .from('trash_notes')
+    .delete()
+    .gte('id', '00000000-0000-0000-0000-000000000000') // match all rows
+  if (notesError) throw notesError
+
+  const { error: foldersError } = await supabase
+    .from('trash_folders')
+    .delete()
+    .gte('id', '00000000-0000-0000-0000-000000000000')
+  if (foldersError) throw foldersError
+}

@@ -7,6 +7,7 @@ import { NotePage } from "./pages/NotePage";
 import { PrivatePage } from "./pages/PrivatePage";
 import { SearchPage } from "./pages/SearchPage";
 import { TeamHubPage } from "./pages/TeamHubPage";
+import { TrashPage } from "./pages/TrashPage";
 import { AppDataProvider } from "./state/AppDataContext";
 import { supabase } from "./lib/supabase";
 
@@ -120,6 +121,7 @@ function App() {
           <Route path="/team" element={<TeamHubPage />} />
           <Route path="/folder/:id" element={<FolderPage />} />
           <Route path="/note/:id" element={<NotePage />} />
+          <Route path="/trash" element={<TrashPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

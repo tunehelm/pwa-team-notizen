@@ -46,6 +46,9 @@ export interface AppDataContextValue {
   moveNoteToTrash: (noteId: string) => Promise<void>
   restoreFolderFromTrash: (folderId: string) => Promise<void>
   restoreNoteFromTrash: (noteId: string) => Promise<void>
+  permanentlyDeleteFolder: (folderId: string) => Promise<void>
+  permanentlyDeleteNote: (noteId: string) => Promise<void>
+  emptyTrash: () => Promise<void>
 }
 
 export const AppDataContext = createContext<AppDataContextValue | undefined>(undefined)

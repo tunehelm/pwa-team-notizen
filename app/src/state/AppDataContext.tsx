@@ -16,6 +16,9 @@ import {
   togglePinFolder as togglePinFolderApi,
   updateFolderIcon as updateFolderIconApi,
   updateNote as updateNoteApi,
+  permanentlyDeleteFolder as permanentlyDeleteFolderApi,
+  permanentlyDeleteNote as permanentlyDeleteNoteApi,
+  emptyTrash as emptyTrashApi,
 } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import {
@@ -538,6 +541,36 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
           setNotes((prev) => [restoredNote, ...prev.filter((item) => item.id !== restoredNote.id)])
         } catch (error) {
           showApiError('Notiz konnte nicht aus dem Papierkorb wiederhergestellt werden.', error)
+        }
+      },
+      permanentlyDeleteFolder: async (folderId) => {
+        try {
+          await permanentlyDeleteFolderApi(folderId)
+          setTrash((prev) => ({
+            folders: prev.folders.filter((item) => item.id !== folderId),
+            notes: prev.notes.filter((item) => item.folderId !== folderId),
+          }))
+        } catch (error) {
+          showApiError('Ordner konnte nicht endgültig gelöscht werden.', error)
+        }
+      },
+      permanentlyDeleteNote: async (noteId) => {
+        try {
+          await permanentlyDeleteNoteApi(noteId)
+          setTrash((prev) => ({
+            folders: prev.folders,
+            notes: prev.notes.filter((item) => item.id !== noteId),
+          }))
+        } catch (error) {
+          showApiError('Notiz konnte nicht endgültig gelöscht werden.', error)
+        }
+      },
+      emptyTrash: async () => {
+        try {
+          await emptyTrashApi()
+          setTrash({ folders: [], notes: [] })
+        } catch (error) {
+          showApiError('Papierkorb konnte nicht geleert werden.', error)
         }
       },
     }),
