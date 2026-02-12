@@ -15,7 +15,7 @@ import { MoveNoteModal } from '../components/MoveNoteModal'
 import { ShareModal } from '../components/ShareModal'
 import { useAppData } from '../state/useAppData'
 
-const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL ?? '').toLowerCase()
+import { isAdminEmail } from '../lib/admin'
 
 export function NotePage() {
   const { id = '' } = useParams()
@@ -33,7 +33,7 @@ export function NotePage() {
     updateNoteContent,
   } = useAppData()
   const note = findNoteById(id)
-  const isAdmin = Boolean(ADMIN_EMAIL && currentUserEmail?.toLowerCase() === ADMIN_EMAIL)
+  const isAdmin = isAdminEmail(currentUserEmail)
   const isOwner = Boolean(note && (!note.ownerId || (currentUserId && note.ownerId === currentUserId)))
   const canDelete = isOwner || isAdmin
 

@@ -7,7 +7,7 @@ import { FolderIcon, FOLDER_COLOR_CYCLE, IconPicker, READONLY_ICON } from '../co
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
 
-const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL ?? '').toLowerCase()
+import { isAdminEmail } from '../lib/admin'
 
 export function FolderPage() {
   const { id = '' } = useParams()
@@ -40,7 +40,7 @@ export function FolderPage() {
   } = useAppData()
 
   const folder = findFolderById(id)
-  const isAdmin = Boolean(ADMIN_EMAIL && currentUserEmail?.toLowerCase() === ADMIN_EMAIL)
+  const isAdmin = isAdminEmail(currentUserEmail)
   const isOwner = Boolean(folder && (!folder.ownerId || (currentUserId && folder.ownerId === currentUserId)))
   const canDelete = isOwner || isAdmin
   const isReadonly = folder?.access === 'readonly'

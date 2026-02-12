@@ -535,21 +535,33 @@ export async function restoreFolderFromTrash(folderId: string): Promise<FolderIt
 
     const trashNotesRows = (trashedNotes ?? []) as TrashNoteRow[]
     if (trashNotesRows.length > 0) {
-      const { error: restoreNotesError } = await supabase.from('notes').upsert(
-        trashNotesRows.map((note) => ({
+      // Insert notes one by one to handle potential conflicts gracefully
+      for (const note of trashNotesRows) {
+        const notePayload = {
           id: note.id,
           folder_id: note.folder_id ?? null,
           title: note.title,
           content: typeof note.content === 'string' ? note.content : '',
+          excerpt: note.excerpt ?? buildExcerpt(typeof note.content === 'string' ? note.content : ''),
+          updated_label: note.updated_label ?? formatUpdatedLabel(note.updated_at),
           pinned: note.pinned,
           created_at: note.created_at,
           updated_at: note.updated_at,
           owner_id: note.owner_id,
-        })),
-        { onConflict: 'id' },
-      )
-      if (restoreNotesError) {
-        console.warn('[restoreFolderFromTrash] restore notes failed', fId, restoreNotesError)
+          user_id: note.user_id ?? note.owner_id,
+        }
+        // Try insert first, if it already exists try update
+        const { error: insertError } = await supabase.from('notes').insert(notePayload)
+        if (insertError) {
+          // Note might already exist – try update instead
+          const { error: updateError } = await supabase
+            .from('notes')
+            .update(notePayload)
+            .eq('id', note.id)
+          if (updateError) {
+            console.warn('[restoreFolderFromTrash] restore note failed', note.id, updateError)
+          }
+        }
       }
 
       const { error: deleteTrashNotesError } = await supabase
@@ -721,22 +733,25 @@ export async function restoreNoteFromTrash(noteId: string): Promise<NoteItem> {
 
   const note = data as TrashNoteRow
 
-  const { error: restoreError } = await supabase.from('notes').upsert(
-    {
-      id: note.id,
-      folder_id: note.folder_id ?? null,
-      title: note.title,
-      content: typeof note.content === 'string' ? note.content : '',
-      excerpt: note.excerpt ?? buildExcerpt(typeof note.content === 'string' ? note.content : ''),
-      updated_label: note.updated_label ?? formatUpdatedLabel(note.updated_at),
-      pinned: note.pinned,
-      created_at: note.created_at,
-      updated_at: note.updated_at,
-      user_id: note.user_id ?? note.owner_id,
-    },
-    { onConflict: 'id' },
-  )
-  if (restoreError) throw restoreError
+  const notePayload = {
+    id: note.id,
+    folder_id: note.folder_id ?? null,
+    title: note.title,
+    content: typeof note.content === 'string' ? note.content : '',
+    excerpt: note.excerpt ?? buildExcerpt(typeof note.content === 'string' ? note.content : ''),
+    updated_label: note.updated_label ?? formatUpdatedLabel(note.updated_at),
+    pinned: note.pinned,
+    created_at: note.created_at,
+    updated_at: note.updated_at,
+    owner_id: note.owner_id,
+    user_id: note.user_id ?? note.owner_id,
+  }
+  // Try insert first, fall back to update if note already exists
+  const { error: insertError } = await supabase.from('notes').insert(notePayload)
+  if (insertError) {
+    const { error: updateError } = await supabase.from('notes').update(notePayload).eq('id', note.id)
+    if (updateError) throw updateError
+  }
 
   const { error: deleteTrashError } = await supabase.from('trash_notes').delete().eq('id', noteId)
   if (deleteTrashError) throw deleteTrashError

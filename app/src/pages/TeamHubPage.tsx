@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { SidebarLayout } from '../components/SidebarLayout'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
+import { isAdminEmail } from '../lib/admin'
 
 interface TeamMember {
   id: string
@@ -9,13 +10,11 @@ interface TeamMember {
   name?: string
 }
 
-const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL ?? '').toLowerCase()
-
 export function TeamHubPage() {
   const { currentUserId, currentUserEmail, currentUserName, folders, notes } = useAppData()
   const [members, setMembers] = useState<TeamMember[]>([])
 
-  const isAdmin = Boolean(ADMIN_EMAIL && currentUserEmail.toLowerCase() === ADMIN_EMAIL)
+  const isAdmin = isAdminEmail(currentUserEmail)
 
   // Sammle eindeutige Owner-IDs aus den Daten und löse den aktuellen User auf
   useEffect(() => {

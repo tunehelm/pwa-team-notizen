@@ -44,7 +44,7 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--color-bg-app)]">
       {/* Sidebar */}
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar isOpen={sidebarOpen} onClose={() => { if (!isDesktop()) setSidebarOpen(false) }} />
 
       {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
