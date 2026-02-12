@@ -37,6 +37,17 @@ export function NotePage() {
   const isOwner = Boolean(note && (!note.ownerId || (currentUserId && note.ownerId === currentUserId)))
   const canDelete = isOwner || isAdmin
 
+  // Debug – in Browser-Konsole prüfbar (F12 → Console)
+  console.log('[NotePage] canDelete debug', {
+    ADMIN_EMAIL,
+    currentUserEmail,
+    isAdmin,
+    currentUserId,
+    noteOwnerId: note?.ownerId,
+    isOwner,
+    canDelete,
+  })
+
   // Check if the note lives in a readonly folder
   const parentFolder = note?.folderId ? findFolderById(note.folderId) : undefined
   const isReadonly = parentFolder?.access === 'readonly' && !isOwner
