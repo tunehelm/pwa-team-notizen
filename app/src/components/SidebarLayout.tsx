@@ -1,7 +1,8 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { BottomNavigation } from './BottomNavigation'
+import { useAppData } from '../state/useAppData'
 
 interface SidebarLayoutProps {
   children: ReactNode
@@ -16,12 +17,23 @@ function isDesktop() {
   return typeof window !== 'undefined' && window.innerWidth >= 1024
 }
 
+/** Auto-Polling Intervall in ms */
+const POLL_INTERVAL = 30_000
+
 export function SidebarLayout({ children, title }: SidebarLayoutProps) {
   // Auf Desktop standardmäßig offen, auf Mobile standardmäßig geschlossen
   const [sidebarOpen, setSidebarOpen] = useState(() => isDesktop())
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const navigate = useNavigate()
+  const { refreshData } = useAppData()
+
+  // ── Pull-to-Refresh State ──
+  const mainRef = useRef<HTMLElement>(null)
+  const pullStartY = useRef(0)
+  const [pullDistance, setPullDistance] = useState(0)
+  const isPulling = useRef(false)
 
   // Sidebar automatisch ein-/ausblenden bei Resize
   useEffect(() => {
@@ -31,6 +43,62 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  // ── Auto-Polling alle 30 Sekunden ──
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void refreshData()
+    }, POLL_INTERVAL)
+    return () => clearInterval(interval)
+  }, [refreshData])
+
+  // ── Refresh-Handler ──
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true)
+    try {
+      await refreshData()
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 600)
+    }
+  }, [refreshData])
+
+  // ── Pull-to-Refresh Touch-Handler ──
+  useEffect(() => {
+    const el = mainRef.current
+    if (!el) return
+
+    function onTouchStart(e: TouchEvent) {
+      if (el!.scrollTop <= 0) {
+        pullStartY.current = e.touches[0].clientY
+        isPulling.current = true
+      }
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (!isPulling.current) return
+      const delta = e.touches[0].clientY - pullStartY.current
+      if (delta > 0) {
+        setPullDistance(Math.min(delta * 0.4, 80))
+      }
+    }
+
+    function onTouchEnd() {
+      if (pullDistance > 50) {
+        void handleRefresh()
+      }
+      isPulling.current = false
+      setPullDistance(0)
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: true })
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [pullDistance, handleRefresh])
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -104,22 +172,73 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
               </button>
             </form>
           ) : (
-            <button
-              type="button"
-              onClick={() => setShowSearch(true)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
-              style={{ color: 'var(--color-sidebar-text-muted)' }}
-              aria-label="Suche"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4.5 w-4.5">
-                <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-1">
+              {/* Refresh-Button */}
+              <button
+                type="button"
+                onClick={() => void handleRefresh()}
+                disabled={isRefreshing}
+                className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
+                style={{ color: 'var(--color-sidebar-text-muted)' }}
+                aria-label="Aktualisieren"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`h-4.5 w-4.5 transition-transform ${isRefreshing ? 'animate-spin' : ''}`}
+                >
+                  <path d="M21 2v6h-6" />
+                  <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                  <path d="M3 22v-6h6" />
+                  <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                </svg>
+              </button>
+              {/* Suche-Button */}
+              <button
+                type="button"
+                onClick={() => setShowSearch(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
+                style={{ color: 'var(--color-sidebar-text-muted)' }}
+                aria-label="Suche"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4.5 w-4.5">
+                  <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+                </svg>
+              </button>
+            </div>
           )}
         </header>
 
+        {/* Pull-to-Refresh Indikator */}
+        {pullDistance > 0 ? (
+          <div
+            className="flex items-center justify-center overflow-hidden transition-[height]"
+            style={{ height: `${pullDistance}px`, backgroundColor: 'var(--color-bg-app)' }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-5 w-5 text-[var(--color-accent)]"
+              style={{ opacity: Math.min(pullDistance / 50, 1), transform: `rotate(${pullDistance * 4}deg)` }}
+            >
+              <path d="M21 2v6h-6" />
+              <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+              <path d="M3 22v-6h6" />
+              <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+            </svg>
+          </div>
+        ) : null}
+
         {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto">
+        <main ref={mainRef} className="flex-1 overflow-y-auto">
           {children}
         </main>
 

@@ -573,8 +573,11 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
           showApiError('Papierkorb konnte nicht geleert werden.', error)
         }
       },
+      refreshData: async () => {
+        await loadFoldersAndNotes()
+      },
     }),
-    [apiError, currentUserEmail, currentUserName, folders, notes, replaceFolderNotes, showApiError, trash, userId],
+    [apiError, currentUserEmail, currentUserName, folders, loadFoldersAndNotes, notes, replaceFolderNotes, showApiError, trash, userId],
   )
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>
