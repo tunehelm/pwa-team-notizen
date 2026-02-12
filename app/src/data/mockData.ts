@@ -119,7 +119,7 @@ export function getNoteById(notes: NoteItem[], noteId: string) {
 }
 
 export function getPinnedNotes(notes: NoteItem[]) {
-  return notes.filter((note) => note.pinned).slice(0, 4)
+  return notes.filter((note) => note.pinned)
 }
 
 export function getPinnedFolders(folders: FolderItem[]) {
