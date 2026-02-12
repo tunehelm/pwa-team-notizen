@@ -59,7 +59,6 @@ export function NotePage() {
       <NoteEditor
         key={id || 'new'}
         note={note}
-        isOwner={isOwner}
         canDelete={canDelete}
         readOnly={isReadonly}
         backPath={backPath}
@@ -107,7 +106,6 @@ export function NotePage() {
 
 interface NoteEditorProps {
   note?: NoteItem
-  isOwner: boolean
   canDelete: boolean
   readOnly?: boolean
   backPath: string
@@ -138,7 +136,6 @@ const FONT_COLORS = [
 
 function NoteEditor({
   note,
-  isOwner,
   canDelete,
   readOnly = false,
   backPath,
