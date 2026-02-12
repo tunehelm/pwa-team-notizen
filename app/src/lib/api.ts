@@ -200,6 +200,7 @@ async function selectAllTrashFolders(): Promise<TrashFolderRow[]> {
 }
 
 async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
+  const userId = await requireUserId()
   const full = await supabase.from('trash_folders').upsert(
     {
       id: sourceFolder.id,
@@ -207,6 +208,7 @@ async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
       pinned: sourceFolder.pinned,
       created_at: sourceFolder.created_at,
       owner_id: sourceFolder.owner_id,
+      user_id: userId,
       parent_id: sourceFolder.parent_id,
       kind: sourceFolder.kind ?? 'team',
       deleted_at: deletedAt,
@@ -228,6 +230,7 @@ async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
       pinned: sourceFolder.pinned,
       created_at: sourceFolder.created_at,
       owner_id: sourceFolder.owner_id,
+      user_id: userId,
       deleted_at: deletedAt,
     },
     { onConflict: 'id' },
@@ -355,6 +358,7 @@ export async function deleteFolderToTrash(folderId: string): Promise<TrashFolder
   await upsertTrashFolder(sourceFolder, deletedAt)
 
   const notesRows = (notesInFolder ?? []) as NoteRow[]
+  const currentUserId = await requireUserId()
   if (notesRows.length > 0) {
     const { error: trashNotesError } = await supabase.from('trash_notes').upsert(
       notesRows.map((note) => ({
@@ -366,6 +370,7 @@ export async function deleteFolderToTrash(folderId: string): Promise<TrashFolder
         created_at: note.created_at,
         updated_at: note.updated_at,
         owner_id: note.user_id ?? note.owner_id,
+        user_id: note.user_id ?? note.owner_id ?? currentUserId,
         deleted_at: deletedAt,
       })),
       { onConflict: 'id' },
@@ -549,6 +554,7 @@ export async function deleteNoteToTrash(noteId: string): Promise<TrashNoteItem> 
 
   const note = data as NoteRow
   const deletedAt = new Date().toISOString()
+  const currentUserId = await requireUserId()
 
   const { error: trashError } = await supabase.from('trash_notes').upsert(
     {
@@ -562,6 +568,7 @@ export async function deleteNoteToTrash(noteId: string): Promise<TrashNoteItem> 
       created_at: note.created_at,
       updated_at: note.updated_at,
       owner_id: note.user_id ?? note.owner_id,
+      user_id: note.user_id ?? note.owner_id ?? currentUserId,
       deleted_at: deletedAt,
     },
     { onConflict: 'id' },
