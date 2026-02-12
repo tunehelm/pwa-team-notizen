@@ -19,7 +19,19 @@ Im Ordner `assets/` liegen Referenzbilder, die den Stil und Aufbau vorgeben:
 - Layout-Idee (clean/tidy)
 - Notizen (Text, Bilder, Emojis, Diktieren iOS, Formatierung)
 - Unterordner (zusätzliche Ebene)
-Diese Bilder sind Inspiration; Ziel ist “in dieser Art”, nicht Pixel-perfect.
+- App-Icon und App-Icon2
+- Privat-Ansicht
+- Suchfeld-Ansicht
+- Team-Ansicht
+Diese Bilder dienen als visuelle Leitlinie für:
+
+- Layout-Struktur
+- Abstände & Hierarchie
+- Ordner-Stil
+- Farbwirkung
+- Apple-ähnliche UX
+
+Sie sind keine pixelgenaue Kopiervorgabe, sondern stilistische Referenz.
 
 ## UX/UI Regeln (verbindlich)
 1) Hintergrund: sanftes, beruhigendes Hellblau (nicht aufdringlich).

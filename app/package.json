@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "lsof -t -i :5173 | xargs kill -9 2>/dev/null; vite",
     "dev:api": "vercel dev",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

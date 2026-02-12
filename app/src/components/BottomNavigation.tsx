@@ -1,54 +1,46 @@
-import { Link } from 'react-router-dom'
-import { mainNavigationFolderIds } from '../data/mockData'
-import { useAppData } from '../state/useAppData'
+import { Link, useLocation } from 'react-router-dom'
 
-export type BottomNavigationActive = 'team' | 'projects' | 'private' | 'archive'
+export type BottomNavigationActive = 'start' | 'search' | 'private' | 'team'
 
 interface BottomNavigationProps {
   active?: BottomNavigationActive
 }
 
-const activeToFolderId: Record<BottomNavigationActive, string> = {
-  team: 'team-hub',
-  projects: 'projects',
-  private: 'private-space',
-  archive: 'archive',
-}
+const tabs: { id: BottomNavigationActive; label: string; path: string }[] = [
+  { id: 'start', label: 'Start', path: '/' },
+  { id: 'search', label: 'Suche', path: '/search' },
+  { id: 'private', label: 'Privat', path: '/private' },
+  { id: 'team', label: 'Team', path: '/team' },
+]
 
 export function BottomNavigation({ active }: BottomNavigationProps) {
-  const { findFolderById } = useAppData()
-  const activeFolderId = active ? activeToFolderId[active] : undefined
+  const location = useLocation()
 
   return (
     <nav
-      aria-label="Hauptordner"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] pt-3 backdrop-blur"
+      aria-label="Navigation"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-900/90"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.25rem)' }}
     >
-      <ul className="mx-auto grid w-full max-w-xl grid-cols-4 gap-3">
-        {mainNavigationFolderIds.map((folderId) => {
-          const folder = findFolderById(folderId)
-          if (!folder) return null
-
-          const isActive = activeFolderId === folder.id
+      <ul className="mx-auto grid w-full max-w-xl grid-cols-4">
+        {tabs.map((tab) => {
+          const isActive = active
+            ? active === tab.id
+            : location.pathname === tab.path
 
           return (
-            <li key={folder.id} className="min-w-0">
+            <li key={tab.id}>
               <Link
-                to={`/folder/${folder.id}`}
-                className={`flex h-16 w-full min-w-0 flex-col items-center justify-center rounded-2xl px-3 py-3 text-center transition ${
+                to={tab.path}
+                className={`flex flex-col items-center gap-0.5 px-2 pb-1 pt-2 text-center transition-colors ${
                   isActive
-                    ? 'bg-slate-900 text-white shadow-sm ring-1 ring-slate-900'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    ? 'text-blue-500 dark:text-blue-400'
+                    : 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300'
                 }`}
               >
-                <span
-                  className={`${folder.id === 'team-hub' ? 'h-5 w-5' : 'h-6 w-6'} shrink-0`}
-                  aria-hidden="true"
-                >
-                  <FolderIcon folderId={folder.id} />
-                </span>
-                <span className="mt-1 max-w-[72px] truncate whitespace-nowrap text-[11px] font-medium leading-none">
-                  {folder.name}
+                <TabIcon id={tab.id} active={isActive} />
+                <span className="text-[10px] font-medium leading-tight">
+                  {tab.label}
                 </span>
               </Link>
             </li>
@@ -59,53 +51,43 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
   )
 }
 
-interface FolderIconProps {
-  folderId: string
-}
+function TabIcon({ id, active }: { id: BottomNavigationActive; active: boolean }) {
+  const cls = `h-6 w-6 ${active ? 'stroke-blue-500 dark:stroke-blue-400' : 'stroke-current'}`
 
-function FolderIcon({ folderId }: FolderIconProps) {
-  if (folderId === 'team-hub') {
+  if (id === 'start') {
     return (
-      <svg viewBox="0 0 24 24" fill="none" className="h-full w-full stroke-current">
-        <path strokeWidth="1.8" strokeLinecap="round" d="M4 18a4 4 0 0 1 8 0" />
-        <path strokeWidth="1.8" strokeLinecap="round" d="M12 18a4 4 0 0 1 8 0" />
-        <circle cx="9" cy="9" r="2.5" strokeWidth="1.8" />
-        <circle cx="15.5" cy="8.5" r="2" strokeWidth="1.8" />
+      <svg viewBox="0 0 24 24" fill="none" className={cls} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 10.5L12 3l9 7.5" />
+        <path d="M5 9.5V19a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1V9.5" />
       </svg>
     )
   }
 
-  if (folderId === 'projects') {
+  if (id === 'search') {
     return (
-      <svg viewBox="0 0 24 24" fill="none" className="h-full w-full stroke-current">
-        <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" strokeWidth="1.8" />
-        <path strokeWidth="1.8" strokeLinecap="round" d="M8 3.5v4M16 3.5v4M3.5 10h17" />
+      <svg viewBox="0 0 24 24" fill="none" className={cls} strokeWidth="1.8" strokeLinecap="round">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M16.5 16.5L21 21" />
       </svg>
     )
   }
 
-  if (folderId === 'private-space') {
+  if (id === 'private') {
     return (
-      <svg viewBox="0 0 24 24" fill="none" className="h-full w-full stroke-current">
-        <rect x="4.5" y="10.5" width="15" height="9" rx="2.5" strokeWidth="1.8" />
-        <path
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          d="M8 10.5V8a4 4 0 0 1 8 0v2.5"
-        />
+      <svg viewBox="0 0 24 24" fill="none" className={cls} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="4.5" y="10.5" width="15" height="9" rx="2" />
+        <path d="M8 10.5V8a4 4 0 018 0v2.5" />
       </svg>
     )
   }
 
+  // team
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-full w-full stroke-current">
-      <path
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M7.5 4.5h9l3 3V18a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2Z"
-      />
-      <path strokeWidth="1.8" strokeLinecap="round" d="M8.5 12h7M8.5 15h5" />
+    <svg viewBox="0 0 24 24" fill="none" className={cls} strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="9" cy="7" r="3" />
+      <path d="M2 20a7 7 0 0114 0" />
+      <path d="M16 3.13a4 4 0 010 7.75" />
+      <path d="M21 20c0-2.5-1.7-4.6-4-5.5" />
     </svg>
   )
 }

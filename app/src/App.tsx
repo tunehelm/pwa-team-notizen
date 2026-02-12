@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { QRCodeSVG } from "qrcode.react";
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { DashboardPage } from "./pages/DashboardPage";
 import { FolderPage } from "./pages/FolderPage";
 import { NotePage } from "./pages/NotePage";
+import { PrivatePage } from "./pages/PrivatePage";
+import { SearchPage } from "./pages/SearchPage";
+import { TeamHubPage } from "./pages/TeamHubPage";
 import { AppDataProvider } from "./state/AppDataContext";
 import { supabase } from "./lib/supabase";
 
 function App() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -26,8 +29,11 @@ function App() {
 
     void init();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession ?? null);
+      if (event === "PASSWORD_RECOVERY") {
+        setIsRecoveryMode(true);
+      }
     });
 
     return () => {
@@ -36,62 +42,31 @@ function App() {
     };
   }, []);
 
-  const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error(error);
-      alert(`Logout-Fehler: ${error.message}`);
-    }
-  };
-
   if (loading) {
     return (
-      <div style={{ padding: 24, fontFamily: "system-ui" }}>
-        Lade…
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-app)]">
+        <div className="text-center">
+          <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          <p className="text-sm text-[var(--color-text-secondary)]">Lade…</p>
+        </div>
       </div>
     );
   }
 
   if (!session) return <LoginPage />;
 
-  // Logged in -> show the app
+  if (isRecoveryMode) {
+    return <SetNewPasswordPage onDone={() => setIsRecoveryMode(false)} />;
+  }
+
   return (
     <AppDataProvider userId={session.user.id}>
-      {/* Mini-Header nur für den Start: zeigt Login-Status + Logout */}
-      <div
-        style={{
-          position: "fixed",
-          top: 12,
-          right: 12,
-          zIndex: 99999,
-          pointerEvents: "auto",
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
-          fontFamily: "system-ui",
-        }}
-      >
-        <span style={{ fontSize: 12, opacity: 0.8 }}>{session.user.email ?? "Eingeloggt"}</span>
-        <button
-          onClick={signOut}
-          style={{
-            padding: "8px 10px",
-            fontSize: 12,
-            borderRadius: 8,
-            cursor: "pointer",
-            background: "#111827",
-            color: "white",
-            border: "none",
-          }}
-        >
-          Logout
-        </button>
-      </div>
-
       <BrowserRouter>
-        {import.meta.env.DEV ? <DevQrOverlay /> : null}
         <Routes>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/private" element={<PrivatePage />} />
+          <Route path="/team" element={<TeamHubPage />} />
           <Route path="/folder/:id" element={<FolderPage />} />
           <Route path="/note/:id" element={<NotePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -101,21 +76,49 @@ function App() {
   );
 }
 
+/* ─── Login ──────────────────────────────────────────────── */
+
 function LoginPage() {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [sendingMagicLink, setSendingMagicLink] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const canSubmit = email.includes("@") && password.length >= 6;
+  const canSubmit = email.includes("@") && (mode === "forgot" || password.length >= 6);
 
-  const submitWithPassword = async () => {
+  const resetPassword = async () => {
+    if (!email.includes("@")) {
+      setMessage({ type: "error", text: "Bitte zuerst eine gültige E-Mail eingeben." });
+      return;
+    }
+    try {
+      setMessage(null);
+      setSubmitting(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/`,
+      });
+      if (error) {
+        setMessage({ type: "error", text: `Fehler: ${error.message}` });
+        return;
+      }
+      setMessage({
+        type: "success",
+        text: "E-Mail zum Zurücksetzen wurde verschickt. Bitte Postfach prüfen (auch Spam).",
+      });
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Unbekannter Fehler";
+      setMessage({ type: "error", text: `Technischer Fehler: ${text}` });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const signIn = async () => {
     if (!canSubmit) {
       setMessage({
         type: "error",
-        text: "Bitte gueltige E-Mail und ein Passwort mit mindestens 6 Zeichen eingeben.",
+        text: "Bitte gültige E-Mail und ein Passwort mit mindestens 6 Zeichen eingeben.",
       });
       return;
     }
@@ -124,42 +127,12 @@ function LoginPage() {
       setMessage(null);
       setSubmitting(true);
 
-      if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-
-        if (error) {
-          console.error(error);
-          setMessage({ type: "error", text: `Registrierung fehlgeschlagen: ${error.message}` });
-          return;
-        }
-
-        if (data.session) {
-          setMessage({ type: "success", text: "Registrierung erfolgreich. Du bist eingeloggt." });
-        } else {
-          setMessage({
-            type: "success",
-            text: "Registrierung erfolgreich. Bitte E-Mail bestaetigen und danach anmelden.",
-          });
-        }
-        return;
-      }
-
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
-        console.error(error);
         setMessage({ type: "error", text: `Anmeldung fehlgeschlagen: ${error.message}` });
-      } else {
-        setMessage({ type: "success", text: "Anmeldung erfolgreich." });
       }
     } catch (error) {
-      console.error(error);
       const text = error instanceof Error ? error.message : "Unbekannter Fehler";
       setMessage({ type: "error", text: `Technischer Fehler: ${text}` });
     } finally {
@@ -167,244 +140,161 @@ function LoginPage() {
     }
   };
 
-  const sendMagicLink = async () => {
-    if (!email.includes("@")) {
-      setMessage({ type: "error", text: "Bitte zuerst eine gueltige E-Mail eingeben." });
-      return;
-    }
-
-    try {
-      setMessage(null);
-      setSendingMagicLink(true);
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: window.location.origin,
-        },
-      });
-
-      if (error) {
-        console.error(error);
-        setMessage({ type: "error", text: `Magic-Link Fehler: ${error.message}` });
-      } else {
-        setMessage({ type: "success", text: "Magic Link wurde per E-Mail verschickt." });
-      }
-    } catch (error) {
-      console.error(error);
-      const text = error instanceof Error ? error.message : "Unbekannter Fehler";
-      setMessage({ type: "error", text: `Technischer Fehler: ${text}` });
-    } finally {
-      setSendingMagicLink(false);
-    }
+  const handleSubmit = () => {
+    if (mode === "forgot") void resetPassword();
+    else void signIn();
   };
 
   return (
-    <div style={{ padding: 24, fontFamily: "system-ui", maxWidth: 460 }}>
-      <h1 style={{ margin: "0 0 10px 0" }}>Team-Notizen</h1>
-      <p style={{ margin: "0 0 18px 0", color: "#334155", fontSize: 14 }}>
-        Einmal registrieren oder anmelden. Danach bleibst du bis zum Logout eingeloggt.
-      </p>
-      {message ? (
-        <div
-          role="status"
-          style={{
-            margin: "0 0 12px 0",
-            padding: "10px 12px",
-            borderRadius: 8,
-            border: `1px solid ${message.type === "error" ? "#fecaca" : "#bbf7d0"}`,
-            background: message.type === "error" ? "#fef2f2" : "#f0fdf4",
-            color: message.type === "error" ? "#991b1b" : "#166534",
-            fontSize: 14,
-          }}
-        >
-          {message.text}
+    <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-app)] px-6">
+      <div className="w-full max-w-sm">
+        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Team-Notizen</h1>
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          Nur für eingeladene Teammitglieder.
+        </p>
+
+        {message ? (
+          <div
+            role="status"
+            className={`mt-4 rounded-xl px-4 py-3 text-sm ${
+              message.type === "error"
+                ? "border border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+                : "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+            }`}
+          >
+            {message.text}
+          </div>
+        ) : null}
+
+        <div className="mt-5 flex gap-2">
+          {(["signin", "forgot"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => { setMode(m); setMessage(null); }}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                mode === m
+                  ? "bg-blue-500 text-white"
+                  : "bg-[var(--color-bg-card)] text-[var(--color-text-secondary)] hover:bg-slate-200 dark:hover:bg-slate-700"
+              }`}
+            >
+              {m === "signin" ? "Anmelden" : "Passwort vergessen"}
+            </button>
+          ))}
         </div>
-      ) : null}
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <button
-          type="button"
-          onClick={() => setMode("signin")}
-          style={{
-            padding: "10px 12px",
-            borderRadius: 8,
-            border: "1px solid #cbd5e1",
-            background: mode === "signin" ? "#111827" : "white",
-            color: mode === "signin" ? "white" : "#0f172a",
-            cursor: "pointer",
-          }}
-        >
-          Anmelden
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("signup")}
-          style={{
-            padding: "10px 12px",
-            borderRadius: 8,
-            border: "1px solid #cbd5e1",
-            background: mode === "signup" ? "#111827" : "white",
-            color: mode === "signup" ? "white" : "#0f172a",
-            cursor: "pointer",
-          }}
-        >
-          Registrieren
-        </button>
-      </div>
+        <div className="mt-4 space-y-3">
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="E-Mail"
+            autoComplete="email"
+            className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-blue-400 focus:outline-none dark:focus:border-blue-500"
+          />
 
-      <div style={{ display: "grid", gap: 10 }}>
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="E-Mail"
-          autoComplete="email"
-          style={{
-            width: "100%",
-            padding: 10,
-            borderRadius: 8,
-            border: "1px solid #d0d0d0",
-            fontSize: 16,
-          }}
-        />
+          {mode !== "forgot" && (
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Passwort"
+              autoComplete="current-password"
+              className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-blue-400 focus:outline-none dark:focus:border-blue-500"
+            />
+          )}
 
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Passwort (mind. 6 Zeichen)"
-          autoComplete={mode === "signup" ? "new-password" : "current-password"}
-          style={{
-            width: "100%",
-            padding: 10,
-            borderRadius: 8,
-            border: "1px solid #d0d0d0",
-            fontSize: 16,
-          }}
-        />
-
-        <button
-          type="button"
-          onClick={submitWithPassword}
-          disabled={submitting || !canSubmit}
-          style={{
-            width: "100%",
-            padding: "12px 16px",
-            fontSize: 16,
-            borderRadius: 8,
-            cursor: submitting || !canSubmit ? "default" : "pointer",
-            background: submitting || !canSubmit ? "#94a3b8" : "#2563eb",
-            color: "white",
-            border: "none",
-          }}
-        >
-          {submitting
-            ? "Bitte warten…"
-            : mode === "signup"
-              ? "Registrieren"
-              : "Mit Passwort anmelden"}
-        </button>
-
-        <button
-          type="button"
-          onClick={sendMagicLink}
-          disabled={sendingMagicLink || !email.includes("@")}
-          style={{
-            width: "100%",
-            padding: "10px 14px",
-            fontSize: 14,
-            borderRadius: 8,
-            cursor: sendingMagicLink || !email.includes("@") ? "default" : "pointer",
-            background: "white",
-            color: "#0f172a",
-            border: "1px solid #cbd5e1",
-          }}
-        >
-          {sendingMagicLink ? "Sende Magic Link…" : "Alternativ: Magic Link senden"}
-        </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting || !canSubmit}
+            className={`w-full rounded-xl px-4 py-3 text-sm font-semibold text-white transition-colors ${
+              submitting || !canSubmit ? "bg-slate-400 dark:bg-slate-600" : "bg-blue-500 hover:bg-blue-600 active:bg-blue-700"
+            }`}
+          >
+            {submitting
+              ? "Bitte warten…"
+              : mode === "forgot"
+                ? "Link zum Zurücksetzen senden"
+                : "Anmelden"}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function DevQrOverlay() {
-  const location = useLocation();
-  const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const currentUrl = `${window.location.origin}${location.pathname}${location.search}${location.hash}`;
+/* ─── Password Recovery ──────────────────────────────────── */
 
-  const copyUrl = async () => {
+function SetNewPasswordPage({ onDone }: { onDone: () => void }) {
+  const [newPassword, setNewPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const handleSetPassword = async () => {
+    if (newPassword.length < 6) {
+      setMessage({ type: "error", text: "Das Passwort muss mindestens 6 Zeichen haben." });
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(currentUrl);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch (error) {
-      console.error(error);
+      setSubmitting(true);
+      setMessage(null);
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        setMessage({ type: "error", text: `Fehler: ${error.message}` });
+        return;
+      }
+      setMessage({ type: "success", text: "Passwort wurde gesetzt. Du wirst weitergeleitet…" });
+      window.setTimeout(() => onDone(), 1500);
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Unbekannter Fehler";
+      setMessage({ type: "error", text });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 12,
-        left: 12,
-        zIndex: 99999,
-        fontFamily: "system-ui",
-      }}
-    >
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        style={{
-          minHeight: 44,
-          minWidth: 44,
-          padding: "10px 12px",
-          borderRadius: 10,
-          background: "#111827",
-          color: "white",
-          border: "none",
-          fontSize: 12,
-          cursor: "pointer",
-        }}
-      >
-        Show QR
-      </button>
+    <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-app)] px-6">
+      <div className="w-full max-w-sm">
+        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Neues Passwort setzen</h1>
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          Mindestens 6 Zeichen.
+        </p>
 
-      {open ? (
-        <div
-          style={{
-            marginTop: 8,
-            width: 260,
-            border: "1px solid #e2e8f0",
-            borderRadius: 12,
-            background: "white",
-            padding: 12,
-            boxShadow: "0 10px 25px rgba(15, 23, 42, 0.18)",
-          }}
-        >
-          <p style={{ margin: 0, fontSize: 12, color: "#334155" }}>Aktuelle URL (dev)</p>
-          <div style={{ marginTop: 10, display: "flex", justifyContent: "center" }}>
-            <QRCodeSVG value={currentUrl} size={200} />
+        {message ? (
+          <div
+            role="status"
+            className={`mt-4 rounded-xl px-4 py-3 text-sm ${
+              message.type === "error"
+                ? "border border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+                : "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+            }`}
+          >
+            {message.text}
           </div>
+        ) : null}
+
+        <div className="mt-4 space-y-3">
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Neues Passwort"
+            autoComplete="new-password"
+            className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-blue-400 focus:outline-none"
+          />
           <button
             type="button"
-            onClick={copyUrl}
-            style={{
-              marginTop: 10,
-              minHeight: 44,
-              width: "100%",
-              borderRadius: 10,
-              border: "1px solid #cbd5e1",
-              background: "white",
-              color: "#0f172a",
-              cursor: "pointer",
-              fontSize: 13,
-            }}
+            onClick={() => void handleSetPassword()}
+            disabled={submitting || newPassword.length < 6}
+            className={`w-full rounded-xl px-4 py-3 text-sm font-semibold text-white transition-colors ${
+              submitting || newPassword.length < 6 ? "bg-slate-400" : "bg-blue-500 hover:bg-blue-600"
+            }`}
           >
-            {copied ? "URL kopiert" : "URL kopieren"}
+            {submitting ? "Bitte warten…" : "Passwort speichern"}
           </button>
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }

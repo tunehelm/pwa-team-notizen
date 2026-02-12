@@ -4,7 +4,11 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  server: {
+    port: 5173,
+    strictPort: true, // Wenn 5173 belegt ist: Fehler statt anderem Port – nur eine URL in Supabase nötig
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -16,8 +20,8 @@ export default defineConfig({
         name: 'PWA Team-Notizen',
         short_name: 'TeamNotizen',
         description: 'Kollaborative Team-Notizen PWA',
-        theme_color: '#0f172a',
-        background_color: '#f8fafc',
+        theme_color: '#3b82f6',
+        background_color: '#f0f4f8',
         display: 'standalone',
         start_url: '/',
         icons: [
@@ -40,8 +44,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Precache App-Shell inkl. index.html und aller Build-Assets.
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,webmanifest}'],
+        // Precache nur im Produktions-Build (in dev hat dev-dist fast keine Dateien → Warnung).
+        globPatterns: mode === 'development' ? [] : ['**/*.{js,css,html,ico,png,svg,webp,webmanifest}'],
         // SPA-Routen offline immer auf die gecachte index.html abbilden.
         navigateFallback: '/index.html',
         // offline.html nur nutzen, wenn keine index.html aus dem Cache verfügbar ist.
@@ -67,4 +71,4 @@ export default defineConfig({
       },
     }),
   ],
-})
+}))

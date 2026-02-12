@@ -2,6 +2,14 @@ import type { FolderItem, NoteItem } from '../data/mockData'
 import type { TrashFolderItem, TrashNoteItem } from '../state/appDataStore'
 import { supabase } from './supabase'
 
+/** Returns the current user's ID or throws if not logged in. */
+async function requireUserId(): Promise<string> {
+  const { data } = await supabase.auth.getUser()
+  const uid = data.user?.id
+  if (!uid) throw new Error('Nicht eingeloggt – bitte neu anmelden.')
+  return uid
+}
+
 type FolderRow = {
   id: string
   title: string
@@ -9,7 +17,8 @@ type FolderRow = {
   created_at: string
   owner_id: string
   parent_id: string | null
-  access: 'team' | 'private' | 'readonly' | null
+  kind: 'team' | 'private' | 'readonly' | null
+  icon?: string | null
 }
 
 type NoteRow = {
@@ -17,10 +26,13 @@ type NoteRow = {
   folder_id: string | null
   title: string
   content: string
+  excerpt?: string
+  updated_label?: string
   pinned: boolean
   created_at: string
   updated_at: string
-  owner_id: string
+  owner_id?: string
+  user_id?: string
 }
 
 type TrashFolderRow = FolderRow & {
@@ -31,11 +43,12 @@ type TrashNoteRow = NoteRow & {
   deleted_at: string
 }
 
-const FOLDER_COLUMNS = 'id,title,pinned,created_at,owner_id,parent_id,access'
-const NOTE_COLUMNS = 'id,folder_id,title,content,pinned,created_at,updated_at,owner_id'
-const TRASH_FOLDER_COLUMNS = 'id,title,pinned,created_at,owner_id,parent_id,access,deleted_at'
+const FOLDER_COLUMNS = 'id,title,pinned,created_at,owner_id,parent_id,kind,icon'
+const FOLDER_COLUMNS_FALLBACK = 'id,title,pinned,created_at,owner_id,parent_id,kind'
+const NOTE_COLUMNS = 'id,folder_id,title,content,excerpt,updated_label,pinned,created_at,updated_at,owner_id,user_id'
+const TRASH_FOLDER_COLUMNS = 'id,title,pinned,created_at,owner_id,parent_id,kind,icon,deleted_at'
 const TRASH_FOLDER_COLUMNS_FALLBACK = 'id,title,pinned,created_at,owner_id,deleted_at'
-const TRASH_NOTE_COLUMNS = 'id,folder_id,title,content,pinned,created_at,updated_at,owner_id,deleted_at'
+const TRASH_NOTE_COLUMNS = 'id,folder_id,title,content,excerpt,updated_label,pinned,created_at,updated_at,owner_id,user_id,deleted_at'
 
 function stripHtml(value: string) {
   return value
@@ -74,8 +87,10 @@ function mapFolderRow(row: FolderRow): FolderItem {
     id: row.id,
     name: row.title,
     parentId: row.parent_id ?? null,
-    access: row.access ?? 'team',
+    access: row.kind ?? 'team',
     pinned: Boolean(row.pinned),
+    ownerId: row.owner_id ?? '',
+    icon: row.icon ?? undefined,
   }
 }
 
@@ -90,6 +105,7 @@ function mapNoteRow(row: NoteRow): NoteItem {
     excerpt: buildExcerpt(content),
     updatedLabel: formatUpdatedLabel(row.updated_at ?? row.created_at),
     pinned: Boolean(row.pinned),
+    ownerId: row.user_id ?? row.owner_id ?? '',
   }
 }
 
@@ -108,7 +124,7 @@ function isMissingColumnError(error: unknown) {
     code === '42703' ||
     code === 'PGRST204' ||
     message.includes('parent_id') ||
-    message.includes('access')
+    message.includes('kind')
   )
 }
 
@@ -141,11 +157,11 @@ async function selectTrashFolderById(folderId: string): Promise<TrashFolderRow> 
   })
 
   if (fallback.error) throw fallback.error
-  const row = fallback.data as Omit<TrashFolderRow, 'parent_id' | 'access'>
+  const row = fallback.data as Omit<TrashFolderRow, 'parent_id' | 'kind'>
   return {
     ...row,
     parent_id: null,
-    access: 'team',
+    kind: 'team',
   }
 }
 
@@ -176,10 +192,10 @@ async function selectAllTrashFolders(): Promise<TrashFolderRow[]> {
   })
 
   if (fallback.error) throw fallback.error
-  return ((fallback.data ?? []) as Array<Omit<TrashFolderRow, 'parent_id' | 'access'>>).map((row) => ({
+  return ((fallback.data ?? []) as Array<Omit<TrashFolderRow, 'parent_id' | 'kind'>>).map((row) => ({
     ...row,
     parent_id: null,
-    access: 'team',
+    kind: 'team',
   }))
 }
 
@@ -192,7 +208,7 @@ async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
       created_at: sourceFolder.created_at,
       owner_id: sourceFolder.owner_id,
       parent_id: sourceFolder.parent_id,
-      access: sourceFolder.access ?? 'team',
+      kind: sourceFolder.kind ?? 'team',
       deleted_at: deletedAt,
     },
     { onConflict: 'id' },
@@ -232,28 +248,56 @@ export async function fetchFolders(): Promise<FolderItem[]> {
   const { data, error } = await supabase
     .from('folders')
     .select(FOLDER_COLUMNS)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
 
   console.log('[api.fetchFolders] response', { data, error })
+
+  // Fallback falls die icon-Spalte noch nicht existiert
+  if (error && isMissingColumnError(error)) {
+    const fallback = await supabase
+      .from('folders')
+      .select(FOLDER_COLUMNS_FALLBACK)
+      .order('created_at', { ascending: false })
+    if (fallback.error) throw fallback.error
+    return ((fallback.data ?? []) as FolderRow[]).map(mapFolderRow)
+  }
+
   if (error) throw error
   return ((data ?? []) as FolderRow[]).map(mapFolderRow)
 }
 
 export async function createFolder(
   title: string,
-  options?: { pinned?: boolean; parentId?: string | null; access?: FolderItem['access'] },
+  options?: { pinned?: boolean; parentId?: string | null; access?: FolderItem['access']; icon?: string },
 ): Promise<FolderItem> {
   const cleanTitle = title.trim()
-  const { data, error } = await supabase
+  const ownerId = await requireUserId()
+  const insertPayload: Record<string, unknown> = {
+    title: cleanTitle,
+    pinned: options?.pinned ?? false,
+    parent_id: options?.parentId ?? null,
+    kind: options?.access ?? 'team',
+    owner_id: ownerId,
+  }
+  if (options?.icon) insertPayload.icon = options.icon
+
+  let { data, error } = await supabase
     .from('folders')
-    .insert({
-      title: cleanTitle,
-      pinned: options?.pinned ?? false,
-      parent_id: options?.parentId ?? null,
-      access: options?.access ?? 'team',
-    })
+    .insert(insertPayload)
     .select(FOLDER_COLUMNS)
     .single()
+
+  // Falls icon-Spalte nicht existiert, ohne icon erneut versuchen
+  if (error && isMissingColumnError(error) && insertPayload.icon) {
+    delete insertPayload.icon
+    const retry = await supabase
+      .from('folders')
+      .insert(insertPayload)
+      .select(FOLDER_COLUMNS_FALLBACK)
+      .single()
+    data = retry.data
+    error = retry.error
+  }
 
   if (error) throw error
   return mapFolderRow(data as FolderRow)
@@ -263,6 +307,12 @@ export async function renameFolder(folderId: string, title: string): Promise<voi
   const cleanTitle = title.trim()
   const { error } = await supabase.from('folders').update({ title: cleanTitle }).eq('id', folderId)
   if (error) throw error
+}
+
+export async function updateFolderIcon(folderId: string, icon: string): Promise<void> {
+  const { error } = await supabase.from('folders').update({ icon }).eq('id', folderId)
+  // Graceful: Wenn die icon-Spalte nicht existiert, ignorieren wir den Fehler
+  if (error && !isMissingColumnError(error)) throw error
 }
 
 export async function moveFolderToParent(folderId: string, parentId: string | null): Promise<void> {
@@ -315,7 +365,7 @@ export async function deleteFolderToTrash(folderId: string): Promise<TrashFolder
         pinned: note.pinned,
         created_at: note.created_at,
         updated_at: note.updated_at,
-        owner_id: note.owner_id,
+        owner_id: note.user_id ?? note.owner_id,
         deleted_at: deletedAt,
       })),
       { onConflict: 'id' },
@@ -354,7 +404,7 @@ export async function restoreFolderFromTrash(folderId: string): Promise<FolderIt
       created_at: row.created_at,
       owner_id: row.owner_id,
       parent_id: row.parent_id,
-      access: row.access ?? 'team',
+      kind: row.kind ?? 'team',
     },
     { onConflict: 'id' },
   )
@@ -408,15 +458,22 @@ export async function fetchNotes(folderId: string): Promise<NoteItem[]> {
 
 export async function createNote(folderId: string, title: string): Promise<NoteItem> {
   const cleanTitle = title.trim()
-  console.log('[api.createNote] before', { folderId, title: cleanTitle })
+  const ownerId = await requireUserId()
+  console.log('[api.createNote] before', { folderId, title: cleanTitle, ownerId })
 
+  const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('notes')
     .insert({
       folder_id: folderId,
       title: cleanTitle,
       content: '',
+      excerpt: '',
+      updated_label: 'gerade eben',
       pinned: false,
+      user_id: ownerId,
+      created_at: now,
+      updated_at: now,
     })
     .select(NOTE_COLUMNS)
     .single()
@@ -432,8 +489,12 @@ export async function updateNote(
 ): Promise<NoteItem> {
   const payload: Record<string, unknown> = {}
   if (typeof patch.title === 'string') payload.title = patch.title
-  if (typeof patch.content === 'string') payload.content = patch.content
+  if (typeof patch.content === 'string') {
+    payload.content = patch.content
+    payload.excerpt = buildExcerpt(patch.content)
+  }
   if (typeof patch.pinned === 'boolean') payload.pinned = patch.pinned
+  payload.updated_label = 'gerade eben'
 
   if (Object.keys(payload).length === 0) {
     const { data, error } = await supabase.from('notes').select(NOTE_COLUMNS).eq('id', noteId).single()
@@ -465,10 +526,12 @@ export async function deleteNoteToTrash(noteId: string): Promise<TrashNoteItem> 
       folder_id: note.folder_id ?? null,
       title: note.title,
       content: typeof note.content === 'string' ? note.content : '',
+      excerpt: note.excerpt ?? buildExcerpt(typeof note.content === 'string' ? note.content : ''),
+      updated_label: note.updated_label ?? formatUpdatedLabel(note.updated_at),
       pinned: note.pinned,
       created_at: note.created_at,
       updated_at: note.updated_at,
-      owner_id: note.owner_id,
+      owner_id: note.user_id ?? note.owner_id,
       deleted_at: deletedAt,
     },
     { onConflict: 'id' },
@@ -500,10 +563,12 @@ export async function restoreNoteFromTrash(noteId: string): Promise<NoteItem> {
       folder_id: note.folder_id ?? null,
       title: note.title,
       content: typeof note.content === 'string' ? note.content : '',
+      excerpt: note.excerpt ?? buildExcerpt(typeof note.content === 'string' ? note.content : ''),
+      updated_label: note.updated_label ?? formatUpdatedLabel(note.updated_at),
       pinned: note.pinned,
       created_at: note.created_at,
       updated_at: note.updated_at,
-      owner_id: note.owner_id,
+      user_id: note.user_id ?? note.owner_id,
     },
     { onConflict: 'id' },
   )

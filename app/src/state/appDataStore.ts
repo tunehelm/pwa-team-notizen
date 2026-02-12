@@ -10,6 +10,10 @@ export interface TrashNoteItem extends NoteItem {
 }
 
 export interface AppDataContextValue {
+  currentUserId: string
+  currentUserEmail: string
+  currentUserName: string
+  apiError: string | null
   folders: FolderItem[]
   notes: NoteItem[]
   trash: {
@@ -18,19 +22,22 @@ export interface AppDataContextValue {
   }
   createFolder: (
     title: string,
-    options?: { pinned?: boolean; parentId?: string | null; access?: AccessType },
+    options?: { pinned?: boolean; parentId?: string | null; access?: AccessType; icon?: string },
   ) => Promise<FolderItem | null>
+  updateFolderIcon: (folderId: string, icon: string) => Promise<void>
   createNote: (folderId: string, title: string) => Promise<NoteItem | null>
   moveFolderToParent: (folderId: string, parentId: string | null) => Promise<void>
   loadNotesForFolder: (folderId: string) => Promise<void>
   findFolderById: (folderId: string) => FolderItem | undefined
   findNoteById: (noteId: string) => NoteItem | undefined
   getPinnedNoteItems: () => NoteItem[]
+  getPinnedFolderItems: () => FolderItem[]
   getMainFolderItems: () => FolderItem[]
   getSubfolderItems: (folderId: string) => FolderItem[]
   getFolderNoteItems: (folderId: string) => NoteItem[]
   getFolderPathItems: (folderId: string) => FolderItem[]
   renameFolder: (folderId: string, name: string) => Promise<void>
+  toggleFolderPinned: (folderId: string) => Promise<void>
   updateNoteTitle: (noteId: string, title: string) => Promise<void>
   updateNoteContent: (noteId: string, content: string) => Promise<void>
   toggleNotePinned: (noteId: string) => Promise<void>

@@ -1,19 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { BottomNavigation } from '../components/BottomNavigation'
 import { CreateItemModal } from '../components/CreateItemModal'
-import { getAccessLabel } from '../data/mockData'
+import { FolderIcon, FOLDER_COLOR_CYCLE, IconPicker, READONLY_ICON } from '../components/FolderIcons'
+import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
 
 export function FolderPage() {
   const { id = '' } = useParams()
+  const navigate = useNavigate()
   const [isModalOpen, setModalOpen] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [isRenameMode, setRenameMode] = useState(false)
   const [isActionsMenuOpen, setActionsMenuOpen] = useState(false)
   const [renameValue, setRenameValue] = useState('')
+  const [showIconPicker, setShowIconPicker] = useState(false)
   const actionsMenuRef = useRef<HTMLDivElement>(null)
   const {
+    apiError,
+    currentUserId,
     findFolderById,
     getFolderPathItems,
     getFolderNoteItems,
@@ -23,21 +28,17 @@ export function FolderPage() {
     loadNotesForFolder,
     moveFolderToTrash,
     renameFolder,
+    toggleFolderPinned,
+    updateFolderIcon,
   } = useAppData()
 
   const folder = findFolderById(id)
+  const isOwner = Boolean(folder && (!folder.ownerId || (currentUserId && folder.ownerId === currentUserId)))
+  const isReadonly = folder?.access === 'readonly'
+  const canEdit = isOwner || !isReadonly // Owner kann immer bearbeiten; bei nicht-readonly kann jeder
   const path = folder ? getFolderPathItems(folder.id) : []
   const subfolders = folder ? getSubfolderItems(folder.id) : []
   const folderNotes = folder ? getFolderNoteItems(folder.id) : []
-  const rootFolderId = path[0]?.id
-  const activeNav =
-    rootFolderId === 'projects'
-      ? 'projects'
-      : rootFolderId === 'private-space'
-        ? 'private'
-        : rootFolderId === 'archive' || rootFolderId === 'read-only'
-          ? 'archive'
-          : 'team'
 
   useEffect(() => {
     if (!isActionsMenuOpen) return
@@ -66,16 +67,10 @@ export function FolderPage() {
 
   if (!folder) {
     return (
-      <main className="mx-auto min-h-screen w-full max-w-xl bg-slate-50 px-4 py-8 text-slate-900">
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-semibold">Ordner nicht gefunden</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Dieser Dummy-Ordner existiert nicht in der aktuellen UI-Shell.
-          </p>
-          <Link
-            to="/"
-            className="mt-4 inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm text-white"
-          >
+      <main className="mx-auto min-h-screen w-full max-w-xl bg-[var(--color-bg-app)] px-4 py-8">
+        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-6 shadow-sm">
+          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">Ordner nicht gefunden</h1>
+          <Link to="/" className="mt-4 inline-flex rounded-xl bg-blue-500 px-4 py-2 text-sm text-white">
             Zurück zum Dashboard
           </Link>
         </div>
@@ -100,41 +95,68 @@ export function FolderPage() {
 
   return (
     <>
-      <main className="mx-auto min-h-screen w-full max-w-xl bg-slate-50 px-4 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-5 text-slate-900">
-        <header className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <Link to="/" className="text-sm text-slate-500 hover:text-slate-700">
-                ← Zurück
-              </Link>
-              <h1 className="mt-2 text-2xl font-semibold">{folder.name}</h1>
-              <p className="mt-1 text-xs text-slate-500">
-                Bereich: {getAccessLabel(folder.access)}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative" ref={actionsMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setActionsMenuOpen((prev) => !prev)}
-                  className="h-11 min-w-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                  aria-label="Ordneraktionen öffnen"
-                >
-                  ...
-                </button>
+      <main className="mx-auto min-h-screen w-full max-w-xl bg-[var(--color-bg-app)] px-4 pb-24 pt-[calc(env(safe-area-inset-top)+1rem)]">
+        {/* Navigation Bar */}
+        <div className="flex items-center justify-between">
+          <Link to={path.length > 1 ? `/folder/${path[path.length - 2].id}` : '/'} className="text-sm font-medium text-blue-500">
+            ‹ Zurück
+          </Link>
+          <div className="flex items-center gap-2">
+            <div className="relative" ref={actionsMenuRef}>
+              <button
+                type="button"
+                onClick={() => setActionsMenuOpen((prev) => !prev)}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-text-muted)] transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
+                aria-label="Aktionen"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+                  <circle cx="12" cy="6" r="1.5" />
+                  <circle cx="12" cy="12" r="1.5" />
+                  <circle cx="12" cy="18" r="1.5" />
+                </svg>
+              </button>
 
-                {isActionsMenuOpen ? (
-                  <div className="absolute right-0 top-12 z-20 w-48 rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
+              {isActionsMenuOpen ? (
+                <div className="absolute right-0 top-12 z-20 w-52 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-1 shadow-xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void toggleFolderPinned(folder.id)
+                      setActionsMenuOpen(false)
+                      setFeedback(folder.pinned ? 'Fixierung gelöst.' : 'Ordner fixiert.')
+                    }}
+                    className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-700"
+                  >
+                    <span className="text-base">{folder.pinned ? '📌' : '📍'}</span>
+                    {folder.pinned ? 'Fixierung lösen' : 'Fixieren'}
+                  </button>
+                  {canEdit && !isReadonly ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowIconPicker(true)
+                        setActionsMenuOpen(false)
+                      }}
+                      className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-700"
+                    >
+                      <span className="text-base">🎨</span>
+                      Symbol ändern
+                    </button>
+                  ) : null}
+                  {canEdit ? (
                     <button
                       type="button"
                       onClick={() => {
                         startRename()
                         setActionsMenuOpen(false)
                       }}
-                      className="flex h-11 w-full items-center rounded-xl px-3 text-left text-sm text-slate-700 hover:bg-slate-100"
+                      className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-700"
                     >
+                      <span className="text-base">✏️</span>
                       Umbenennen
                     </button>
+                  ) : null}
+                  {isOwner ? (
                     <button
                       type="button"
                       onClick={async () => {
@@ -142,121 +164,230 @@ export function FolderPage() {
                         setActionsMenuOpen(false)
                         setFeedback('Ordner wurde in den Papierkorb verschoben.')
                       }}
-                      className="flex h-11 w-full items-center rounded-xl px-3 text-left text-sm text-rose-600 hover:bg-rose-50"
+                      className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20"
                     >
+                      <span className="text-base">🗑️</span>
                       In Papierkorb
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setActionsMenuOpen(false)}
-                      className="flex h-11 w-full items-center rounded-xl px-3 text-left text-sm text-slate-700 hover:bg-slate-100"
-                    >
-                      Abbrechen/Schließen
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
 
+            {canEdit ? (
               <button
                 type="button"
                 onClick={() => setModalOpen(true)}
-                className="h-11 w-11 rounded-2xl bg-slate-900 text-2xl leading-none text-white hover:bg-slate-800"
-                aria-label="Neues Element im Ordner"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500 text-lg font-medium text-white shadow-md shadow-blue-500/30 transition-transform active:scale-95"
+                aria-label="Neues Element"
               >
                 +
               </button>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Title */}
+        <div className="mt-4">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{folder.name}</h1>
+            {isReadonly ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0110 0v4" />
+                </svg>
+                Nur Lesen
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-0.5 text-sm text-[var(--color-text-muted)]">
+            {subfolders.length} Unterordner · {folderNotes.length} Notizen
+          </p>
+        </div>
+
+        {/* Rename */}
+        {isRenameMode ? (
+          <div className="mt-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 shadow-sm">
+            <p className="mb-2 text-xs font-medium text-[var(--color-text-muted)]">Ordner umbenennen</p>
+            <div className="flex items-center gap-2">
+              <input
+                value={renameValue}
+                onChange={(event) => setRenameValue(event.target.value)}
+                className="h-10 min-w-0 flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-app)] px-3 text-sm text-[var(--color-text-primary)] focus:border-blue-400 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={saveRename}
+                className="h-10 rounded-xl bg-blue-500 px-4 text-sm font-medium text-white"
+              >
+                OK
+              </button>
+              <button
+                type="button"
+                onClick={() => setRenameMode(false)}
+                className="h-10 rounded-xl border border-[var(--color-border)] px-3 text-sm text-[var(--color-text-secondary)]"
+              >
+                Abbrechen
+              </button>
             </div>
           </div>
+        ) : null}
 
-          {isRenameMode ? (
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="mb-2 text-xs font-medium text-slate-600">Ordner umbenennen</p>
-              <div className="flex items-center gap-2">
-                <input
-                  value={renameValue}
-                  onChange={(event) => setRenameValue(event.target.value)}
-                  className="h-11 min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={saveRename}
-                  className="h-11 rounded-xl bg-slate-900 px-4 text-sm font-medium text-white"
-                >
-                  Speichern
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRenameMode(false)}
-                  className="h-11 rounded-xl border border-slate-300 px-3 text-sm text-slate-700"
-                >
-                  Abbrechen
-                </button>
-              </div>
-            </div>
-          ) : null}
+        {/* Icon Picker */}
+        {showIconPicker ? (
+          <div className="mt-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 shadow-sm">
+            <p className="mb-3 text-xs font-medium text-[var(--color-text-muted)]">Symbol wählen</p>
+            <IconPicker
+              selected={folder.icon || 'folder'}
+              onSelect={async (icon) => {
+                await updateFolderIcon(folder.id, icon)
+                setShowIconPicker(false)
+                setFeedback('Symbol wurde geändert.')
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowIconPicker(false)}
+              className="mt-3 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+            >
+              Abbrechen
+            </button>
+          </div>
+        ) : null}
 
-          <nav className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <Link to="/" className="hover:text-slate-700">
-              Dashboard
-            </Link>
+        {/* Breadcrumb */}
+        {path.length > 1 ? (
+          <nav className="mt-3 flex flex-wrap items-center gap-1 text-xs text-[var(--color-text-muted)]">
+            <Link to="/" className="hover:text-blue-500">Start</Link>
             {path.map((entry, index) => (
-              <span key={entry.id} className="flex items-center gap-2">
+              <span key={entry.id} className="flex items-center gap-1">
                 <span>/</span>
                 {index === path.length - 1 ? (
-                  <span className="font-medium text-slate-700">{entry.name}</span>
+                  <span className="font-medium text-[var(--color-text-primary)]">{entry.name}</span>
                 ) : (
-                  <Link to={`/folder/${entry.id}`} className="hover:text-slate-700">
-                    {entry.name}
-                  </Link>
+                  <Link to={`/folder/${entry.id}`} className="hover:text-blue-500">{entry.name}</Link>
                 )}
               </span>
             ))}
           </nav>
-        </header>
+        ) : null}
+
+        {apiError ? (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+            {apiError}
+          </div>
+        ) : null}
 
         {feedback ? (
-          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
             {feedback}
           </div>
         ) : null}
 
-        <section className="mt-6">
-          <h2 className="mb-3 text-lg font-semibold">Subordner</h2>
-          {subfolders.length === 0 ? (
-            <EmptyState text="Noch keine Unterordner. Erstelle den ersten Unterordner über +." />
-          ) : (
-            <div className="space-y-2">
-              {subfolders.map((entry) => (
-                <Link
-                  key={entry.id}
-                  to={`/folder/${entry.id}`}
-                  className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
-                >
-                  <span className="font-medium text-slate-900">{entry.name}</span>
-                  <span className="text-xs text-slate-500">
-                    {getAccessLabel(entry.access)}
-                  </span>
-                </Link>
-              ))}
+        {/* Unterordner */}
+        {subfolders.length > 0 ? (
+          <section className="mt-6">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+              Unterordner
+            </h2>
+            <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-sm">
+              {subfolders.map((entry, index) => {
+                const isSubReadonly = entry.access === 'readonly'
+                const iconId = isSubReadonly ? READONLY_ICON : (entry.icon || 'folder')
+                const color = isSubReadonly
+                  ? { bg: 'bg-amber-100 dark:bg-amber-900/30', stroke: 'stroke-amber-600' }
+                  : FOLDER_COLOR_CYCLE[index % FOLDER_COLOR_CYCLE.length]
+                return (
+                  <Link
+                    key={entry.id}
+                    to={`/folder/${entry.id}`}
+                    className={`flex items-center gap-3 px-4 py-3 transition-colors active:bg-slate-100 dark:active:bg-slate-700 ${
+                      index > 0 ? 'border-t border-[var(--color-border)]' : ''
+                    }`}
+                  >
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${color.bg}`}>
+                      <FolderIcon icon={iconId} className={`h-4.5 w-4.5 ${color.stroke}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[var(--color-text-primary)]">{entry.name}</p>
+                    </div>
+                    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" strokeWidth="2" stroke="currentColor" strokeLinecap="round">
+                      <path d="M9 6l6 6-6 6" />
+                    </svg>
+                  </Link>
+                )
+              })}
             </div>
-          )}
-        </section>
+          </section>
+        ) : (
+          <section className="mt-6">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+              Unterordner
+            </h2>
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={() => setModalOpen(true)}
+                className="w-full rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-6 text-center text-sm text-[var(--color-text-muted)] transition-colors hover:border-blue-300 hover:text-blue-500"
+              >
+                Tippe hier, um einen Unterordner zu erstellen
+              </button>
+            ) : (
+              <p className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-6 text-center text-sm text-[var(--color-text-muted)]">
+                Keine Unterordner vorhanden.
+              </p>
+            )}
+          </section>
+        )}
 
-        <section className="mt-7">
-          <h2 className="mb-3 text-lg font-semibold">Notizen / Projekte</h2>
+        {/* Notizen */}
+        <section className="mt-6">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+            Notizen
+          </h2>
           {folderNotes.length === 0 ? (
-            <EmptyState text="Noch keine Notizen in diesem Ordner. Erstelle eine neue Notiz über +." />
+            canEdit ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  const created = await createNote(folder.id, 'Neue Notiz')
+                  if (created) {
+                    navigate(`/note/${created.id}`)
+                  }
+                }}
+                className="w-full rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-6 text-center text-sm text-[var(--color-text-muted)] transition-colors hover:border-blue-300 hover:text-blue-500"
+              >
+                Noch keine Notizen. Tippe hier, um eine zu erstellen.
+              </button>
+            ) : (
+              <p className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-6 text-center text-sm text-[var(--color-text-muted)]">
+                Noch keine Notizen vorhanden.
+              </p>
+            )
           ) : (
-            <div className="space-y-2">
-              {folderNotes.map((note) => (
+            <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-sm">
+              {folderNotes.map((note, index) => (
                 <Link
                   key={note.id}
                   to={`/note/${note.id}`}
-                  className="block rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+                  className={`block px-4 py-3 transition-colors active:bg-slate-100 dark:active:bg-slate-700 ${
+                    index > 0 ? 'border-t border-[var(--color-border)]' : ''
+                  }`}
                 >
-                  <p className="font-medium text-slate-900">{note.title}</p>
-                  <p className="mt-1 text-sm text-slate-600">{note.excerpt}</p>
-                  <p className="mt-2 text-xs text-slate-500">{note.updatedLabel}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[var(--color-text-primary)]">{note.title}</p>
+                      <p className="mt-0.5 line-clamp-1 text-xs text-[var(--color-text-secondary)]">{note.excerpt}</p>
+                    </div>
+                    <svg viewBox="0 0 24 24" fill="none" className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-text-muted)]" strokeWidth="2" stroke="currentColor" strokeLinecap="round">
+                      <path d="M9 6l6 6-6 6" />
+                    </svg>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <UserAvatar email={note.ownerId || undefined} size="sm" />
+                    <span className="text-[10px] text-[var(--color-text-muted)]">{note.updatedLabel}</span>
+                  </div>
                 </Link>
               ))}
             </div>
@@ -264,23 +395,26 @@ export function FolderPage() {
         </section>
       </main>
 
-      <BottomNavigation active={activeNav} />
+      <BottomNavigation />
 
       {isModalOpen ? (
         <CreateItemModal
           title="Im Ordner erstellen"
           options={['Unterordner', 'Notiz/Projekt']}
           onClose={() => setModalOpen(false)}
-          onSubmit={async ({ type, name }) => {
+          onSubmit={async ({ type, name, icon }) => {
             if (type === 'Notiz/Projekt') {
               const createdNote = await createNote(folder.id, name)
               if (createdNote) {
                 setFeedback(`Notiz "${createdNote.title}" wurde erstellt.`)
+              } else {
+                setFeedback('Notiz konnte nicht erstellt werden. Prüfe die Browser-Konsole für Details.')
               }
             } else {
               const createdFolder = await createFolder(name, {
                 parentId: folder.id,
                 access: folder.access,
+                icon,
               })
               if (createdFolder) {
                 setFeedback(`Ordner "${createdFolder.name}" wurde erstellt.`)
@@ -291,13 +425,5 @@ export function FolderPage() {
         />
       ) : null}
     </>
-  )
-}
-
-function EmptyState({ text }: { text: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
-      {text}
-    </div>
   )
 }

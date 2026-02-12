@@ -6,6 +6,8 @@ export interface FolderItem {
   parentId: string | null
   access: AccessType
   pinned: boolean
+  ownerId: string
+  icon?: string
 }
 
 export interface NoteItem {
@@ -16,23 +18,25 @@ export interface NoteItem {
   content: string
   updatedLabel: string
   pinned: boolean
+  ownerId: string
 }
 
 export const initialFolders: FolderItem[] = [
-  { id: 'team-hub', name: 'Team Hub', parentId: null, access: 'team', pinned: false },
-  { id: 'projects', name: 'Projekte', parentId: null, access: 'team', pinned: false },
-  { id: 'private-space', name: 'Privat', parentId: null, access: 'private', pinned: false },
-  { id: 'read-only', name: 'Read-only', parentId: null, access: 'readonly', pinned: false },
-  { id: 'archive', name: 'Archiv', parentId: null, access: 'readonly', pinned: false },
-  { id: 'roadmap', name: 'Roadmap 2026', parentId: 'projects', access: 'team', pinned: true },
-  { id: 'mobile', name: 'Mobile UX', parentId: 'projects', access: 'team', pinned: false },
-  { id: 'weekly', name: 'Weekly Notizen', parentId: 'team-hub', access: 'team', pinned: false },
+  { id: 'team-hub', name: 'Team Hub', parentId: null, access: 'team', pinned: false, ownerId: 'mock' },
+  { id: 'projects', name: 'Projekte', parentId: null, access: 'team', pinned: false, ownerId: 'mock' },
+  { id: 'private-space', name: 'Privat', parentId: null, access: 'private', pinned: false, ownerId: 'mock' },
+  { id: 'read-only', name: 'Read-only', parentId: null, access: 'readonly', pinned: false, ownerId: 'mock' },
+  { id: 'archive', name: 'Archiv', parentId: null, access: 'readonly', pinned: false, ownerId: 'mock' },
+  { id: 'roadmap', name: 'Roadmap 2026', parentId: 'projects', access: 'team', pinned: true, ownerId: 'mock' },
+  { id: 'mobile', name: 'Mobile UX', parentId: 'projects', access: 'team', pinned: false, ownerId: 'mock' },
+  { id: 'weekly', name: 'Weekly Notizen', parentId: 'team-hub', access: 'team', pinned: false, ownerId: 'mock' },
   {
     id: 'private-brainstorm',
     name: 'Brainstorm privat',
     parentId: 'private-space',
     access: 'private',
     pinned: false,
+    ownerId: 'mock',
   },
 ]
 
@@ -42,10 +46,10 @@ export const initialNotes: NoteItem[] = [
     folderId: 'projects',
     title: 'Kickoff – Team-Notizen',
     excerpt: 'Umfang der ersten Release-Phase und Timeline.',
-    content:
-      'Kickoff-Notiz mit Zielen, Scope und den ersten UI-Shell-Bausteinen.',
+    content: 'Kickoff-Notiz mit Zielen, Scope und den ersten UI-Shell-Bausteinen.',
     updatedLabel: 'vor 2 Std.',
     pinned: true,
+    ownerId: 'mock',
   },
   {
     id: 'note-ux',
@@ -55,6 +59,7 @@ export const initialNotes: NoteItem[] = [
     content: 'Checkliste für iOS-optimierte Bedienung in der PWA.',
     updatedLabel: 'gestern',
     pinned: true,
+    ownerId: 'mock',
   },
   {
     id: 'note-sync',
@@ -64,6 +69,7 @@ export const initialNotes: NoteItem[] = [
     content: 'Dummy-Notiz für spätere Zustände ohne Backend-Anbindung.',
     updatedLabel: 'vor 3 Tagen',
     pinned: false,
+    ownerId: 'mock',
   },
   {
     id: 'note-retro',
@@ -73,6 +79,7 @@ export const initialNotes: NoteItem[] = [
     content: 'Retro-Inhalte als Beispiel für die Ordneransicht.',
     updatedLabel: 'vor 5 Tagen',
     pinned: true,
+    ownerId: 'mock',
   },
   {
     id: 'note-private',
@@ -82,6 +89,7 @@ export const initialNotes: NoteItem[] = [
     content: 'Lokale Dummy-Inhalte ohne Persistenz.',
     updatedLabel: 'vor 1 Woche',
     pinned: false,
+    ownerId: 'mock',
   },
   {
     id: 'note-readonly',
@@ -91,6 +99,7 @@ export const initialNotes: NoteItem[] = [
     content: 'Read-only Demo-Inhalt.',
     updatedLabel: 'vor 8 Tagen',
     pinned: true,
+    ownerId: 'mock',
   },
 ]
 
@@ -111,6 +120,10 @@ export function getNoteById(notes: NoteItem[], noteId: string) {
 
 export function getPinnedNotes(notes: NoteItem[]) {
   return notes.filter((note) => note.pinned).slice(0, 4)
+}
+
+export function getPinnedFolders(folders: FolderItem[]) {
+  return folders.filter((folder) => folder.pinned)
 }
 
 export function getMainFolders(folders: FolderItem[]) {
