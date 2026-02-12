@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { SidebarLayout } from '../components/SidebarLayout'
 import { CreateItemModal } from '../components/CreateItemModal'
@@ -17,6 +17,7 @@ export function FolderPage() {
   const [renameValue, setRenameValue] = useState('')
   const [showIconPicker, setShowIconPicker] = useState(false)
   const [moveNoteTarget, setMoveNoteTarget] = useState<{ id: string; title: string; folderId: string } | null>(null)
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
   const actionsMenuRef = useRef<HTMLDivElement>(null)
   const {
     apiError,
@@ -28,6 +29,7 @@ export function FolderPage() {
     createFolder,
     createNote,
     loadNotesForFolder,
+    moveNoteToFolder,
     moveFolderToTrash,
     renameFolder,
     toggleFolderPinned,
@@ -300,13 +302,30 @@ export function FolderPage() {
                 const color = isSubReadonly
                   ? { bg: 'bg-amber-100 dark:bg-amber-900/30', stroke: 'stroke-amber-600' }
                   : FOLDER_COLOR_CYCLE[index % FOLDER_COLOR_CYCLE.length]
+                const isDragOver = dragOverFolderId === entry.id
                 return (
                   <Link
                     key={entry.id}
                     to={`/folder/${entry.id}`}
                     className={`flex items-center gap-3 px-4 py-3 transition-colors active:bg-slate-100 dark:active:bg-slate-700 ${
                       index > 0 ? 'border-t border-[var(--color-border)]' : ''
-                    }`}
+                    } ${isDragOver ? 'ring-2 ring-inset ring-blue-400 bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                    onDragOver={(e: DragEvent) => {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = 'move'
+                      setDragOverFolderId(entry.id)
+                    }}
+                    onDragLeave={() => setDragOverFolderId(null)}
+                    onDrop={(e: DragEvent) => {
+                      e.preventDefault()
+                      setDragOverFolderId(null)
+                      const noteId = e.dataTransfer.getData('text/note-id')
+                      if (noteId) {
+                        void moveNoteToFolder(noteId, entry.id).then(() => {
+                          setFeedback(`Notiz wurde nach „${entry.name}" verschoben.`)
+                        })
+                      }
+                    }}
                   >
                     <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${color.bg}`}>
                       <FolderIcon icon={iconId} className={`h-4.5 w-4.5 ${color.stroke}`} />
@@ -372,7 +391,12 @@ export function FolderPage() {
               {folderNotes.map((note, index) => (
                 <div
                   key={note.id}
-                  className={`flex items-center gap-0 ${
+                  draggable
+                  onDragStart={(e: DragEvent<HTMLDivElement>) => {
+                    e.dataTransfer.setData('text/note-id', note.id)
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
+                  className={`flex cursor-grab items-center gap-0 active:cursor-grabbing ${
                     index > 0 ? 'border-t border-[var(--color-border)]' : ''
                   }`}
                 >

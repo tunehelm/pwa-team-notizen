@@ -8,15 +8,20 @@
 }
 
 :root {
-  --color-bg-app: #f0f4f8;
-  --color-bg-card: #ffffff;
-  --color-bg-nav: rgba(255, 255, 255, 0.92);
+  --color-bg-app: #e8ecf1;
+  --color-bg-card: #f3f5f8;
+  --color-bg-nav: rgba(243, 245, 248, 0.92);
   --color-text-primary: #1e293b;
   --color-text-secondary: #64748b;
   --color-text-muted: #94a3b8;
-  --color-border: #e2e8f0;
+  --color-border: #d5dbe3;
   --color-accent: #3b82f6;
   --color-accent-soft: #dbeafe;
+  --color-sidebar: #2c3444;
+  --color-sidebar-hover: #363f50;
+  --color-sidebar-border: rgba(100, 116, 139, 0.35);
+  --color-sidebar-text: #e2e8f0;
+  --color-sidebar-text-muted: #94a3b8;
   color-scheme: light;
 }
 
@@ -31,6 +36,11 @@
     --color-border: #334155;
     --color-accent: #60a5fa;
     --color-accent-soft: #1e3a5f;
+    --color-sidebar: #0f172a;
+    --color-sidebar-hover: #1e293b;
+    --color-sidebar-border: rgba(51, 65, 85, 0.6);
+    --color-sidebar-text: #e2e8f0;
+    --color-sidebar-text-muted: #64748b;
     color-scheme: dark;
   }
 }
@@ -45,6 +55,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Sidebar link hover */
+.sidebar-link:hover {
+  background-color: var(--color-sidebar-hover);
 }
 
 /* Hide scrollbar for horizontal scroll containers */

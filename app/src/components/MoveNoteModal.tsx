@@ -15,7 +15,16 @@ export function MoveNoteModal({ noteId, noteTitle, currentFolderId, onClose, onM
   const { folders, moveNoteToFolder } = useAppData()
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const [moving, setMoving] = useState(false)
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  // Standardmäßig alle Ordner ausklappen, die Kinder haben
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
+    const ids = new Set<string>()
+    for (const f of folders) {
+      if (folders.some((c) => c.parentId === f.id)) {
+        ids.add(f.id)
+      }
+    }
+    return ids
+  })
 
   // Alle Root-Ordner
   const rootFolders = folders.filter((f) => !f.parentId)
