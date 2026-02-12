@@ -10,6 +10,22 @@ import { TeamHubPage } from "./pages/TeamHubPage";
 import { AppDataProvider } from "./state/AppDataContext";
 import { supabase } from "./lib/supabase";
 
+/** Prüft ob ein eingeloggter User noch kein Passwort gesetzt hat (Invite-User) */
+function needsPasswordSetup(session: Session | null): boolean {
+  if (!session?.user) return false;
+  // Wenn der User bereits ein Passwort gesetzt hat, steht das in den Metadaten
+  if (session.user.user_metadata?.password_set) return false;
+  // Invite-User haben oft kein confirmed_at oder es ist sehr nah am created_at
+  // Sicherste Prüfung: Hat der User das password_set Flag NICHT?
+  // Wir setzen dieses Flag beim ersten Passwort-Setzen
+  const createdAt = new Date(session.user.created_at).getTime();
+  const lastSignIn = session.user.last_sign_in_at ? new Date(session.user.last_sign_in_at).getTime() : createdAt;
+  // Wenn der User sich zum ersten Mal einloggt (weniger als 2 Min seit Erstellung)
+  // und noch kein password_set Flag hat → Passwort setzen
+  const isFirstLogin = Math.abs(lastSignIn - createdAt) < 120_000;
+  return isFirstLogin && !session.user.user_metadata?.password_set;
+}
+
 function App() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
@@ -21,7 +37,7 @@ function App() {
 
     // Prüfe ob ein Invite- oder Recovery-Token im URL-Hash liegt
     const hash = window.location.hash;
-    const isInviteHash = hash.includes('type=invite') || hash.includes('type=signup');
+    const isInviteHash = hash.includes('type=invite') || hash.includes('type=signup') || hash.includes('type=magiclink');
     const isRecoveryHash = hash.includes('type=recovery');
 
     const init = async () => {
@@ -29,13 +45,14 @@ function App() {
       if (!isMounted) return;
 
       if (error) console.error(error);
-      setSession(data.session ?? null);
+      const sess = data.session ?? null;
+      setSession(sess);
 
       // Invite-User: Passwort setzen erzwingen
-      if (isInviteHash && data.session) {
+      if (sess && (isInviteHash || needsPasswordSetup(sess))) {
         setIsInviteMode(true);
       }
-      if (isRecoveryHash && data.session) {
+      if (isRecoveryHash && sess) {
         setIsRecoveryMode(true);
       }
 
@@ -50,7 +67,7 @@ function App() {
         setIsRecoveryMode(true);
       }
       // Invite-Event abfangen
-      if (event === "SIGNED_IN" && (isInviteHash)) {
+      if (event === "SIGNED_IN" && newSession && (isInviteHash || needsPasswordSetup(newSession))) {
         setIsInviteMode(true);
       }
     });
@@ -277,7 +294,10 @@ function SetNewPasswordPage({ onDone, title, subtitle, buttonLabel }: {
     try {
       setSubmitting(true);
       setMessage(null);
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+        data: { password_set: true },
+      });
       if (error) {
         setMessage({ type: "error", text: `Fehler: ${error.message}` });
         return;

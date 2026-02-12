@@ -57,12 +57,12 @@ export function SidebarLayout({ children, title, showCreate = true }: SidebarLay
       {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top Header Bar */}
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 pt-[env(safe-area-inset-top)]">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-slate-700/60 bg-slate-900 px-4 pt-[env(safe-area-inset-top)]">
           {/* Sidebar Toggle */}
           <button
             type="button"
             onClick={() => setSidebarOpen((v) => !v)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-700"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-700"
             aria-label="Sidebar"
           >
             {/* Mobile: Hamburger Icon | Desktop: Sidebar Panel Icon */}
@@ -76,7 +76,7 @@ export function SidebarLayout({ children, title, showCreate = true }: SidebarLay
           </button>
 
           {/* Title */}
-          <h1 className="min-w-0 flex-1 truncate text-lg font-semibold text-[var(--color-text-primary)]">
+          <h1 className="min-w-0 flex-1 truncate text-lg font-semibold text-slate-100">
             {title || 'Dashboard'}
           </h1>
 
@@ -88,12 +88,12 @@ export function SidebarLayout({ children, title, showCreate = true }: SidebarLay
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Suchen…"
-                className="h-8 w-44 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-app)] px-3 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-blue-400 focus:outline-none"
+                className="h-8 w-44 rounded-lg border border-slate-600 bg-slate-800 px-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-400 focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => { setShowSearch(false); setSearchQuery('') }}
-                className="text-xs text-[var(--color-text-muted)]"
+                className="text-xs text-slate-400"
               >
                 Abbrechen
               </button>
@@ -104,7 +104,7 @@ export function SidebarLayout({ children, title, showCreate = true }: SidebarLay
               <button
                 type="button"
                 onClick={() => setShowSearch(true)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-700"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-700"
                 aria-label="Suche"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4.5 w-4.5">

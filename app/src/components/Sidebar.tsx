@@ -39,8 +39,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Sidebar Container */}
       <aside
         className={[
-          // Basis
-          'flex h-full w-64 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-bg-card)] transition-all duration-300',
+          // Basis – immer dunkler Look
+          'flex h-full w-64 shrink-0 flex-col border-r border-slate-700/60 bg-slate-900 text-slate-200 transition-all duration-300',
           // Mobile: Fixed Overlay
           'fixed left-0 top-0 z-40 pt-[env(safe-area-inset-top)]',
           // Desktop: Static, im Flex-Layout
@@ -50,19 +50,19 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         ].join(' ')}
       >
         {/* User Header */}
-        <div className="flex items-center gap-3 border-b border-[var(--color-border)] px-4 py-4">
+        <div className="flex items-center gap-3 border-b border-slate-700/60 px-4 py-4">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-sm font-semibold text-white">
             {userName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">{userName}</p>
-            <p className="truncate text-[10px] text-[var(--color-text-muted)]">{currentUserEmail}</p>
+            <p className="truncate text-sm font-semibold text-slate-100">{userName}</p>
+            <p className="truncate text-[10px] text-slate-400">{currentUserEmail}</p>
           </div>
           {/* Sidebar schließen (nur mobile) */}
           <button
             type="button"
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-muted)] hover:bg-slate-200 dark:hover:bg-slate-700 lg:hidden"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-700 lg:hidden"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
               <path d="M18 6L6 18M6 6l12 12" />
@@ -75,14 +75,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           {/* Fixierte Ordner */}
           {pinnedFolders.length > 0 ? (
             <div className="mb-4">
-              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                 Fixiert
               </p>
               {pinnedFolders.map((folder, idx) => {
                 const isRo = folder.access === 'readonly'
                 const iconId = isRo ? READONLY_ICON : (folder.icon || 'folder')
                 const color = isRo
-                  ? { bg: 'bg-amber-100 dark:bg-amber-900/30', stroke: 'stroke-amber-600' }
+                  ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
                   : FOLDER_COLOR_CYCLE[idx % FOLDER_COLOR_CYCLE.length]
                 const isActive = activeFolderId === folder.id
                 return (
@@ -93,7 +93,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     className={`flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm transition-colors ${
                       isActive
                         ? 'bg-blue-500 text-white font-medium'
-                        : 'text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-700'
+                        : 'text-slate-200 hover:bg-slate-800'
                     }`}
                   >
                     <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${isActive ? 'bg-white/20' : color.bg}`}>
@@ -108,14 +108,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
           {/* Alle Ordner */}
           <div>
-            <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+            <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
               Bereiche
             </p>
             {rootFolders.map((folder, idx) => {
               const isRo = folder.access === 'readonly'
               const iconId = isRo ? READONLY_ICON : (folder.icon || 'folder')
               const color = isRo
-                ? { bg: 'bg-amber-100 dark:bg-amber-900/30', stroke: 'stroke-amber-600' }
+                ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
                 : FOLDER_COLOR_CYCLE[idx % FOLDER_COLOR_CYCLE.length]
               const isActive = activeFolderId === folder.id
               return (
@@ -126,7 +126,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   className={`flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm transition-colors ${
                     isActive
                       ? 'bg-blue-500 text-white font-medium'
-                      : 'text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-700'
+                      : 'text-slate-200 hover:bg-slate-800'
                   }`}
                 >
                   <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${isActive ? 'bg-white/20' : color.bg}`}>
@@ -134,7 +134,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   </div>
                   <span className="truncate">{folder.name}</span>
                   {isRo ? (
-                    <span className="ml-auto rounded-full bg-amber-100 px-1.5 py-0.5 text-[8px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    <span className="ml-auto rounded-full bg-amber-900/30 px-1.5 py-0.5 text-[8px] font-semibold text-amber-400">
                       Nur Lesen
                     </span>
                   ) : null}
@@ -142,20 +142,20 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               )
             })}
             {rootFolders.length === 0 ? (
-              <p className="px-2 py-3 text-xs text-[var(--color-text-muted)]">Keine Ordner vorhanden</p>
+              <p className="px-2 py-3 text-xs text-slate-500">Keine Ordner vorhanden</p>
             ) : null}
           </div>
         </nav>
 
         {/* Bottom Nav Links */}
-        <div className="border-t border-[var(--color-border)] px-2 py-2">
+        <div className="border-t border-slate-700/60 px-2 py-2">
           <Link
             to="/"
             onClick={onClose}
             className={`flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm transition-colors ${
               location.pathname === '/'
-                ? 'bg-blue-50 text-blue-600 font-medium dark:bg-blue-900/30 dark:text-blue-400'
-                : 'text-[var(--color-text-muted)] hover:bg-slate-100 dark:hover:bg-slate-700'
+                ? 'bg-blue-900/40 text-blue-400 font-medium'
+                : 'text-slate-400 hover:bg-slate-800'
             }`}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
@@ -168,8 +168,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             onClick={onClose}
             className={`flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm transition-colors ${
               location.pathname === '/private'
-                ? 'bg-blue-50 text-blue-600 font-medium dark:bg-blue-900/30 dark:text-blue-400'
-                : 'text-[var(--color-text-muted)] hover:bg-slate-100 dark:hover:bg-slate-700'
+                ? 'bg-blue-900/40 text-blue-400 font-medium'
+                : 'text-slate-400 hover:bg-slate-800'
             }`}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
@@ -182,8 +182,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             onClick={onClose}
             className={`flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm transition-colors ${
               location.pathname === '/team'
-                ? 'bg-blue-50 text-blue-600 font-medium dark:bg-blue-900/30 dark:text-blue-400'
-                : 'text-[var(--color-text-muted)] hover:bg-slate-100 dark:hover:bg-slate-700'
+                ? 'bg-blue-900/40 text-blue-400 font-medium'
+                : 'text-slate-400 hover:bg-slate-800'
             }`}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
