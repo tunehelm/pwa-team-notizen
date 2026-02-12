@@ -779,19 +779,17 @@ function NoteEditor({
                   </svg>
                   Herunterladen
                 </button>
-                {isOwner ? (
-                  <button
-                    type="button"
-                    onClick={() => { onDeleteNote(); setNoteMenuOpen(false) }}
-                    className="mt-1 flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                      <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
-                      <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                    </svg>
-                    In Papierkorb
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  onClick={() => { onDeleteNote(); setNoteMenuOpen(false) }}
+                  className="mt-1 flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+                    <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                  </svg>
+                  In Papierkorb
+                </button>
               </div>
             ) : null}
           </div>
