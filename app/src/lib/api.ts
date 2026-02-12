@@ -376,29 +376,45 @@ export async function deleteFolderToTrash(folderId: string): Promise<TrashFolder
   const deletedAt = new Date().toISOString()
   const currentUserId = await requireUserId()
 
-  // Recursively collect all descendant folder IDs (children, grandchildren, etc.)
-  async function collectDescendantFolderIds(parentId: string): Promise<string[]> {
+  // Recursively collect all descendant folders (depth-first, deepest first)
+  async function collectDescendants(parentId: string): Promise<FolderRow[]> {
     const { data: children, error } = await supabase
       .from('folders')
-      .select('id')
+      .select(FOLDER_COLUMNS)
       .eq('parent_id', parentId)
-    if (error) throw error
-    const childIds = ((children ?? []) as Array<{ id: string }>).map((c) => c.id)
-    const grandChildIds: string[] = []
-    for (const childId of childIds) {
-      const descendants = await collectDescendantFolderIds(childId)
-      grandChildIds.push(...descendants)
+    if (error) {
+      // Fallback without icon column
+      const { data: fb, error: fbErr } = await supabase
+        .from('folders')
+        .select(FOLDER_COLUMNS_FALLBACK)
+        .eq('parent_id', parentId)
+      if (fbErr) throw fbErr
+      const rows = (fb ?? []) as FolderRow[]
+      const result: FolderRow[] = []
+      for (const row of rows) {
+        const deeper = await collectDescendants(row.id)
+        result.push(...deeper) // grandchildren first
+        result.push(row) // then the child
+      }
+      return result
     }
-    return [...childIds, ...grandChildIds]
+    const rows = (children ?? []) as FolderRow[]
+    const result: FolderRow[] = []
+    for (const row of rows) {
+      const deeper = await collectDescendants(row.id)
+      result.push(...deeper) // grandchildren first
+      result.push(row) // then the child
+    }
+    return result
   }
 
-  const descendantIds = await collectDescendantFolderIds(folderId)
-  // All folder IDs to process: descendants first (deepest last), then the main folder
-  const allFolderIds = [...descendantIds, folderId]
+  // Descendants ordered deepest-first, then the main folder last
+  const descendants = await collectDescendants(folderId)
+  const allFolders: FolderRow[] = [...descendants, sourceFolder]
+  const allFolderIds = allFolders.map((f) => f.id)
 
-  // For each folder: trash its notes, then trash the folder itself
+  // Step 1: Trash all notes from all affected folders
   for (const fId of allFolderIds) {
-    // Fetch & trash notes in this folder
     const { data: notesInFolder, error: notesFetchError } = await supabase
       .from('notes')
       .select(NOTE_COLUMNS)
@@ -430,29 +446,28 @@ export async function deleteFolderToTrash(folderId: string): Promise<TrashFolder
     // Delete notes from original table
     const { error: deleteNotesError } = await supabase.from('notes').delete().eq('folder_id', fId)
     if (deleteNotesError) throw deleteNotesError
-
-    // Trash the folder itself (only for main folder – subfolders just get trashed too)
-    if (fId === folderId) {
-      await upsertTrashFolder(sourceFolder, deletedAt)
-    } else {
-      // Fetch subfolder data and trash it
-      const { data: subFolder } = await supabase.from('folders').select(FOLDER_COLUMNS).eq('id', fId).single()
-      if (subFolder) {
-        await upsertTrashFolder(subFolder as FolderRow, deletedAt)
-      }
-    }
   }
 
-  // Delete all folders from original table – children first, then parent
-  // Reverse so deepest children are deleted first
-  const deleteOrder = [...descendantIds].reverse()
-  for (const dId of deleteOrder) {
-    const { error } = await supabase.from('folders').delete().eq('id', dId)
+  // Step 2: Trash all folders (order doesn't matter for inserts)
+  for (const f of allFolders) {
+    await upsertTrashFolder(f, deletedAt)
+  }
+
+  // Step 3: Remove parent_id references first so FK constraints don't block deletion
+  if (descendants.length > 0) {
+    const descIds = descendants.map((d) => d.id)
+    const { error: nullifyError } = await supabase
+      .from('folders')
+      .update({ parent_id: null })
+      .in('id', descIds)
+    if (nullifyError) console.warn('[deleteFolderToTrash] nullify parent_id failed:', nullifyError)
+  }
+
+  // Step 4: Delete all folders (deepest first, main folder last)
+  for (const f of allFolders) {
+    const { error } = await supabase.from('folders').delete().eq('id', f.id)
     if (error) throw error
   }
-  // Finally delete the main folder
-  const { error: deleteFolderError } = await supabase.from('folders').delete().eq('id', folderId)
-  if (deleteFolderError) throw deleteFolderError
 
   return mapTrashFolderRow({
     ...sourceFolder,
