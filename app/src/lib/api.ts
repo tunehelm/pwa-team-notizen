@@ -513,6 +513,18 @@ export async function updateNote(
   return mapNoteRow(data as NoteRow)
 }
 
+export async function moveNoteToFolder(noteId: string, targetFolderId: string): Promise<NoteItem> {
+  const { data, error } = await supabase
+    .from('notes')
+    .update({ folder_id: targetFolderId })
+    .eq('id', noteId)
+    .select(NOTE_COLUMNS)
+    .single()
+
+  if (error) throw error
+  return mapNoteRow(data as NoteRow)
+}
+
 export async function deleteNoteToTrash(noteId: string): Promise<TrashNoteItem> {
   const { data, error } = await supabase.from('notes').select(NOTE_COLUMNS).eq('id', noteId).single()
   if (error) throw error

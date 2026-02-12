@@ -1,15 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BottomNavigation } from '../components/BottomNavigation'
-import { CreateItemModal } from '../components/CreateItemModal'
+import { SidebarLayout } from '../components/SidebarLayout'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
 import { supabase } from '../lib/supabase'
 import { FolderIcon, FOLDER_COLOR_CYCLE, READONLY_ICON } from '../components/FolderIcons'
 
 export function DashboardPage() {
-  const [isModalOpen, setModalOpen] = useState(false)
-  const [feedback, setFeedback] = useState('')
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [isEditingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
@@ -19,8 +16,6 @@ export function DashboardPage() {
     currentUserEmail,
     currentUserName,
     notes,
-    createFolder,
-    createNote,
     getMainFolderItems,
     getPinnedFolderItems,
     getPinnedNoteItems,
@@ -52,102 +47,81 @@ export function DashboardPage() {
   const hasPinned = pinnedFolders.length > 0 || pinnedNotes.length > 0
 
   return (
-    <>
-      <main className="mx-auto min-h-screen w-full max-w-xl bg-[var(--color-bg-app)] px-4 pb-24 pt-[calc(env(safe-area-inset-top)+1.5rem)]">
-        {/* Header – wie Mockup: "Guten Tag, Thomas" + Avatar */}
-        <header className="flex items-center justify-between">
+    <SidebarLayout title={`Hallo, ${userName ? userName.split(' ')[0] : 'Team'}`}>
+      <div className="mx-auto max-w-3xl px-4 py-6">
+        {/* User Menu */}
+        <div className="mb-6 flex items-center justify-between">
           <div>
-            <p className="text-xs text-[var(--color-text-muted)]">Guten Tag,</p>
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-              {userName
-                ? userName.split(' ')[0]
-                : userEmail
-                  ? userEmail.split('@')[0].charAt(0).toUpperCase() + userEmail.split('@')[0].slice(1)
-                  : 'Team'}
-            </h1>
+            <p className="text-xs text-[var(--color-text-muted)]">Willkommen zurück</p>
+            <p className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {userName || userEmail}
+            </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="relative">
             <button
               type="button"
-              onClick={() => setModalOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-xl font-medium text-white shadow-md shadow-blue-500/30 transition-transform active:scale-95"
-              aria-label="Neues Element"
+              onClick={() => setShowUserMenu((v) => !v)}
+              className="transition-transform active:scale-95"
             >
-              +
+              <UserAvatar email={userEmail} name={userName} size="lg" />
             </button>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowUserMenu((v) => !v)}
-                className="transition-transform active:scale-95"
-              >
-                <UserAvatar email={userEmail} name={userName} size="lg" />
-              </button>
-              {showUserMenu ? (
-                <div className="absolute right-0 top-14 z-50 w-64 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-1 shadow-xl">
-                  <p className="truncate px-3 py-2 text-xs text-[var(--color-text-muted)]">
-                    {userEmail}
+            {showUserMenu ? (
+              <div className="absolute right-0 top-14 z-50 w-64 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-1 shadow-xl">
+                <p className="truncate px-3 py-2 text-xs text-[var(--color-text-muted)]">
+                  {userEmail}
+                </p>
+                {userName ? (
+                  <p className="truncate px-3 pb-1 text-sm font-medium text-[var(--color-text-primary)]">
+                    {userName}
                   </p>
-                  {userName ? (
-                    <p className="truncate px-3 pb-1 text-sm font-medium text-[var(--color-text-primary)]">
-                      {userName}
-                    </p>
-                  ) : null}
-                  {isEditingName ? (
-                    <form
-                      className="flex gap-1.5 px-2 py-1.5"
-                      onSubmit={async (e) => {
-                        e.preventDefault()
-                        const trimmed = nameInput.trim()
-                        if (!trimmed) return
-                        await supabase.auth.updateUser({ data: { display_name: trimmed } })
-                        // Reload to pick up new name
-                        window.location.reload()
-                      }}
-                    >
-                      <input
-                        type="text"
-                        value={nameInput}
-                        onChange={(e) => setNameInput(e.target.value)}
-                        placeholder="Vor- und Nachname"
-                        className="h-9 flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-app)] px-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-blue-400 focus:outline-none"
-                        autoFocus
-                      />
-                      <button type="submit" className="h-9 rounded-lg bg-blue-500 px-3 text-xs font-medium text-white active:bg-blue-600">
-                        OK
-                      </button>
-                    </form>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => { setNameInput(userName); setEditingName(true) }}
-                      className="flex h-10 w-full items-center rounded-xl px-3 text-left text-sm text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-700"
-                    >
-                      {userName ? 'Name ändern' : 'Name eingeben'}
+                ) : null}
+                {isEditingName ? (
+                  <form
+                    className="flex gap-1.5 px-2 py-1.5"
+                    onSubmit={async (e) => {
+                      e.preventDefault()
+                      const trimmed = nameInput.trim()
+                      if (!trimmed) return
+                      await supabase.auth.updateUser({ data: { display_name: trimmed } })
+                      window.location.reload()
+                    }}
+                  >
+                    <input
+                      type="text"
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
+                      placeholder="Vor- und Nachname"
+                      className="h-9 flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-app)] px-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-blue-400 focus:outline-none"
+                      autoFocus
+                    />
+                    <button type="submit" className="h-9 rounded-lg bg-blue-500 px-3 text-xs font-medium text-white active:bg-blue-600">
+                      OK
                     </button>
-                  )}
+                  </form>
+                ) : (
                   <button
                     type="button"
-                    onClick={() => void handleSignOut()}
-                    className="flex h-10 w-full items-center rounded-xl px-3 text-left text-sm text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                    onClick={() => { setNameInput(userName); setEditingName(true) }}
+                    className="flex h-10 w-full items-center rounded-xl px-3 text-left text-sm text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-700"
                   >
-                    Abmelden
+                    {userName ? 'Name ändern' : 'Name eingeben'}
                   </button>
-                </div>
-              ) : null}
-            </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void handleSignOut()}
+                  className="flex h-10 w-full items-center rounded-xl px-3 text-left text-sm text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                >
+                  Abmelden
+                </button>
+              </div>
+            ) : null}
           </div>
-        </header>
+        </div>
 
         {apiError ? (
           <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
             {apiError}
-          </div>
-        ) : null}
-
-        {feedback ? (
-          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-            {feedback}
           </div>
         ) : null}
 
@@ -213,13 +187,9 @@ export function DashboardPage() {
             Bereiche
           </h2>
           {rootFolders.length === 0 ? (
-            <button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              className="w-full cursor-pointer rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-8 text-center text-sm text-[var(--color-text-muted)] transition-colors hover:border-blue-300 hover:text-blue-500"
-            >
-              Noch keine Ordner. Tippe hier, um den ersten zu erstellen.
-            </button>
+            <p className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-8 text-center text-sm text-[var(--color-text-muted)]">
+              Noch keine Ordner. Nutze das + oben rechts, um einen zu erstellen.
+            </p>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-sm">
               {rootFolders.map((folder, index) => {
@@ -293,44 +263,7 @@ export function DashboardPage() {
             </div>
           </section>
         ) : null}
-      </main>
-
-      <BottomNavigation active="start" />
-
-      {isModalOpen ? (
-        <CreateItemModal
-          title="Neu erstellen"
-          options={['Ordner', 'Nur-Lesen Ordner', 'Notiz/Projekt']}
-          onClose={() => setModalOpen(false)}
-          onSubmit={async ({ type, name, icon }) => {
-            if (type === 'Ordner') {
-              const createdFolder = await createFolder(name, { icon })
-              if (createdFolder) {
-                setFeedback(`Ordner "${createdFolder.name}" wurde erstellt.`)
-              }
-            } else if (type === 'Nur-Lesen Ordner') {
-              const createdFolder = await createFolder(name, { access: 'readonly' })
-              if (createdFolder) {
-                setFeedback(`Nur-Lesen Ordner "${createdFolder.name}" wurde erstellt. Nur du kannst Inhalte hinzufügen.`)
-              }
-            } else {
-              const targetFolder = rootFolders[0]
-              if (!targetFolder) {
-                setFeedback('Lege zuerst einen Ordner an, damit eine Notiz erstellt werden kann.')
-                setModalOpen(false)
-                return
-              }
-
-              const createdNote = await createNote(targetFolder.id, name)
-              if (createdNote) {
-                setFeedback(`Notiz "${createdNote.title}" wurde in "${targetFolder.name}" erstellt.`)
-              }
-            }
-
-            setModalOpen(false)
-          }}
-        />
-      ) : null}
-    </>
+      </div>
+    </SidebarLayout>
   )
 }

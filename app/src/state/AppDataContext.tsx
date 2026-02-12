@@ -9,6 +9,7 @@ import {
   fetchTrashFolders,
   fetchTrashNotes,
   moveFolderToParent as moveFolderToParentApi,
+  moveNoteToFolder as moveNoteToFolderApi,
   renameFolder as renameFolderApi,
   restoreFolderFromTrash as restoreFolderFromTrashApi,
   restoreNoteFromTrash as restoreNoteFromTrashApi,
@@ -361,6 +362,22 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
           setNotes(previousNotes)
           setTrash(previousTrash)
           showApiError('Ordner konnte nicht in den Papierkorb verschoben werden.', error)
+        }
+      },
+      moveNoteToFolder: async (noteId, targetFolderId) => {
+        const previous = notes
+        setNotes((prev) =>
+          prev.map((note) =>
+            note.id === noteId ? { ...note, folderId: targetFolderId } : note,
+          ),
+        )
+
+        try {
+          const updated = await moveNoteToFolderApi(noteId, targetFolderId)
+          setNotes((prev) => prev.map((note) => (note.id === noteId ? updated : note)))
+        } catch (error) {
+          setNotes(previous)
+          showApiError('Notiz konnte nicht verschoben werden.', error)
         }
       },
       moveNoteToTrash: async (noteId) => {

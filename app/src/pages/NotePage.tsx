@@ -10,11 +10,13 @@ import {
 } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { type NoteItem } from '../data/mockData'
+import { MoveNoteModal } from '../components/MoveNoteModal'
 import { useAppData } from '../state/useAppData'
 
 export function NotePage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const [showMoveModal, setShowMoveModal] = useState(false)
   const {
     currentUserId,
     findNoteById,
@@ -34,30 +36,42 @@ export function NotePage() {
   const backPath = note?.folderId ? `/folder/${note.folderId}` : '/'
 
   return (
-    <NoteEditor
-      key={id || 'new'}
-      note={note}
-      isOwner={isOwner}
-      readOnly={isReadonly}
-      backPath={backPath}
-      onTitleChange={(title) => {
-        if (!note || isReadonly) return
-        updateNoteTitle(note.id, title)
-      }}
-      onContentChange={(content) => {
-        if (!note || isReadonly) return
-        updateNoteContent(note.id, content)
-      }}
-      isPinned={Boolean(note?.pinned)}
-      onTogglePinned={() => {
-        if (!note) return
-        void toggleNotePinned(note.id)
-      }}
-      onDeleteNote={() => {
-        if (!note) return
-        void moveNoteToTrash(note.id).then(() => navigate(backPath))
-      }}
-    />
+    <>
+      <NoteEditor
+        key={id || 'new'}
+        note={note}
+        isOwner={isOwner}
+        readOnly={isReadonly}
+        backPath={backPath}
+        onTitleChange={(title) => {
+          if (!note || isReadonly) return
+          updateNoteTitle(note.id, title)
+        }}
+        onContentChange={(content) => {
+          if (!note || isReadonly) return
+          updateNoteContent(note.id, content)
+        }}
+        isPinned={Boolean(note?.pinned)}
+        onTogglePinned={() => {
+          if (!note) return
+          void toggleNotePinned(note.id)
+        }}
+        onDeleteNote={() => {
+          if (!note) return
+          void moveNoteToTrash(note.id).then(() => navigate(backPath))
+        }}
+        onMoveNote={() => setShowMoveModal(true)}
+      />
+      {showMoveModal && note ? (
+        <MoveNoteModal
+          noteId={note.id}
+          noteTitle={note.title}
+          currentFolderId={note.folderId}
+          onClose={() => setShowMoveModal(false)}
+          onMoved={() => setShowMoveModal(false)}
+        />
+      ) : null}
+    </>
   )
 }
 
@@ -73,6 +87,7 @@ interface NoteEditorProps {
   isPinned: boolean
   onTogglePinned: () => void
   onDeleteNote: () => void
+  onMoveNote?: () => void
 }
 
 type ToolbarPanel = 'none' | 'format' | 'insert' | 'link' | 'draw'
@@ -89,6 +104,7 @@ function NoteEditor({
   isPinned,
   onTogglePinned,
   onDeleteNote,
+  onMoveNote,
 }: NoteEditorProps) {
   const [titleValue, setTitleValue] = useState(note?.title ?? 'Neue Notiz')
   const editorRef = useRef<HTMLDivElement>(null)
@@ -432,12 +448,30 @@ function NoteEditor({
                   >
                     {isPinned ? 'Fixierung lösen' : 'Fixieren'}
                   </button>
+                  {onMoveNote ? (
+                    <button
+                      type="button"
+                      onClick={() => { onMoveNote(); setNoteMenuOpen(false) }}
+                      className="flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm text-slate-700 hover:bg-slate-100"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                        <path d="M15 3h6v6" />
+                        <path d="M10 14L21 3" />
+                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                      </svg>
+                      Verschieben
+                    </button>
+                  ) : null}
                   {isOwner ? (
                     <button
                       type="button"
                       onClick={() => { onDeleteNote(); setNoteMenuOpen(false) }}
-                      className="mt-1 flex h-11 w-full items-center rounded-xl px-3 text-left text-sm text-rose-600 hover:bg-rose-50"
+                      className="mt-1 flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm text-rose-600 hover:bg-rose-50"
                     >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+                        <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                      </svg>
                       In Papierkorb
                     </button>
                   ) : null}

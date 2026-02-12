@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BottomNavigation } from '../components/BottomNavigation'
+import { SidebarLayout } from '../components/SidebarLayout'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
 
@@ -56,8 +56,8 @@ export function TeamHubPage() {
   })
 
   return (
-    <>
-      <main className="mx-auto min-h-screen w-full max-w-xl bg-[var(--color-bg-app)] px-4 pb-24 pt-[calc(env(safe-area-inset-top)+1.5rem)]">
+    <SidebarLayout title="Team" showCreate={false}>
+      <div className="mx-auto max-w-3xl px-4 py-6">
         <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Team</h1>
         <p className="mt-0.5 text-sm text-[var(--color-text-muted)]">
           {members.length} Mitglieder
@@ -141,9 +141,7 @@ export function TeamHubPage() {
             </div>
           </div>
         </section>
-      </main>
-
-      <BottomNavigation active="team" />
-    </>
+      </div>
+    </SidebarLayout>
   )
 }

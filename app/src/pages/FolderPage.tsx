@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { BottomNavigation } from '../components/BottomNavigation'
+import { SidebarLayout } from '../components/SidebarLayout'
 import { CreateItemModal } from '../components/CreateItemModal'
+import { MoveNoteModal } from '../components/MoveNoteModal'
 import { FolderIcon, FOLDER_COLOR_CYCLE, IconPicker, READONLY_ICON } from '../components/FolderIcons'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
@@ -15,6 +16,7 @@ export function FolderPage() {
   const [isActionsMenuOpen, setActionsMenuOpen] = useState(false)
   const [renameValue, setRenameValue] = useState('')
   const [showIconPicker, setShowIconPicker] = useState(false)
+  const [moveNoteTarget, setMoveNoteTarget] = useState<{ id: string; title: string; folderId: string } | null>(null)
   const actionsMenuRef = useRef<HTMLDivElement>(null)
   const {
     apiError,
@@ -94,8 +96,8 @@ export function FolderPage() {
   }
 
   return (
-    <>
-      <main className="mx-auto min-h-screen w-full max-w-xl bg-[var(--color-bg-app)] px-4 pb-24 pt-[calc(env(safe-area-inset-top)+1rem)]">
+    <SidebarLayout title={folder?.name || 'Ordner'} showCreate={canEdit}>
+      <div className="mx-auto max-w-3xl px-4 py-6">
         {/* Navigation Bar */}
         <div className="flex items-center justify-between">
           <Link to={path.length > 1 ? `/folder/${path[path.length - 2].id}` : '/'} className="text-sm font-medium text-blue-500">
@@ -368,34 +370,55 @@ export function FolderPage() {
           ) : (
             <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-sm">
               {folderNotes.map((note, index) => (
-                <Link
+                <div
                   key={note.id}
-                  to={`/note/${note.id}`}
-                  className={`block px-4 py-3 transition-colors active:bg-slate-100 dark:active:bg-slate-700 ${
+                  className={`flex items-center gap-0 ${
                     index > 0 ? 'border-t border-[var(--color-border)]' : ''
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-[var(--color-text-primary)]">{note.title}</p>
-                      <p className="mt-0.5 line-clamp-1 text-xs text-[var(--color-text-secondary)]">{note.excerpt}</p>
+                  <Link
+                    to={`/note/${note.id}`}
+                    className="block min-w-0 flex-1 px-4 py-3 transition-colors active:bg-slate-100 dark:active:bg-slate-700"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[var(--color-text-primary)]">{note.title}</p>
+                        <p className="mt-0.5 line-clamp-1 text-xs text-[var(--color-text-secondary)]">{note.excerpt}</p>
+                      </div>
+                      <svg viewBox="0 0 24 24" fill="none" className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-text-muted)]" strokeWidth="2" stroke="currentColor" strokeLinecap="round">
+                        <path d="M9 6l6 6-6 6" />
+                      </svg>
                     </div>
-                    <svg viewBox="0 0 24 24" fill="none" className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-text-muted)]" strokeWidth="2" stroke="currentColor" strokeLinecap="round">
-                      <path d="M9 6l6 6-6 6" />
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <UserAvatar email={note.ownerId || undefined} size="sm" />
+                      <span className="text-[10px] text-[var(--color-text-muted)]">{note.updatedLabel}</span>
+                    </div>
+                  </Link>
+                  {/* Verschieben-Button */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMoveNoteTarget({
+                        id: note.id,
+                        title: note.title,
+                        folderId: note.folderId,
+                      })
+                    }
+                    className="flex h-full shrink-0 items-center px-3 text-[var(--color-text-muted)] transition-colors hover:text-blue-500"
+                    title="Notiz verschieben"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                      <path d="M15 3h6v6" />
+                      <path d="M10 14L21 3" />
+                      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
                     </svg>
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <UserAvatar email={note.ownerId || undefined} size="sm" />
-                    <span className="text-[10px] text-[var(--color-text-muted)]">{note.updatedLabel}</span>
-                  </div>
-                </Link>
+                  </button>
+                </div>
               ))}
             </div>
           )}
         </section>
-      </main>
-
-      <BottomNavigation />
+      </div>
 
       {isModalOpen ? (
         <CreateItemModal
@@ -424,6 +447,19 @@ export function FolderPage() {
           }}
         />
       ) : null}
-    </>
+
+      {moveNoteTarget ? (
+        <MoveNoteModal
+          noteId={moveNoteTarget.id}
+          noteTitle={moveNoteTarget.title}
+          currentFolderId={moveNoteTarget.folderId}
+          onClose={() => setMoveNoteTarget(null)}
+          onMoved={(targetName) => {
+            setFeedback(`Notiz wurde nach „${targetName}" verschoben.`)
+            setMoveNoteTarget(null)
+          }}
+        />
+      ) : null}
+    </SidebarLayout>
   )
 }

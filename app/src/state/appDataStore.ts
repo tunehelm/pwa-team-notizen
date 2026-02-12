@@ -42,6 +42,7 @@ export interface AppDataContextValue {
   updateNoteContent: (noteId: string, content: string) => Promise<void>
   toggleNotePinned: (noteId: string) => Promise<void>
   moveFolderToTrash: (folderId: string) => Promise<void>
+  moveNoteToFolder: (noteId: string, targetFolderId: string) => Promise<void>
   moveNoteToTrash: (noteId: string) => Promise<void>
   restoreFolderFromTrash: (folderId: string) => Promise<void>
   restoreNoteFromTrash: (noteId: string) => Promise<void>

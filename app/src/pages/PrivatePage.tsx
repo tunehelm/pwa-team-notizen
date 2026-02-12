@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { BottomNavigation } from '../components/BottomNavigation'
+import { SidebarLayout } from '../components/SidebarLayout'
 import { CreateItemModal } from '../components/CreateItemModal'
 import { useAppData } from '../state/useAppData'
 
@@ -30,8 +30,8 @@ export function PrivatePage() {
   )
 
   return (
-    <>
-      <main className="mx-auto min-h-screen w-full max-w-xl bg-[var(--color-bg-app)] px-4 pb-24 pt-[calc(env(safe-area-inset-top)+1.5rem)]">
+    <SidebarLayout title="Privat">
+      <div className="mx-auto max-w-3xl px-4 py-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Privat</h1>
@@ -146,9 +146,7 @@ export function PrivatePage() {
             </button>
           </div>
         ) : null}
-      </main>
-
-      <BottomNavigation active="private" />
+      </div>
 
       {isModalOpen ? (
         <CreateItemModal
@@ -162,7 +160,6 @@ export function PrivatePage() {
                 setFeedback(`Privater Ordner "${created.name}" erstellt.`)
               }
             } else {
-              // Erste privaten Ordner als Ziel nehmen, oder einen erstellen
               let targetFolder = privateFolders[0]
               if (!targetFolder) {
                 targetFolder = (await createFolder('Meine Notizen', { access: 'private' }))!
@@ -179,6 +176,6 @@ export function PrivatePage() {
           }}
         />
       ) : null}
-    </>
+    </SidebarLayout>
   )
 }

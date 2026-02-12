@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BottomNavigation } from '../components/BottomNavigation'
+import { SidebarLayout } from '../components/SidebarLayout'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
 
@@ -30,8 +30,8 @@ export function SearchPage() {
   const isSearching = query.trim().length >= 2
 
   return (
-    <>
-      <main className="mx-auto min-h-screen w-full max-w-xl bg-[var(--color-bg-app)] px-4 pb-24 pt-[calc(env(safe-area-inset-top)+1.5rem)]">
+    <SidebarLayout title="Suche" showCreate={false}>
+      <div className="mx-auto max-w-3xl px-4 py-6">
         <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Suche</h1>
 
         {/* Suchfeld */}
@@ -140,9 +140,7 @@ export function SearchPage() {
             </div>
           </section>
         ) : null}
-      </main>
-
-      <BottomNavigation active="search" />
-    </>
+      </div>
+    </SidebarLayout>
   )
 }
