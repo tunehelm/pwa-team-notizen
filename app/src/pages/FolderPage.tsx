@@ -7,6 +7,8 @@ import { FolderIcon, FOLDER_COLOR_CYCLE, IconPicker, READONLY_ICON } from '../co
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
 
+const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL ?? '').toLowerCase()
+
 export function FolderPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
@@ -22,6 +24,7 @@ export function FolderPage() {
   const {
     apiError,
     currentUserId,
+    currentUserEmail,
     findFolderById,
     getFolderPathItems,
     getFolderNoteItems,
@@ -37,9 +40,11 @@ export function FolderPage() {
   } = useAppData()
 
   const folder = findFolderById(id)
+  const isAdmin = Boolean(ADMIN_EMAIL && currentUserEmail?.toLowerCase() === ADMIN_EMAIL)
   const isOwner = Boolean(folder && (!folder.ownerId || (currentUserId && folder.ownerId === currentUserId)))
+  const canDelete = isOwner || isAdmin
   const isReadonly = folder?.access === 'readonly'
-  const canEdit = isOwner || !isReadonly // Owner kann immer bearbeiten; bei nicht-readonly kann jeder
+  const canEdit = isOwner || isAdmin || !isReadonly // Owner oder Admin kann immer bearbeiten; bei nicht-readonly kann jeder
   const path = folder ? getFolderPathItems(folder.id) : []
   const subfolders = folder ? getSubfolderItems(folder.id) : []
   const folderNotes = folder ? getFolderNoteItems(folder.id) : []
@@ -160,7 +165,7 @@ export function FolderPage() {
                       Umbenennen
                     </button>
                   ) : null}
-                  {isOwner ? (
+                  {canDelete ? (
                     <button
                       type="button"
                       onClick={async () => {

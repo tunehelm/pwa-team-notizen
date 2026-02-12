@@ -15,6 +15,8 @@ import { MoveNoteModal } from '../components/MoveNoteModal'
 import { ShareModal } from '../components/ShareModal'
 import { useAppData } from '../state/useAppData'
 
+const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL ?? '').toLowerCase()
+
 export function NotePage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
@@ -22,6 +24,7 @@ export function NotePage() {
   const [showShareModal, setShowShareModal] = useState(false)
   const {
     currentUserId,
+    currentUserEmail,
     findNoteById,
     findFolderById,
     moveNoteToTrash,
@@ -30,7 +33,9 @@ export function NotePage() {
     updateNoteContent,
   } = useAppData()
   const note = findNoteById(id)
+  const isAdmin = Boolean(ADMIN_EMAIL && currentUserEmail?.toLowerCase() === ADMIN_EMAIL)
   const isOwner = Boolean(note && (!note.ownerId || (currentUserId && note.ownerId === currentUserId)))
+  const canDelete = isOwner || isAdmin
 
   // Check if the note lives in a readonly folder
   const parentFolder = note?.folderId ? findFolderById(note.folderId) : undefined
@@ -44,6 +49,7 @@ export function NotePage() {
         key={id || 'new'}
         note={note}
         isOwner={isOwner}
+        canDelete={canDelete}
         readOnly={isReadonly}
         backPath={backPath}
         onTitleChange={(title) => {
@@ -91,6 +97,7 @@ export function NotePage() {
 interface NoteEditorProps {
   note?: NoteItem
   isOwner: boolean
+  canDelete: boolean
   readOnly?: boolean
   backPath: string
   onTitleChange: (title: string) => void
@@ -121,6 +128,7 @@ const FONT_COLORS = [
 function NoteEditor({
   note,
   isOwner,
+  canDelete,
   readOnly = false,
   backPath,
   onTitleChange,
@@ -779,17 +787,19 @@ function NoteEditor({
                   </svg>
                   Herunterladen
                 </button>
-                <button
-                  type="button"
-                  onClick={() => { onDeleteNote(); setNoteMenuOpen(false) }}
-                  className="mt-1 flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
-                    <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                  </svg>
-                  In Papierkorb
-                </button>
+                {canDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => { onDeleteNote(); setNoteMenuOpen(false) }}
+                    className="mt-1 flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                      <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+                      <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                    </svg>
+                    In Papierkorb
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>
