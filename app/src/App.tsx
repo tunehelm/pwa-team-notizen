@@ -14,9 +14,15 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const [isInviteMode, setIsInviteMode] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
+
+    // Prüfe ob ein Invite- oder Recovery-Token im URL-Hash liegt
+    const hash = window.location.hash;
+    const isInviteHash = hash.includes('type=invite') || hash.includes('type=signup');
+    const isRecoveryHash = hash.includes('type=recovery');
 
     const init = async () => {
       const { data, error } = await supabase.auth.getSession();
@@ -24,6 +30,15 @@ function App() {
 
       if (error) console.error(error);
       setSession(data.session ?? null);
+
+      // Invite-User: Passwort setzen erzwingen
+      if (isInviteHash && data.session) {
+        setIsInviteMode(true);
+      }
+      if (isRecoveryHash && data.session) {
+        setIsRecoveryMode(true);
+      }
+
       setLoading(false);
     };
 
@@ -33,6 +48,10 @@ function App() {
       setSession(newSession ?? null);
       if (event === "PASSWORD_RECOVERY") {
         setIsRecoveryMode(true);
+      }
+      // Invite-Event abfangen
+      if (event === "SIGNED_IN" && (isInviteHash)) {
+        setIsInviteMode(true);
       }
     });
 
@@ -57,6 +76,21 @@ function App() {
 
   if (isRecoveryMode) {
     return <SetNewPasswordPage onDone={() => setIsRecoveryMode(false)} />;
+  }
+
+  if (isInviteMode) {
+    return (
+      <SetNewPasswordPage
+        title="Willkommen bei SM-TeamNotes!"
+        subtitle="Bitte setze ein Passwort für deinen Account."
+        buttonLabel="Passwort setzen & starten"
+        onDone={() => {
+          setIsInviteMode(false);
+          // Hash aus URL entfernen
+          window.history.replaceState(null, '', window.location.pathname);
+        }}
+      />
+    );
   }
 
   return (
@@ -225,7 +259,12 @@ function LoginPage() {
 
 /* ─── Password Recovery ──────────────────────────────────── */
 
-function SetNewPasswordPage({ onDone }: { onDone: () => void }) {
+function SetNewPasswordPage({ onDone, title, subtitle, buttonLabel }: {
+  onDone: () => void;
+  title?: string;
+  subtitle?: string;
+  buttonLabel?: string;
+}) {
   const [newPassword, setNewPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -256,9 +295,9 @@ function SetNewPasswordPage({ onDone }: { onDone: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-app)] px-6">
       <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Neues Passwort setzen</h1>
+        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{title || "Neues Passwort setzen"}</h1>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          Mindestens 6 Zeichen.
+          {subtitle || "Mindestens 6 Zeichen."}
         </p>
 
         {message ? (
@@ -291,7 +330,7 @@ function SetNewPasswordPage({ onDone }: { onDone: () => void }) {
               submitting || newPassword.length < 6 ? "bg-slate-400" : "bg-blue-500 hover:bg-blue-600"
             }`}
           >
-            {submitting ? "Bitte warten…" : "Passwort speichern"}
+            {submitting ? "Bitte warten…" : (buttonLabel || "Passwort speichern")}
           </button>
         </div>
       </div>

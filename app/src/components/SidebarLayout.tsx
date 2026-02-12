@@ -62,7 +62,7 @@ export function SidebarLayout({ children, title, showCreate = true }: SidebarLay
           <button
             type="button"
             onClick={() => setSidebarOpen((v) => !v)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-700"
             aria-label="Sidebar"
           >
             {/* Mobile: Hamburger Icon | Desktop: Sidebar Panel Icon */}
@@ -104,7 +104,7 @@ export function SidebarLayout({ children, title, showCreate = true }: SidebarLay
               <button
                 type="button"
                 onClick={() => setShowSearch(true)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-700"
                 aria-label="Suche"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4.5 w-4.5">
@@ -117,10 +117,10 @@ export function SidebarLayout({ children, title, showCreate = true }: SidebarLay
                 <button
                   type="button"
                   onClick={() => setModalOpen(true)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-white shadow-sm transition-all hover:bg-blue-600 active:scale-95"
                   aria-label="Neu erstellen"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4.5 w-4.5">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-4 w-4">
                     <path d="M12 5v14M5 12h14" />
                   </svg>
                 </button>
