@@ -210,7 +210,10 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
       },
       findFolderById: (folderId) => getFolderById(folders, folderId),
       findNoteById: (noteId) => getNoteById(notes, noteId),
-      getPinnedNoteItems: () => getPinnedNotes(notes),
+      getPinnedNoteItems: () => {
+        const privateFolderIds = new Set(folders.filter((f) => f.access === 'private').map((f) => f.id))
+        return getPinnedNotes(notes).filter((n) => !privateFolderIds.has(n.folderId))
+      },
       getPinnedFolderItems: () => getPinnedFolders(folders),
       getMainFolderItems: () => getMainFolders(folders),
       getSubfolderItems: (folderId) => getSubfolders(folders, folderId),

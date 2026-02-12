@@ -11,12 +11,14 @@ import {
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { type NoteItem } from '../data/mockData'
 import { MoveNoteModal } from '../components/MoveNoteModal'
+import { ShareModal } from '../components/ShareModal'
 import { useAppData } from '../state/useAppData'
 
 export function NotePage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const [showMoveModal, setShowMoveModal] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
   const {
     currentUserId,
     findNoteById,
@@ -61,7 +63,15 @@ export function NotePage() {
           void moveNoteToTrash(note.id).then(() => navigate(backPath))
         }}
         onMoveNote={() => setShowMoveModal(true)}
+        onShareNote={() => setShowShareModal(true)}
       />
+      {showShareModal && note ? (
+        <ShareModal
+          title={note.title}
+          text={note.content ? note.content.replace(/<[^>]*>/g, '').slice(0, 1000) : ''}
+          onClose={() => setShowShareModal(false)}
+        />
+      ) : null}
       {showMoveModal && note ? (
         <MoveNoteModal
           noteId={note.id}
@@ -88,6 +98,7 @@ interface NoteEditorProps {
   onTogglePinned: () => void
   onDeleteNote: () => void
   onMoveNote?: () => void
+  onShareNote?: () => void
 }
 
 type ToolbarPanel = 'none' | 'format' | 'insert' | 'link' | 'draw'
@@ -105,6 +116,7 @@ function NoteEditor({
   onTogglePinned,
   onDeleteNote,
   onMoveNote,
+  onShareNote,
 }: NoteEditorProps) {
   const [titleValue, setTitleValue] = useState(note?.title ?? 'Neue Notiz')
   const editorRef = useRef<HTMLDivElement>(null)
@@ -448,6 +460,20 @@ function NoteEditor({
                   >
                     {isPinned ? 'Fixierung lösen' : 'Fixieren'}
                   </button>
+                  {onShareNote ? (
+                    <button
+                      type="button"
+                      onClick={() => { onShareNote(); setNoteMenuOpen(false) }}
+                      className="flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm text-slate-700 hover:bg-slate-100"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                        <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" />
+                        <polyline points="16 6 12 2 8 6" />
+                        <line x1="12" y1="2" x2="12" y2="15" />
+                      </svg>
+                      Teilen
+                    </button>
+                  ) : null}
                   {onMoveNote ? (
                     <button
                       type="button"

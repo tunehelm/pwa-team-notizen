@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
+import { BottomNavigation } from './BottomNavigation'
 import { CreateItemModal } from './CreateItemModal'
 import { useAppData } from '../state/useAppData'
 
@@ -24,9 +25,11 @@ export function SidebarLayout({ children, title, showCreate = true }: SidebarLay
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const navigate = useNavigate()
-  const { createFolder, createNote, getMainFolderItems } = useAppData()
+  const { currentUserEmail, createFolder, createNote, getMainFolderItems } = useAppData()
 
   const rootFolders = getMainFolderItems()
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined
+  const isAdmin = Boolean(adminEmail && currentUserEmail && currentUserEmail === adminEmail)
 
   // Sidebar automatisch ein-/ausblenden bei Resize
   useEffect(() => {
@@ -130,13 +133,18 @@ export function SidebarLayout({ children, title, showCreate = true }: SidebarLay
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
+
+        {/* Bottom Navigation – nur Mobile */}
+        <div className="lg:hidden">
+          <BottomNavigation />
+        </div>
       </div>
 
       {/* Create Modal */}
       {isModalOpen ? (
         <CreateItemModal
           title="Neu erstellen"
-          options={['Ordner', 'Nur-Lesen Ordner', 'Notiz/Projekt']}
+          options={isAdmin ? ['Ordner', 'Nur-Lesen Ordner', 'Notiz/Projekt'] : ['Ordner', 'Notiz/Projekt']}
           onClose={() => setModalOpen(false)}
           onSubmit={async ({ type, name, icon }) => {
             if (type === 'Ordner') {

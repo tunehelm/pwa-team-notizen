@@ -123,11 +123,11 @@ export function getPinnedNotes(notes: NoteItem[]) {
 }
 
 export function getPinnedFolders(folders: FolderItem[]) {
-  return folders.filter((folder) => folder.pinned)
+  return folders.filter((folder) => folder.pinned && folder.access !== 'private')
 }
 
 export function getMainFolders(folders: FolderItem[]) {
-  return folders.filter((folder) => folder.parentId === null)
+  return folders.filter((folder) => folder.parentId === null && folder.access !== 'private')
 }
 
 export function getSubfolders(folders: FolderItem[], folderId: string) {
