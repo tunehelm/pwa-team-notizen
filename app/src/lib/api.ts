@@ -123,8 +123,13 @@ function isMissingColumnError(error: unknown) {
   return (
     code === '42703' ||
     code === 'PGRST204' ||
+    message.includes('schema cache') ||
+    message.includes('Could not find') ||
     message.includes('parent_id') ||
-    message.includes('kind')
+    message.includes('kind') ||
+    message.includes('title') ||
+    message.includes('name') ||
+    message.includes('access')
   )
 }
 
@@ -203,8 +208,9 @@ async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
   const userId = await requireUserId()
   const folderAccess = sourceFolder.kind ?? 'team'
 
-  // Try with all possible column names (trash_folders may use 'name'/'access' instead of 'title'/'kind')
-  const full = await supabase.from('trash_folders').upsert(
+  // Build all possible payloads, from most complete to minimal
+  const payloads = [
+    // Attempt 1: all columns with both naming conventions
     {
       id: sourceFolder.id,
       title: sourceFolder.title,
@@ -218,18 +224,7 @@ async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
       access: folderAccess,
       deleted_at: deletedAt,
     },
-    { onConflict: 'id' },
-  )
-
-  console.log('[api.upsertTrashFolder] full response', { error: full.error })
-  if (!full.error) return
-
-  if (!isMissingColumnError(full.error)) {
-    throw full.error
-  }
-
-  // Fallback without parent_id / icon columns
-  const fallback = await supabase.from('trash_folders').upsert(
+    // Attempt 2: without 'kind' and 'parent_id' (trash_folders may only have 'access')
     {
       id: sourceFolder.id,
       title: sourceFolder.title,
@@ -238,15 +233,38 @@ async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
       created_at: sourceFolder.created_at,
       owner_id: sourceFolder.owner_id,
       user_id: userId,
-      kind: folderAccess,
       access: folderAccess,
       deleted_at: deletedAt,
     },
-    { onConflict: 'id' },
-  )
+    // Attempt 3: without 'title' (trash_folders may only have 'name')
+    {
+      id: sourceFolder.id,
+      name: sourceFolder.title,
+      pinned: sourceFolder.pinned,
+      created_at: sourceFolder.created_at,
+      owner_id: sourceFolder.owner_id,
+      user_id: userId,
+      access: folderAccess,
+      deleted_at: deletedAt,
+    },
+    // Attempt 4: minimal
+    {
+      id: sourceFolder.id,
+      name: sourceFolder.title,
+      owner_id: sourceFolder.owner_id,
+      user_id: userId,
+      access: folderAccess,
+      deleted_at: deletedAt,
+    },
+  ]
 
-  console.log('[api.upsertTrashFolder] fallback response', { error: fallback.error })
-  if (fallback.error) throw fallback.error
+  for (let i = 0; i < payloads.length; i++) {
+    const { error } = await supabase.from('trash_folders').upsert(payloads[i], { onConflict: 'id' })
+    console.log(`[api.upsertTrashFolder] attempt ${i + 1}`, { error })
+    if (!error) return
+    if (i === payloads.length - 1) throw error
+    if (!isMissingColumnError(error)) throw error
+  }
 }
 
 function mapTrashNoteRow(row: TrashNoteRow): TrashNoteItem {
