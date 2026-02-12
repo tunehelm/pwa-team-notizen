@@ -453,20 +453,34 @@ export async function deleteFolderToTrash(folderId: string): Promise<TrashFolder
     await upsertTrashFolder(f, deletedAt)
   }
 
-  // Step 3: Remove parent_id references first so FK constraints don't block deletion
-  if (descendants.length > 0) {
-    const descIds = descendants.map((d) => d.id)
+  // Step 3: Nullify parent_id on ALL folders that reference any folder we're deleting
+  // This includes both descendants and any other folders referencing the main folder
+  const allIdsToDelete = allFolderIds
+  for (const targetId of allIdsToDelete) {
     const { error: nullifyError } = await supabase
       .from('folders')
       .update({ parent_id: null })
-      .in('id', descIds)
-    if (nullifyError) console.warn('[deleteFolderToTrash] nullify parent_id failed:', nullifyError)
+      .eq('parent_id', targetId)
+    if (nullifyError) {
+      console.warn('[deleteFolderToTrash] nullify parent_id for', targetId, 'failed:', nullifyError)
+    }
   }
 
-  // Step 4: Delete all folders (deepest first, main folder last)
-  for (const f of allFolders) {
-    const { error } = await supabase.from('folders').delete().eq('id', f.id)
-    if (error) throw error
+  // Step 4: Delete all folders at once using .in() – no ordering needed since parent_id refs are nullified
+  const { error: bulkDeleteError } = await supabase
+    .from('folders')
+    .delete()
+    .in('id', allIdsToDelete)
+
+  if (bulkDeleteError) {
+    // Fallback: try deleting one by one (deepest first)
+    console.warn('[deleteFolderToTrash] bulk delete failed, trying one by one:', bulkDeleteError)
+    for (const f of allFolders) {
+      const { error } = await supabase.from('folders').delete().eq('id', f.id)
+      if (error) {
+        console.warn('[deleteFolderToTrash] single delete failed for', f.id, error)
+      }
+    }
   }
 
   return mapTrashFolderRow({
