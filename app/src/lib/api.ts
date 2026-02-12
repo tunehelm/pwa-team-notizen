@@ -413,6 +413,8 @@ export async function deleteFolderToTrash(folderId: string): Promise<TrashFolder
           folder_id: note.folder_id ?? null,
           title: note.title,
           content: typeof note.content === 'string' ? note.content : '',
+          excerpt: note.excerpt ?? buildExcerpt(typeof note.content === 'string' ? note.content : ''),
+          updated_label: note.updated_label ?? formatUpdatedLabel(note.updated_at),
           pinned: note.pinned,
           created_at: note.created_at,
           updated_at: note.updated_at,
