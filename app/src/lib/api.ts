@@ -373,42 +373,82 @@ export async function deleteFolderToTrash(folderId: string): Promise<TrashFolder
   if (folderError) throw folderError
   const sourceFolder = folder as FolderRow
 
-  const { data: notesInFolder, error: notesFetchError } = await supabase
-    .from('notes')
-    .select(NOTE_COLUMNS)
-    .eq('folder_id', folderId)
-
-  if (notesFetchError) throw notesFetchError
-
   const deletedAt = new Date().toISOString()
-
-  await upsertTrashFolder(sourceFolder, deletedAt)
-
-  const notesRows = (notesInFolder ?? []) as NoteRow[]
   const currentUserId = await requireUserId()
-  if (notesRows.length > 0) {
-    const { error: trashNotesError } = await supabase.from('trash_notes').upsert(
-      notesRows.map((note) => ({
-        id: note.id,
-        folder_id: note.folder_id ?? null,
-        title: note.title,
-        content: typeof note.content === 'string' ? note.content : '',
-        pinned: note.pinned,
-        created_at: note.created_at,
-        updated_at: note.updated_at,
-        owner_id: note.user_id ?? note.owner_id,
-        user_id: note.user_id ?? note.owner_id ?? currentUserId,
-        deleted_at: deletedAt,
-      })),
-      { onConflict: 'id' },
-    )
 
-    if (trashNotesError) throw trashNotesError
+  // Recursively collect all descendant folder IDs (children, grandchildren, etc.)
+  async function collectDescendantFolderIds(parentId: string): Promise<string[]> {
+    const { data: children, error } = await supabase
+      .from('folders')
+      .select('id')
+      .eq('parent_id', parentId)
+    if (error) throw error
+    const childIds = ((children ?? []) as Array<{ id: string }>).map((c) => c.id)
+    const grandChildIds: string[] = []
+    for (const childId of childIds) {
+      const descendants = await collectDescendantFolderIds(childId)
+      grandChildIds.push(...descendants)
+    }
+    return [...childIds, ...grandChildIds]
   }
 
-  const { error: deleteNotesError } = await supabase.from('notes').delete().eq('folder_id', folderId)
-  if (deleteNotesError) throw deleteNotesError
+  const descendantIds = await collectDescendantFolderIds(folderId)
+  // All folder IDs to process: descendants first (deepest last), then the main folder
+  const allFolderIds = [...descendantIds, folderId]
 
+  // For each folder: trash its notes, then trash the folder itself
+  for (const fId of allFolderIds) {
+    // Fetch & trash notes in this folder
+    const { data: notesInFolder, error: notesFetchError } = await supabase
+      .from('notes')
+      .select(NOTE_COLUMNS)
+      .eq('folder_id', fId)
+    if (notesFetchError) throw notesFetchError
+
+    const notesRows = (notesInFolder ?? []) as NoteRow[]
+    if (notesRows.length > 0) {
+      const { error: trashNotesError } = await supabase.from('trash_notes').upsert(
+        notesRows.map((note) => ({
+          id: note.id,
+          folder_id: note.folder_id ?? null,
+          title: note.title,
+          content: typeof note.content === 'string' ? note.content : '',
+          pinned: note.pinned,
+          created_at: note.created_at,
+          updated_at: note.updated_at,
+          owner_id: note.user_id ?? note.owner_id,
+          user_id: note.user_id ?? note.owner_id ?? currentUserId,
+          deleted_at: deletedAt,
+        })),
+        { onConflict: 'id' },
+      )
+      if (trashNotesError) throw trashNotesError
+    }
+
+    // Delete notes from original table
+    const { error: deleteNotesError } = await supabase.from('notes').delete().eq('folder_id', fId)
+    if (deleteNotesError) throw deleteNotesError
+
+    // Trash the folder itself (only for main folder – subfolders just get trashed too)
+    if (fId === folderId) {
+      await upsertTrashFolder(sourceFolder, deletedAt)
+    } else {
+      // Fetch subfolder data and trash it
+      const { data: subFolder } = await supabase.from('folders').select(FOLDER_COLUMNS).eq('id', fId).single()
+      if (subFolder) {
+        await upsertTrashFolder(subFolder as FolderRow, deletedAt)
+      }
+    }
+  }
+
+  // Delete all folders from original table – children first, then parent
+  // Reverse so deepest children are deleted first
+  const deleteOrder = [...descendantIds].reverse()
+  for (const dId of deleteOrder) {
+    const { error } = await supabase.from('folders').delete().eq('id', dId)
+    if (error) throw error
+  }
+  // Finally delete the main folder
   const { error: deleteFolderError } = await supabase.from('folders').delete().eq('id', folderId)
   if (deleteFolderError) throw deleteFolderError
 
