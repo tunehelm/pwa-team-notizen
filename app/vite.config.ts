@@ -19,9 +19,9 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['apple-touch-icon.png'],
       manifest: {
-        name: 'PWA Team-Notizen',
-        short_name: 'TeamNotizen',
-        description: 'Kollaborative Team-Notizen PWA',
+        name: 'SM-TeamNotes',
+        short_name: 'SM-TeamNotes',
+        description: 'Kollaborative Team-Notizen App',
         theme_color: '#3b82f6',
         background_color: '#f0f4f8',
         display: 'standalone',
