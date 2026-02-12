@@ -1,27 +1,35 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { SidebarLayout } from '../components/SidebarLayout'
+import { CreateItemModal } from '../components/CreateItemModal'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
 import { supabase } from '../lib/supabase'
 import { FolderIcon, FOLDER_COLOR_CYCLE, READONLY_ICON } from '../components/FolderIcons'
+import { isAdminEmail } from '../lib/admin'
 
 export function DashboardPage() {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [isEditingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
+  const [isModalOpen, setModalOpen] = useState(false)
+  const [feedback, setFeedback] = useState('')
+  const navigate = useNavigate()
   const {
     apiError,
     currentUserId,
     currentUserEmail,
     currentUserName,
     notes,
+    createFolder,
+    createNote,
     getMainFolderItems,
     getPinnedFolderItems,
     getPinnedNoteItems,
     getSubfolderItems,
     getFolderNoteItems,
   } = useAppData()
+  const isAdmin = isAdminEmail(currentUserEmail)
 
   const userEmail = currentUserEmail
   const userName = currentUserName
@@ -57,6 +65,18 @@ export function DashboardPage() {
               {userName || userEmail}
             </p>
           </div>
+          <div className="flex items-center gap-3">
+            {/* + Button zum Erstellen */}
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white shadow-md transition-transform hover:bg-blue-700 active:scale-95"
+              aria-label="Erstellen"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-5 w-5">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
           <div className="relative">
             <button
               type="button"
@@ -117,7 +137,13 @@ export function DashboardPage() {
               </div>
             ) : null}
           </div>
+          </div>
         </div>
+
+        {/* Feedback */}
+        {feedback ? (
+          <div className="mb-4 rounded-xl bg-emerald-600/90 px-4 py-2.5 text-sm text-white">{feedback}</div>
+        ) : null}
 
         {apiError ? (
           <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
@@ -264,6 +290,25 @@ export function DashboardPage() {
           </section>
         ) : null}
       </div>
+
+      {/* Create Item Modal */}
+      {isModalOpen ? (
+        <CreateItemModal
+          title="Erstellen"
+          options={isAdmin ? ['Ordner', 'Nur-Lesen Ordner'] : ['Ordner']}
+          onClose={() => setModalOpen(false)}
+          onSubmit={async ({ type, name, icon }) => {
+            if (type === 'Nur-Lesen Ordner') {
+              const created = await createFolder(name, { access: 'readonly', icon })
+              if (created) setFeedback(`Nur-Lesen Ordner "${created.name}" wurde erstellt.`)
+            } else {
+              const created = await createFolder(name, { access: 'team', icon })
+              if (created) setFeedback(`Ordner "${created.name}" wurde erstellt.`)
+            }
+            setModalOpen(false)
+          }}
+        />
+      ) : null}
     </SidebarLayout>
   )
 }
