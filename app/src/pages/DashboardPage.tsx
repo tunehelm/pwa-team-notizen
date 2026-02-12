@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { SidebarLayout } from '../components/SidebarLayout'
 import { CreateItemModal } from '../components/CreateItemModal'
 import { UserAvatar } from '../components/UserAvatar'
@@ -14,7 +14,6 @@ export function DashboardPage() {
   const [nameInput, setNameInput] = useState('')
   const [isModalOpen, setModalOpen] = useState(false)
   const [feedback, setFeedback] = useState('')
-  const navigate = useNavigate()
   const {
     apiError,
     currentUserId,
@@ -22,7 +21,6 @@ export function DashboardPage() {
     currentUserName,
     notes,
     createFolder,
-    createNote,
     getMainFolderItems,
     getPinnedFolderItems,
     getPinnedNoteItems,
