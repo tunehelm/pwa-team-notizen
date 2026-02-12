@@ -295,7 +295,7 @@ export async function createFolder(
       .insert(insertPayload)
       .select(FOLDER_COLUMNS_FALLBACK)
       .single()
-    data = retry.data
+    data = retry.data as typeof data
     error = retry.error
   }
 

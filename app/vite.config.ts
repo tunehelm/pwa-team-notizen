@@ -7,14 +7,16 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig(({ mode }) => ({
   server: {
     port: 5173,
-    strictPort: true, // Wenn 5173 belegt ist: Fehler statt anderem Port – nur eine URL in Supabase nötig
+    strictPort: true,
+  },
+  build: {
+    minify: 'esbuild', // esbuild statt terser – vermeidet PWA-Plugin-Konflikt
   },
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      minify: false,
       includeAssets: ['apple-touch-icon.png'],
       manifest: {
         name: 'PWA Team-Notizen',
@@ -44,27 +46,10 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
-        // Precache nur im Produktions-Build (in dev hat dev-dist fast keine Dateien → Warnung).
         globPatterns: mode === 'development' ? [] : ['**/*.{js,css,html,ico,png,svg,webp,webmanifest}'],
-        // SPA-Routen offline immer auf die gecachte index.html abbilden.
         navigateFallback: '/index.html',
-        // offline.html nur nutzen, wenn keine index.html aus dem Cache verfügbar ist.
-        runtimeCaching: [
-          {
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'pages',
-              networkTimeoutSeconds: 3,
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-              precacheFallback: {
-                fallbackURL: '/offline.html',
-              },
-            },
-          },
-        ],
+        // Terser-Workaround: Service Worker nicht minifizieren
+        mode: 'development',
       },
       devOptions: {
         enabled: true,
