@@ -201,10 +201,13 @@ async function selectAllTrashFolders(): Promise<TrashFolderRow[]> {
 
 async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
   const userId = await requireUserId()
+
+  // Try with all columns including 'name' (some trash_folders tables use 'name' instead of 'title')
   const full = await supabase.from('trash_folders').upsert(
     {
       id: sourceFolder.id,
       title: sourceFolder.title,
+      name: sourceFolder.title,
       pinned: sourceFolder.pinned,
       created_at: sourceFolder.created_at,
       owner_id: sourceFolder.owner_id,
@@ -219,14 +222,11 @@ async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
   console.log('[api.upsertTrashFolder] full response', { error: full.error })
   if (!full.error) return
 
-  if (!isMissingColumnError(full.error)) {
-    throw full.error
-  }
-
+  // Fallback: try without columns that might not exist
   const fallback = await supabase.from('trash_folders').upsert(
     {
       id: sourceFolder.id,
-      title: sourceFolder.title,
+      name: sourceFolder.title,
       pinned: sourceFolder.pinned,
       created_at: sourceFolder.created_at,
       owner_id: sourceFolder.owner_id,
@@ -237,7 +237,21 @@ async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
   )
 
   console.log('[api.upsertTrashFolder] fallback response', { error: fallback.error })
-  if (fallback.error) throw fallback.error
+  if (fallback.error) {
+    // Last attempt: minimal columns
+    const minimal = await supabase.from('trash_folders').upsert(
+      {
+        id: sourceFolder.id,
+        title: sourceFolder.title,
+        name: sourceFolder.title,
+        user_id: userId,
+        owner_id: sourceFolder.owner_id,
+        deleted_at: deletedAt,
+      },
+      { onConflict: 'id' },
+    )
+    if (minimal.error) throw minimal.error
+  }
 }
 
 function mapTrashNoteRow(row: TrashNoteRow): TrashNoteItem {
