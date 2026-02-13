@@ -68,7 +68,7 @@ export function NotePage() {
         onDeleteNote={() => {
           if (!note || isReadonly) return
           void moveNoteToTrash(note.id).then(() => navigate(backPath)).catch(() => {/* Fehler wird im AppDataContext angezeigt */})
-        }}}
+        }}
         onMoveNote={!isReadonly ? () => setShowMoveModal(true) : undefined}
         onShareNote={() => setShowShareModal(true)}
       />
@@ -142,7 +142,6 @@ function NoteEditor({
   const didInitEditorRef = useRef(false)
   const noteMenuRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [isEditorEmpty, setEditorEmpty] = useState(stripHtmlText(note?.content ?? '') === '')
   const [isNoteMenuOpen, setNoteMenuOpen] = useState(false)
   const [saveIndicator, setSaveIndicator] = useState<'saved' | 'saving'>('saved')
   const [activePanel, setActivePanel] = useState<ToolbarPanel>('none')
@@ -176,7 +175,6 @@ function NoteEditor({
 
   function syncEditorContent() {
     const html = editorRef.current?.innerHTML ?? ''
-    setEditorEmpty(stripHtmlText(html) === '')
     trackedContentChange(html)
   }
 
@@ -1248,12 +1246,4 @@ function NoteEditor({
       </section>
     </div>
   )
-}
-
-function stripHtmlText(value: string) {
-  return value
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/<[^>]*>/g, '')
-    .trim()
 }
