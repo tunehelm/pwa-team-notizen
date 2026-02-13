@@ -66,7 +66,7 @@ export function NotePage() {
         }}
         onDeleteNote={() => {
           if (!note) return
-          void moveNoteToTrash(note.id).then(() => navigate(backPath))
+          void moveNoteToTrash(note.id).then(() => navigate(backPath)).catch(() => {/* Fehler wird im AppDataContext angezeigt */})
         }}
         onMoveNote={() => setShowMoveModal(true)}
         onShareNote={() => setShowShareModal(true)}

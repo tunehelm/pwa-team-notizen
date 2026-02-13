@@ -169,9 +169,13 @@ export function FolderPage() {
                     <button
                       type="button"
                       onClick={async () => {
-                        await moveFolderToTrash(folder.id)
-                        setActionsMenuOpen(false)
-                        setFeedback('Ordner wurde in den Papierkorb verschoben.')
+                        try {
+                          await moveFolderToTrash(folder.id)
+                          setActionsMenuOpen(false)
+                          setFeedback('Ordner wurde in den Papierkorb verschoben.')
+                        } catch {
+                          setActionsMenuOpen(false)
+                        }
                       }}
                       className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20"
                     >

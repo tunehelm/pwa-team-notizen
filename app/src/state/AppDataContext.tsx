@@ -481,6 +481,7 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
           setNotes(previousNotes)
           setTrash(previousTrash)
           showApiError('Ordner konnte nicht in den Papierkorb verschoben werden.', error)
+          throw error
         }
       },
       moveNoteToFolder: async (noteId, targetFolderId) => {
@@ -497,6 +498,7 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
         } catch (error) {
           setNotes(previous)
           showApiError('Notiz konnte nicht verschoben werden.', error)
+          throw error
         }
       },
       moveNoteToTrash: async (noteId) => {
@@ -515,6 +517,7 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
           setNotes(previousNotes)
           setTrash(previousTrash)
           showApiError('Notiz konnte nicht in den Papierkorb verschoben werden.', error)
+          throw error
         }
       },
       restoreFolderFromTrash: async (folderId) => {
