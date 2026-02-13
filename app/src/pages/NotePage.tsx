@@ -38,9 +38,17 @@ export function NotePage() {
   const isOwner = Boolean(note && (!note.ownerId || (currentUserId && note.ownerId === currentUserId)))
   const canDelete = isOwner || isAdmin
 
-  // Check if the note lives in a readonly folder – Admin + Owner dürfen immer bearbeiten
+  // Prüfe ob die Notiz in einem readonly Ordner (oder dessen Eltern) liegt
   const parentFolder = note?.folderId ? findFolderById(note.folderId) : undefined
-  const isReadonly = parentFolder?.access === 'readonly' && !isOwner && !isAdmin
+  let folderIsReadonly = parentFolder?.access === 'readonly'
+  if (!folderIsReadonly && parentFolder?.parentId) {
+    let ancestor = findFolderById(parentFolder.parentId)
+    while (ancestor) {
+      if (ancestor.access === 'readonly') { folderIsReadonly = true; break }
+      ancestor = ancestor.parentId ? findFolderById(ancestor.parentId) : undefined
+    }
+  }
+  const isReadonly = folderIsReadonly && !isOwner && !isAdmin
 
   const backPath = note?.folderId ? `/folder/${note.folderId}` : '/'
 

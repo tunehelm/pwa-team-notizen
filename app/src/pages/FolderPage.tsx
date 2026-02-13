@@ -44,8 +44,18 @@ export function FolderPage() {
   const isAdmin = isAdminEmail(currentUserEmail)
   const isOwner = Boolean(folder && (!folder.ownerId || (currentUserId && folder.ownerId === currentUserId)))
   const canDelete = isOwner || isAdmin
-  const isReadonly = folder?.access === 'readonly'
-  const canEdit = isOwner || isAdmin || !isReadonly // Owner oder Admin kann immer bearbeiten; bei nicht-readonly kann jeder
+
+  // Prüfe ob dieser Ordner ODER ein Elternordner readonly ist
+  let isReadonly = folder?.access === 'readonly'
+  if (!isReadonly && folder?.parentId) {
+    let ancestor = findFolderById(folder.parentId)
+    while (ancestor) {
+      if (ancestor.access === 'readonly') { isReadonly = true; break }
+      ancestor = ancestor.parentId ? findFolderById(ancestor.parentId) : undefined
+    }
+  }
+
+  const canEdit = isOwner || isAdmin || !isReadonly
   const path = folder ? getFolderPathItems(folder.id) : []
   const subfolders = folder ? getSubfolderItems(folder.id) : []
   const folderNotes = folder ? getFolderNoteItems(folder.id) : []
