@@ -328,6 +328,7 @@ export function FolderPage() {
                     onDrop={(e: DragEvent) => {
                       e.preventDefault()
                       setDragOverFolderId(null)
+                      if (!canEdit) return // Readonly-Ordner: kein Verschieben erlaubt
                       const noteId = e.dataTransfer.getData('text/note-id')
                       if (noteId) {
                         void moveNoteToFolder(noteId, entry.id).then(() => {
@@ -400,12 +401,12 @@ export function FolderPage() {
               {folderNotes.map((note, index) => (
                 <div
                   key={note.id}
-                  draggable
-                  onDragStart={(e: DragEvent<HTMLDivElement>) => {
+                  draggable={canEdit}
+                  onDragStart={canEdit ? (e: DragEvent<HTMLDivElement>) => {
                     e.dataTransfer.setData('text/note-id', note.id)
                     e.dataTransfer.effectAllowed = 'move'
-                  }}
-                  className={`flex cursor-grab items-center gap-0 active:cursor-grabbing ${
+                  } : undefined}
+                  className={`flex ${canEdit ? 'cursor-grab active:cursor-grabbing' : ''} items-center gap-0 ${
                     index > 0 ? 'border-t border-[var(--color-border)]' : ''
                   }`}
                 >
@@ -427,25 +428,27 @@ export function FolderPage() {
                       <span className="text-[10px] text-[var(--color-text-muted)]">{note.updatedLabel}</span>
                     </div>
                   </Link>
-                  {/* Verschieben-Button */}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMoveNoteTarget({
-                        id: note.id,
-                        title: note.title,
-                        folderId: note.folderId,
-                      })
-                    }
-                    className="flex h-full shrink-0 items-center px-3 text-[var(--color-text-muted)] transition-colors hover:text-blue-500"
-                    title="Notiz verschieben"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                      <path d="M15 3h6v6" />
-                      <path d="M10 14L21 3" />
-                      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                    </svg>
-                  </button>
+                  {/* Verschieben-Button – nur wenn Bearbeitungsrechte */}
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMoveNoteTarget({
+                          id: note.id,
+                          title: note.title,
+                          folderId: note.folderId,
+                        })
+                      }
+                      className="flex h-full shrink-0 items-center px-3 text-[var(--color-text-muted)] transition-colors hover:text-blue-500"
+                      title="Notiz verschieben"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                        <path d="M15 3h6v6" />
+                        <path d="M10 14L21 3" />
+                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                      </svg>
+                    </button>
+                  ) : null}
                 </div>
               ))}
             </div>

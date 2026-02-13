@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAppData } from '../state/useAppData'
 import { FolderIcon, FOLDER_COLOR_CYCLE, READONLY_ICON } from './FolderIcons'
+import { isAdminEmail } from '../lib/admin'
 
 interface MoveNoteModalProps {
   noteId: string
@@ -12,7 +13,8 @@ interface MoveNoteModalProps {
 }
 
 export function MoveNoteModal({ noteId, noteTitle, currentFolderId, onClose, onMoved }: MoveNoteModalProps) {
-  const { folders, moveNoteToFolder } = useAppData()
+  const { folders, moveNoteToFolder, currentUserEmail, currentUserId } = useAppData()
+  const isAdmin = isAdminEmail(currentUserEmail)
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const [moving, setMoving] = useState(false)
   // Standardmäßig alle Ordner ausklappen, die Kinder haben
@@ -69,16 +71,20 @@ export function MoveNoteModal({ noteId, noteTitle, currentFolderId, onClose, onM
     const isSelected = folder.id === selectedFolderId
     const children = getChildren(folder.id)
     const isExpanded = expandedIds.has(folder.id)
+    // Readonly-Ordner sind nur für Admin/Owner als Ziel wählbar
+    const isOwnerOfFolder = Boolean(!folder.ownerId || (currentUserId && folder.ownerId === currentUserId))
+    const isReadonlyTarget = isRo && !isAdmin && !isOwnerOfFolder
+    const isDisabled = isCurrent || isReadonlyTarget
 
     return (
       <div key={folder.id}>
         <button
           type="button"
-          disabled={isCurrent}
+          disabled={isDisabled}
           onClick={() => setSelectedFolderId(folder.id)}
           className={[
             'flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
-            isCurrent
+            isDisabled
               ? 'cursor-not-allowed opacity-40'
               : isSelected
                 ? 'bg-blue-500 text-white font-medium'
@@ -118,7 +124,11 @@ export function MoveNoteModal({ noteId, noteTitle, currentFolderId, onClose, onM
 
           <span className="min-w-0 flex-1 truncate">{folder.name}</span>
 
-          {isCurrent ? (
+          {isReadonlyTarget ? (
+            <span className="shrink-0 rounded-full bg-amber-900/30 px-1.5 py-0.5 text-[8px] font-semibold text-amber-400">
+              Nur Lesen
+            </span>
+          ) : isCurrent ? (
             <span className={`shrink-0 text-[10px] ${isSelected ? 'text-white/60' : 'text-[var(--color-text-muted)]'}`}>
               Aktuell
             </span>

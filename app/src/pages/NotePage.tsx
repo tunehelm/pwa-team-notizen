@@ -38,9 +38,9 @@ export function NotePage() {
   const isOwner = Boolean(note && (!note.ownerId || (currentUserId && note.ownerId === currentUserId)))
   const canDelete = isOwner || isAdmin
 
-  // Check if the note lives in a readonly folder
+  // Check if the note lives in a readonly folder – Admin + Owner dürfen immer bearbeiten
   const parentFolder = note?.folderId ? findFolderById(note.folderId) : undefined
-  const isReadonly = parentFolder?.access === 'readonly' && !isOwner
+  const isReadonly = parentFolder?.access === 'readonly' && !isOwner && !isAdmin
 
   const backPath = note?.folderId ? `/folder/${note.folderId}` : '/'
 
@@ -66,10 +66,10 @@ export function NotePage() {
           void toggleNotePinned(note.id)
         }}
         onDeleteNote={() => {
-          if (!note) return
+          if (!note || isReadonly) return
           void moveNoteToTrash(note.id).then(() => navigate(backPath)).catch(() => {/* Fehler wird im AppDataContext angezeigt */})
-        }}
-        onMoveNote={() => setShowMoveModal(true)}
+        }}}
+        onMoveNote={!isReadonly ? () => setShowMoveModal(true) : undefined}
         onShareNote={() => setShowShareModal(true)}
       />
       {showShareModal && note ? (
