@@ -289,7 +289,7 @@ function NoteEditor({
     }
   }, [isNoteMenuOpen])
 
-  /* ── Image Resize Handler ── */
+  /* ── Image Resize + Move Handler ── */
   useEffect(() => {
     const editor = editorRef.current
     if (!editor) return
@@ -299,6 +299,13 @@ function NoteEditor({
     let startX = 0
     let startW = 0
     let startH = 0
+
+    // Move state (für img-wrap)
+    let moveWrapper: HTMLElement | null = null
+    let moveStartX = 0
+    let moveStartY = 0
+    let moveStartLeft = 0
+    let moveStartTop = 0
 
     function positionHandle() {
       if (!selectedImg || !resizeHandle || !editor) return
@@ -311,12 +318,49 @@ function NoteEditor({
     function removeHandle() {
       if (selectedImg) {
         selectedImg.classList.remove('img-selected')
+        selectedImg.removeEventListener('pointerdown', onImagePointerDown)
         selectedImg = null
       }
       if (resizeHandle) {
         resizeHandle.remove()
         resizeHandle = null
       }
+      moveWrapper = null
+    }
+
+    function onImagePointerDown(e: PointerEvent) {
+      if (!selectedImg) return
+      const wrap = selectedImg.parentElement
+      if (!wrap?.classList.contains('img-wrap')) return
+      e.preventDefault()
+      e.stopPropagation()
+      moveWrapper = wrap
+      moveStartX = e.clientX
+      moveStartY = e.clientY
+      moveStartLeft = parseFloat(wrap.style.left || '0')
+      moveStartTop = parseFloat(wrap.style.top || '0')
+      document.addEventListener('pointermove', onMoveMove)
+      document.addEventListener('pointerup', onMoveEnd)
+    }
+
+    function onMoveMove(e: PointerEvent) {
+      if (!moveWrapper) return
+      e.preventDefault()
+      const dx = e.clientX - moveStartX
+      const dy = e.clientY - moveStartY
+      moveWrapper.style.left = `${moveStartLeft + dx}px`
+      moveWrapper.style.top = `${moveStartTop + dy}px`
+      positionHandle()
+    }
+
+    function onMoveEnd() {
+      document.removeEventListener('pointermove', onMoveMove)
+      document.removeEventListener('pointerup', onMoveEnd)
+      if (moveWrapper) {
+        syncEditorContent()
+        moveWrapper = null
+      }
+      positionHandle()
     }
 
     function selectImage(img: HTMLImageElement) {
@@ -326,12 +370,12 @@ function NoteEditor({
 
       resizeHandle = document.createElement('div')
       resizeHandle.className = 'img-resize-handle'
-      // We position relative to the editor which is position:relative
       editor!.style.position = 'relative'
       editor!.appendChild(resizeHandle)
       positionHandle()
 
       resizeHandle.addEventListener('pointerdown', onResizeStart)
+      img.addEventListener('pointerdown', onImagePointerDown)
     }
 
     function onResizeStart(e: PointerEvent) {
@@ -348,7 +392,6 @@ function NoteEditor({
     function onResizeMove(e: PointerEvent) {
       if (!selectedImg) return
       const dx = e.clientX - startX
-      // Keep aspect ratio
       const newW = Math.max(50, startW + dx)
       const ratio = startH / startW
       const newH = Math.max(50, newW * ratio)
@@ -360,7 +403,6 @@ function NoteEditor({
     function onResizeEnd() {
       document.removeEventListener('pointermove', onResizeMove)
       document.removeEventListener('pointerup', onResizeEnd)
-      // Save after resize
       syncEditorContent()
       positionHandle()
     }
@@ -375,6 +417,14 @@ function NoteEditor({
       }
     }
 
+    function preventNativeDrag(e: DragEvent) {
+      const target = e.target as HTMLElement
+      if (target?.closest?.('.img-wrap') || target instanceof HTMLImageElement) {
+        e.preventDefault()
+      }
+    }
+    editor.addEventListener('dragstart', preventNativeDrag)
+
     editor.addEventListener('click', handleClick)
     // Also deselect when clicking outside editor
     function handleOutsideClick(e: Event) {
@@ -385,6 +435,7 @@ function NoteEditor({
     document.addEventListener('click', handleOutsideClick)
 
     return () => {
+      editor.removeEventListener('dragstart', preventNativeDrag)
       editor.removeEventListener('click', handleClick)
       document.removeEventListener('click', handleOutsideClick)
       removeHandle()
@@ -577,11 +628,11 @@ function NoteEditor({
     if (!canvas) return
     const dataUrl = canvas.toDataURL('image/png')
     editorRef.current?.focus()
-    // Insert with resize handle style
+    // Wrapper mit position:relative ermöglicht Verschieben; draggable="false" verhindert native Kopien
     document.execCommand(
       'insertHTML',
       false,
-      `<img src="${dataUrl}" alt="Zeichnung" style="max-width:100%;width:300px;border-radius:12px;margin:8px 0" /><p><br></p>`,
+      `<span class="img-wrap" contenteditable="false" draggable="false" style="display:inline-block;position:relative;left:0;top:0;margin:8px 0"><img src="${dataUrl}" alt="Zeichnung" draggable="false" style="max-width:100%;width:300px;border-radius:12px;cursor:move" /></span><p><br></p>`,
     )
     syncEditorContent()
     setIsDrawing(false)
@@ -707,7 +758,7 @@ function NoteEditor({
   const tbtnActive = 'border-blue-500 bg-blue-500 text-white'
 
   return (
-    <div className="mx-auto w-full max-w-3xl" style={{ color: 'var(--color-text-primary)' }}>
+    <div className="mx-auto w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl" style={{ color: 'var(--color-text-primary)' }}>
       {/* ── Top bar ── */}
       <header
         className="sticky top-0 z-30 px-3 pb-2 backdrop-blur"
@@ -1127,7 +1178,7 @@ function NoteEditor({
             onInput={readOnly ? undefined : syncEditorContent}
             onKeyDown={readOnly ? undefined : handleEditorKeyDown}
             onFocus={readOnly ? undefined : () => updateFormatState()}
-            className={`note-editor min-h-[40vh] w-full rounded-2xl border p-4 text-base leading-7 outline-none ${readOnly ? 'cursor-default' : ''}`}
+            className={`note-editor min-h-[40vh] lg:min-h-[55vh] w-full rounded-2xl border p-4 text-base leading-7 outline-none ${readOnly ? 'cursor-default' : ''}`}
             style={{
               borderColor: 'var(--color-border)',
               backgroundColor: 'var(--color-bg-card)',

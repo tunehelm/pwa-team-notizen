@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Dashboard-Vorschau – iPhone</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      background: #1e293b;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    /* iPhone-Rahmen wie Xcode Preview */
+    .iphone-frame {
+      width: 390px;
+      height: 844px;
+      background: #000;
+      border-radius: 44px;
+      padding: 12px;
+      box-shadow: 0 25px 80px rgba(0,0,0,0.5);
+      position: relative;
+    }
+    .iphone-screen {
+      width: 100%;
+      height: 100%;
+      background: #0f172a;
+      border-radius: 34px;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    .iphone-notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 125px;
+      height: 32px;
+      background: #000;
+      border-radius: 0 0 20px 20px;
+      z-index: 10;
+    }
+    .app-scroll {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 16px;
+    }
+    /* Header */
+    .header {
+      background: #0f172a;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+      padding: 12px 16px;
+      padding-top: calc(12px + 32px);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 1.125rem; font-weight: 600; flex: 1; }
+    .header-icon { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 0.875rem; }
+    /* User block */
+    .user-block {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      margin: 0 16px 16px;
+      border-radius: 12px;
+      background: #1e293b;
+    }
+    .user-block p:first-child { font-size: 0.75rem; color: #94a3b8; }
+    .user-block p:last-child { font-size: 1.125rem; font-weight: 600; }
+    .user-actions { display: flex; gap: 12px; }
+    .btn-plus { width: 40px; height: 40px; border-radius: 50%; background: #2563eb; color: white; border: none; font-size: 1.25rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .btn-avatar { width: 40px; height: 40px; border-radius: 50%; background: #7c3aed; color: white; border: none; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+    /* Section title */
+    .section-title { font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin: 0 16px 8px; display: flex; align-items: center; gap: 6px; }
+    /* Fixiert – horizontal scroll + bar */
+    .fixiert-wrap { margin-bottom: 8px; }
+    .fixiert-scroll {
+      display: flex;
+      gap: 16px;
+      overflow-x: auto;
+      padding: 0 16px 8px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .fixiert-scroll::-webkit-scrollbar { height: 4px; }
+    .fixiert-scroll::-webkit-scrollbar-track { background: rgba(51,65,85,0.5); border-radius: 4px; }
+    .fixiert-scroll::-webkit-scrollbar-thumb { background: #64748b; border-radius: 4px; }
+    .card-fixiert {
+      flex: 0 0 224px;
+      width: 224px;
+      min-height: 120px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 16px;
+      scroll-snap-align: start;
+    }
+    .card-fixiert .icon { width: 48px; height: 48px; border-radius: 12px; background: #3b82f6; margin-bottom: 8px; }
+    .card-fixiert .title { font-size: 0.875rem; font-weight: 600; }
+    .card-fixiert .meta { font-size: 0.75rem; color: #94a3b8; margin-top: 4px; }
+    .scroll-bar-wrap { margin: 6px 16px 0; height: 4px; background: rgba(51,65,85,0.6); border-radius: 4px; overflow: hidden; }
+    .scroll-bar-fill { height: 100%; width: 33%; background: #64748b; border-radius: 4px; transition: width 0.15s; }
+    /* Bereiche – Einzelkarten mit Abstand, kein Pfeil */
+    .bereiche { padding: 0 16px 24px; }
+    .card-bereich {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .card-bereich:last-child { margin-bottom: 0; }
+    .card-bereich .icon { width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0; }
+    .card-bereich .icon.amber { background: rgba(245,158,11,0.2); }
+    .card-bereich .icon.blue { background: rgba(59,130,246,0.2); }
+    .card-bereich .icon.green { background: rgba(34,197,94,0.2); }
+    .card-bereich .content { flex: 1; min-width: 0; }
+    .card-bereich .name { font-size: 0.875rem; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+    .card-bereich .badge { font-size: 0.5625rem; font-weight: 600; padding: 2px 6px; border-radius: 9999px; background: rgba(245,158,11,0.2); color: #f59e0b; }
+    .card-bereich .meta { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+    .hinweis { padding: 12px 16px; margin: 0 16px; background: rgba(51,65,85,0.3); border-radius: 12px; font-size: 0.75rem; color: #94a3b8; text-align: center; }
+    /* Bottom nav – innerhalb iPhone */
+    .bottom-nav {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #0f172a;
+      border-top: 1px solid #334155;
+      padding: 8px 0;
+      padding-bottom: calc(8px + env(safe-area-inset-bottom));
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .bottom-nav span { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.625rem; color: #94a3b8; }
+    .bottom-nav span.active { color: #60a5fa; }
+    .spacer { height: 72px; }
+    .caption { margin-top: 20px; max-width: 390px; padding: 12px 16px; background: #334155; border-radius: 12px; font-size: 0.75rem; color: #94a3b8; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div style="display: flex; flex-direction: column; align-items: center;">
+    <div class="iphone-frame">
+      <div class="iphone-screen">
+        <div class="iphone-notch"></div>
+        <header class="header">
+          <div class="header-icon">☰</div>
+          <h1>Hallo, Thomas</h1>
+          <div class="header-icon">↻</div>
+          <div class="header-icon">🔍</div>
+        </header>
+
+        <div class="app-scroll">
+          <div class="user-block">
+            <div>
+              <p>Willkommen zurück</p>
+              <p>Thomas Braun</p>
+            </div>
+            <div class="user-actions">
+              <button type="button" class="btn-plus">+</button>
+              <button type="button" class="btn-avatar">TB</button>
+            </div>
+          </div>
+
+          <p class="section-title">📌 Fixiert</p>
+          <div class="fixiert-wrap">
+            <div class="fixiert-scroll" id="scrollEl">
+              <div class="card-fixiert">
+                <div class="icon"></div>
+                <div class="title">iPhone UX Checkliste</div>
+                <div class="meta">gestern</div>
+              </div>
+              <div class="card-fixiert">
+                <div class="icon"></div>
+                <div class="title">Retro Woche 05</div>
+                <div class="meta">vor 5 Tagen</div>
+              </div>
+              <div class="card-fixiert">
+                <div class="icon"></div>
+                <div class="title">Dantrolen</div>
+                <div class="meta">vor 4 Std.</div>
+              </div>
+            </div>
+            <div class="scroll-bar-wrap">
+              <div class="scroll-bar-fill" id="scrollFill"></div>
+            </div>
+          </div>
+
+          <p class="section-title">Bereiche</p>
+          <div class="bereiche">
+            <a href="#" class="card-bereich">
+              <div class="icon amber"></div>
+              <div class="content">
+                <div class="name">Infos <span class="badge">Nur Lesen</span></div>
+                <div class="meta">1 Notizen · 1 Ordner</div>
+              </div>
+            </a>
+            <a href="#" class="card-bereich">
+              <div class="icon blue"></div>
+              <div class="content">
+                <div class="name">test-sm</div>
+                <div class="meta">0 Notizen · 2 Ordner</div>
+              </div>
+            </a>
+            <a href="#" class="card-bereich">
+              <div class="icon green"></div>
+              <div class="content">
+                <div class="name">Projekte</div>
+                <div class="meta">2 Notizen · 1 Ordner</div>
+              </div>
+            </a>
+          </div>
+
+          <p class="hinweis">„Zuletzt Bearbeitet“ ist in dieser Vorschau entfernt.</p>
+          <div class="spacer"></div>
+        </div>
+
+        <nav class="bottom-nav">
+          <span class="active">🏠 Start</span>
+          <span>🔍 Suche</span>
+          <span>🔒 Privat</span>
+          <span>👥 Team</span>
+        </nav>
+      </div>
+    </div>
+    <p class="caption">Dashboard-Vorschau wie auf dem iPhone (Xcode-Style). Doppelklick im Finder öffnet im Browser.</p>
+  </div>
+
+  <script>
+    var el = document.getElementById('scrollEl');
+    var fill = document.getElementById('scrollFill');
+    if (el && fill) {
+      el.addEventListener('scroll', function() {
+        var max = el.scrollWidth - el.clientWidth;
+        var pct = max > 0 ? (el.scrollLeft / max) * 100 : 100;
+        fill.style.width = pct + '%';
+      });
+    }
+  </script>
+</body>
+</html>

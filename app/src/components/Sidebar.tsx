@@ -16,40 +16,29 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     folders: allFolders,
     getMainFolderItems,
     getPinnedFolderItems,
+    getFolderNoteItems,
     findNoteById,
   } = useAppData()
 
-  const [manualExpandedIds, setManualExpandedIds] = useState<Set<string>>(new Set())
-  const [manualCollapsedIds, setManualCollapsedIds] = useState<Set<string>>(new Set())
-
-  const toggleExpand = useCallback((folderId: string) => {
-    setManualExpandedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(folderId)) next.delete(folderId)
-      else next.add(folderId)
-      return next
-    })
-    setManualCollapsedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(folderId)) next.delete(folderId)
-      else next.add(folderId)
-      return next
-    })
-  }, [])
+  const [manualState, setManualState] = useState<{
+    expanded: Set<string>
+    collapsed: Set<string>
+  }>({ expanded: new Set(), collapsed: new Set() })
 
   const rootFolders = getMainFolderItems()
   const pinnedFolders = getPinnedFolderItems()
 
   const userName = currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'Team')
 
-  // Aktiver Ordner aus URL ermitteln – auch für Notizseiten den Elternordner finden
+  // Aktiver Ordner und Notiz aus URL ermitteln
   let activeFolderId: string | null = null
+  let activeNoteId: string | null = null
   if (location.pathname.startsWith('/folder/')) {
     activeFolderId = location.pathname.split('/folder/')[1]?.split('/')[0] || null
   } else if (location.pathname.startsWith('/note/')) {
-    // Notiz-Seite: Finde den Ordner der Notiz
     const noteId = location.pathname.split('/note/')[1]?.split('/')[0]
     if (noteId) {
+      activeNoteId = noteId
       const note = findNoteById(noteId)
       if (note?.folderId) {
         activeFolderId = note.folderId
@@ -67,14 +56,43 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     }
   }
 
+  const toggleExpand = useCallback(
+    (folderId: string, e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setManualState((prev) => {
+        const isExpanded =
+          !prev.collapsed.has(folderId) &&
+          (folderId === activeFolderId ||
+            prev.expanded.has(folderId) ||
+            activeAncestorIds.has(folderId) ||
+            allFolders.filter((f) => f.parentId === folderId).some((c) => c.id === activeFolderId))
+        const nextExpanded = new Set(prev.expanded)
+        const nextCollapsed = new Set(prev.collapsed)
+        if (isExpanded) {
+          nextExpanded.delete(folderId)
+          nextCollapsed.add(folderId)
+        } else {
+          nextExpanded.add(folderId)
+          nextCollapsed.delete(folderId)
+        }
+        return { expanded: nextExpanded, collapsed: nextCollapsed }
+      })
+    },
+    [activeAncestorIds, activeFolderId, allFolders]
+  )
+
   // Ein Ordner ist expanded wenn:
-  // 1. Er manuell expanded wurde, ODER
-  // 2. Er ein Vorfahre des aktiven Ordners ist (und nicht manuell collapsed)
+  // 1. User hat explizit zugeklappt → immer zugeklappt
+  // 2. Wir sind in diesem Ordner (activeFolderId) → aufgeklappt (Hierarchie widerspiegeln)
+  // 3. User hat explizit aufgeklappt
+  // 4. Ordner ist Vorfahre des aktiven Ordners
+  // 5. Ein Kind von ihm ist aktiv
   function isFolderExpanded(folderId: string): boolean {
-    if (manualCollapsedIds.has(folderId) && !activeAncestorIds.has(folderId)) return false
-    if (manualExpandedIds.has(folderId)) return true
+    if (manualState.collapsed.has(folderId)) return false
+    if (folderId === activeFolderId) return true
+    if (manualState.expanded.has(folderId)) return true
     if (activeAncestorIds.has(folderId)) return true
-    // Auch expandieren wenn ein Kind aktiv ist
     const children = allFolders.filter((f) => f.parentId === folderId)
     if (children.some((c) => c.id === activeFolderId)) return true
     return false
@@ -131,11 +149,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 overflow-y-auto px-2 py-3 scrollbar-none">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 scrollbar-none">
           {/* Fixierte Ordner */}
           {pinnedFolders.length > 0 ? (
-            <div className="mb-4">
-              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-sidebar-text-muted)' }}>
+            <div className="mb-5">
+              <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--color-sidebar-text-muted)' }}>
                 Fixiert
               </p>
               {pinnedFolders.map((folder, idx) => {
@@ -150,7 +168,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     key={folder.id}
                     to={`/folder/${folder.id}`}
                     onClick={onClose}
-                    className={`sidebar-link flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm transition-colors ${
+                    className={`sidebar-link flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
                       isActive ? 'bg-blue-500 text-white font-medium' : ''
                     }`}
                     style={isActive ? undefined : { color: 'var(--color-sidebar-text)' }}
@@ -167,7 +185,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
           {/* Alle Ordner */}
           <div>
-            <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-sidebar-text-muted)' }}>
+            <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--color-sidebar-text-muted)' }}>
               Bereiche
             </p>
             {rootFolders.map((folder, idx) => {
@@ -178,16 +196,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 : FOLDER_COLOR_CYCLE[idx % FOLDER_COLOR_CYCLE.length]
               const isActive = activeFolderId === folder.id
               const children = allFolders.filter((f) => f.parentId === folder.id)
+              const folderNotes = getFolderNoteItems(folder.id)
+              const hasExpandableContent = children.length > 0 || folderNotes.length > 0
               const expanded = isFolderExpanded(folder.id)
               return (
-                <div key={folder.id}>
-                  <div className="flex items-center">
-                    {/* Expand toggle */}
-                    {children.length > 0 ? (
+                <div key={folder.id} className="mb-0.5">
+                  <div className="flex items-center rounded-lg transition-colors group">
+                    {/* Pfeil: indiziert Unterordner/Notizen, klickbar zum Auf-/Zuklappen */}
+                    {hasExpandableContent ? (
                       <button
                         type="button"
-                        onClick={() => toggleExpand(folder.id)}
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded transition-colors"
+                        onClick={(e) => toggleExpand(folder.id, e)}
+                        className="flex h-8 w-6 shrink-0 cursor-pointer items-center justify-center rounded-l-lg transition-colors hover:bg-white/5"
                         style={{ color: 'var(--color-sidebar-text-muted)' }}
                       >
                         <svg
@@ -195,18 +215,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                           fill="none"
                           stroke="currentColor"
                           strokeWidth="2"
-                          className={`h-3 w-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                          className={`h-3 w-3 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
                         >
                           <path d="M9 6l6 6-6 6" />
                         </svg>
                       </button>
                     ) : (
-                      <span className="w-6 shrink-0" />
+                      <span className="flex h-8 w-6 shrink-0 items-center justify-center" />
                     )}
                     <Link
                       to={`/folder/${folder.id}`}
                       onClick={onClose}
-                      className={`sidebar-link flex flex-1 items-center gap-2.5 rounded-xl px-2 py-2 text-sm transition-colors ${
+                      className={`sidebar-link flex flex-1 items-center gap-2.5 rounded-r-lg px-2.5 py-2 text-sm transition-colors ${
                         isActive ? 'bg-blue-500 text-white font-medium' : ''
                       }`}
                       style={isActive ? undefined : { color: 'var(--color-sidebar-text)' }}
@@ -222,9 +242,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       ) : null}
                     </Link>
                   </div>
-                  {/* Unterordner */}
-                  {expanded && children.length > 0 ? (
-                    <div className="ml-6">
+                  {/* Unterordner + Notizen – weiche Einrückung */}
+                  {expanded && hasExpandableContent ? (
+                    <div className="ml-3 border-l border-slate-500/30 pl-3 mt-0.5">
                       {children.map((child, childIdx) => {
                         const cIsRo = child.access === 'readonly'
                         const cIconId = cIsRo ? READONLY_ICON : (child.icon || 'folder')
@@ -232,17 +252,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                           ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
                           : FOLDER_COLOR_CYCLE[childIdx % FOLDER_COLOR_CYCLE.length]
                         const cIsActive = activeFolderId === child.id
-                        // Dritte Ebene
                         const grandchildren = allFolders.filter((f) => f.parentId === child.id)
+                        const childNotes = getFolderNoteItems(child.id)
+                        const childHasExpandable = grandchildren.length > 0 || childNotes.length > 0
                         const cIsExpanded = isFolderExpanded(child.id)
                         return (
-                          <div key={child.id}>
+                          <div key={child.id} className="mb-0.5">
                             <div className="flex items-center">
-                              {grandchildren.length > 0 ? (
+                              {childHasExpandable ? (
                                 <button
                                   type="button"
-                                  onClick={() => toggleExpand(child.id)}
-                                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors"
+                                  onClick={(e) => toggleExpand(child.id, e)}
+                                  className="flex h-7 w-5 shrink-0 cursor-pointer items-center justify-center rounded-l-md transition-colors hover:bg-white/5"
                                   style={{ color: 'var(--color-sidebar-text-muted)' }}
                                 >
                                   <svg
@@ -250,18 +271,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                     fill="none"
                                     stroke="currentColor"
                                     strokeWidth="2"
-                                    className={`h-2.5 w-2.5 transition-transform ${cIsExpanded ? 'rotate-90' : ''}`}
+                                    className={`h-2.5 w-2.5 transition-transform duration-150 ${cIsExpanded ? 'rotate-90' : ''}`}
                                   >
                                     <path d="M9 6l6 6-6 6" />
                                   </svg>
                                 </button>
                               ) : (
-                                <span className="w-5 shrink-0" />
+                                <span className="flex h-7 w-5 shrink-0" />
                               )}
                               <Link
                                 to={`/folder/${child.id}`}
                                 onClick={onClose}
-                                className={`sidebar-link flex flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] transition-colors ${
+                                className={`sidebar-link flex flex-1 items-center gap-2 rounded-r-md px-2 py-1.5 text-[13px] transition-colors ${
                                   cIsActive ? 'bg-blue-500 text-white font-medium' : ''
                                 }`}
                                 style={cIsActive ? undefined : { color: 'var(--color-sidebar-text)' }}
@@ -272,9 +293,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 <span className="truncate">{child.name}</span>
                               </Link>
                             </div>
-                            {/* Grandchildren */}
-                            {cIsExpanded && grandchildren.length > 0 ? (
-                              <div className="ml-5">
+                            {/* Grandchildren + Notizen im Child – weiche Einrückung */}
+                            {cIsExpanded && (grandchildren.length > 0 || childNotes.length > 0) ? (
+                              <div className="ml-3 border-l border-slate-500/25 pl-3 mt-0.5">
                                 {grandchildren.map((gc, gcIdx) => {
                                   const gcIsRo = gc.access === 'readonly'
                                   const gcIconId = gcIsRo ? READONLY_ICON : (gc.icon || 'folder')
@@ -282,26 +303,152 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                     ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
                                     : FOLDER_COLOR_CYCLE[gcIdx % FOLDER_COLOR_CYCLE.length]
                                   const gcIsActive = activeFolderId === gc.id
+                                  const gcNotes = getFolderNoteItems(gc.id)
+                                  const gcHasExpandable = gcNotes.length > 0
+                                  const gcIsExpanded = isFolderExpanded(gc.id)
                                   return (
-                                    <Link
-                                      key={gc.id}
-                                      to={`/folder/${gc.id}`}
-                                      onClick={onClose}
-                                      className={`sidebar-link flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] transition-colors ${
-                                        gcIsActive ? 'bg-blue-500 text-white font-medium' : ''
-                                      }`}
-                                      style={gcIsActive ? undefined : { color: 'var(--color-sidebar-text)' }}
-                                    >
-                                      <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${gcIsActive ? 'bg-white/20' : gcColor.bg}`}>
-                                        <FolderIcon icon={gcIconId} className={`h-2.5 w-2.5 ${gcIsActive ? 'stroke-white' : gcColor.stroke}`} />
+                                    <div key={gc.id} className="mb-0.5">
+                                      <div className="flex items-center">
+                                        {gcHasExpandable ? (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => toggleExpand(gc.id, e)}
+                                            className="flex h-6 w-5 shrink-0 cursor-pointer items-center justify-center rounded-l-md transition-colors hover:bg-white/5"
+                                            style={{ color: 'var(--color-sidebar-text-muted)' }}
+                                          >
+                                            <svg
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              strokeWidth="2"
+                                              className={`h-2 w-2 transition-transform duration-150 ${gcIsExpanded ? 'rotate-90' : ''}`}
+                                            >
+                                              <path d="M9 6l6 6-6 6" />
+                                            </svg>
+                                          </button>
+                                        ) : (
+                                          <span className="flex h-6 w-5 shrink-0" />
+                                        )}
+                                        <Link
+                                          to={`/folder/${gc.id}`}
+                                          onClick={onClose}
+                                          className={`sidebar-link flex flex-1 items-center gap-2 rounded-r-md px-2 py-1.5 text-[12px] transition-colors ${
+                                            gcIsActive ? 'bg-blue-500 text-white font-medium' : ''
+                                          }`}
+                                          style={gcIsActive ? undefined : { color: 'var(--color-sidebar-text)' }}
+                                        >
+                                          <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${gcIsActive ? 'bg-white/20' : gcColor.bg}`}>
+                                            <FolderIcon icon={gcIconId} className={`h-2.5 w-2.5 ${gcIsActive ? 'stroke-white' : gcColor.stroke}`} />
+                                          </div>
+                                          <span className="truncate">{gc.name}</span>
+                                        </Link>
                                       </div>
-                                      <span className="truncate">{gc.name}</span>
-                                    </Link>
+                                      {/* Notizen im Grandchild-Ordner */}
+                                      {gcIsExpanded &&
+                                        gcNotes.map((note) => {
+                                          const noteIsActive = activeNoteId === note.id
+                                          return (
+                                            <Link
+                                              key={note.id}
+                                              to={`/note/${note.id}`}
+                                              onClick={onClose}
+                                              className={`sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 pl-4 text-[12px] transition-colors ${
+                                                noteIsActive ? 'bg-blue-500 text-white font-medium' : ''
+                                              }`}
+                                              style={noteIsActive ? undefined : { color: 'var(--color-sidebar-text)' }}
+                                            >
+                                              <div
+                                                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded ${
+                                                  noteIsActive ? 'bg-white/20' : 'bg-blue-500/20'
+                                                }`}
+                                              >
+                                                <svg
+                                                  viewBox="0 0 24 24"
+                                                  fill="none"
+                                                  stroke="currentColor"
+                                                  strokeWidth="1.8"
+                                                  className={`h-2 w-2 ${noteIsActive ? 'stroke-white' : 'stroke-blue-400'}`}
+                                                >
+                                                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                                                  <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+                                                </svg>
+                                              </div>
+                                              <span className="truncate">{note.title}</span>
+                                            </Link>
+                                          )
+                                        })}
+                                    </div>
                                   )
                                 })}
-                              </div>
-                            ) : null}
+                                {/* Notizen im Child-Ordner */}
+                                {childNotes.map((note) => {
+                                  const noteIsActive = activeNoteId === note.id
+                                  return (
+                                    <Link
+                                      key={note.id}
+                                      to={`/note/${note.id}`}
+                                      onClick={onClose}
+                                      className={`sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] transition-colors ${
+                                        noteIsActive ? 'bg-blue-500 text-white font-medium' : ''
+                                      }`}
+                                    style={noteIsActive ? undefined : { color: 'var(--color-sidebar-text)' }}
+                                  >
+                                    <div
+                                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
+                                        noteIsActive ? 'bg-white/20' : 'bg-blue-500/20'
+                                      }`}
+                                    >
+                                      <svg
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="1.8"
+                                        className={`h-2.5 w-2.5 ${noteIsActive ? 'stroke-white' : 'stroke-blue-400'}`}
+                                      >
+                                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                                        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+                                      </svg>
+                                    </div>
+                                    <span className="truncate">{note.title}</span>
+                                  </Link>
+                                  )
+                                })}
+                            </div>
+                          ) : null}
                           </div>
+                        )
+                      })}
+                      {/* Notizen im Root-Ordner */}
+                      {folderNotes.map((note) => {
+                        const noteIsActive = activeNoteId === note.id
+                        return (
+                          <Link
+                            key={note.id}
+                            to={`/note/${note.id}`}
+                            onClick={onClose}
+                            className={`sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
+                              noteIsActive ? 'bg-blue-500 text-white font-medium' : ''
+                            }`}
+                            style={noteIsActive ? undefined : { color: 'var(--color-sidebar-text)' }}
+                          >
+                            <div
+                              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
+                                noteIsActive ? 'bg-white/20' : 'bg-blue-500/20'
+                              }`}
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                className={`h-3 w-3 ${noteIsActive ? 'stroke-white' : 'stroke-blue-400'}`}
+                              >
+                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                                <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+                              </svg>
+                            </div>
+                            <span className="truncate">{note.title}</span>
+                          </Link>
                         )
                       })}
                     </div>
@@ -310,17 +457,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               )
             })}
             {rootFolders.length === 0 ? (
-              <p className="px-2 py-3 text-xs" style={{ color: 'var(--color-sidebar-text-muted)' }}>Keine Ordner vorhanden</p>
+              <p className="px-3 py-4 text-xs" style={{ color: 'var(--color-sidebar-text-muted)' }}>Keine Ordner vorhanden</p>
             ) : null}
           </div>
         </nav>
 
         {/* Bottom Nav Links – statisch fixiert */}
-        <div className="shrink-0 px-2 py-2" style={{ borderTop: '1px solid var(--color-sidebar-border)' }}>
+        <div className="shrink-0 px-3 py-3" style={{ borderTop: '1px solid var(--color-sidebar-border)' }}>
           <Link
             to="/"
             onClick={onClose}
-            className={`flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm transition-colors ${
+            className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
               location.pathname === '/'
                 ? 'bg-blue-500/20 text-blue-400 font-medium'
                 : ''
@@ -335,7 +482,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <Link
             to="/private"
             onClick={onClose}
-            className={`flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm transition-colors ${
+            className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
               location.pathname === '/private'
                 ? 'bg-blue-500/20 text-blue-400 font-medium'
                 : ''
@@ -350,7 +497,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <Link
             to="/team"
             onClick={onClose}
-            className={`flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm transition-colors ${
+            className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
               location.pathname === '/team'
                 ? 'bg-blue-500/20 text-blue-400 font-medium'
                 : ''
@@ -365,7 +512,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <Link
             to="/trash"
             onClick={onClose}
-            className={`flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm transition-colors ${
+            className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
               location.pathname === '/trash'
                 ? 'bg-blue-500/20 text-blue-400 font-medium'
                 : ''

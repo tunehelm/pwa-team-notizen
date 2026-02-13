@@ -36,9 +36,12 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Sidebar link hover */
+/* Sidebar link hover – weich wie Layout-Idee */
 .sidebar-link:hover {
   background-color: var(--color-sidebar-hover);
+}
+.sidebar-link:active {
+  background-color: rgba(255, 255, 255, 0.03);
 }
 
 /* Hide scrollbar for horizontal scroll containers */
@@ -130,7 +133,12 @@ body {
   margin: 12px 0;
 }
 
-/* Selectable images in editor */
+/* Selectable images in editor – native Drag verhindern (Kopien-Bug) */
+.note-editor img,
+.note-editor .img-wrap {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
 .note-editor img {
   display: inline-block;
   cursor: pointer;
