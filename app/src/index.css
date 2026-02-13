@@ -174,3 +174,16 @@ body {
 .note-editor {
   caret-color: var(--color-accent);
 }
+
+/* Bottom Navigation – safe area für iPhone Home-Indicator */
+.bottom-nav-safe {
+  padding-bottom: 4px;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+}
+/* iPhone PWA Standalone: Fallback falls env() 0 liefert */
+@media (display-mode: standalone) {
+  .bottom-nav-safe {
+    padding-bottom: 24px;
+    padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 4px);
+  }
+}

@@ -19,8 +19,7 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
   return (
     <nav
       aria-label="Navigation"
-      className="shrink-0 border-t border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-900/90"
-      style={{ paddingBottom: '4px' }}
+      className="bottom-nav-safe shrink-0 border-t border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-900/90"
     >
       <ul className="mx-auto grid w-full max-w-xl grid-cols-4">
         {tabs.map((tab) => {
