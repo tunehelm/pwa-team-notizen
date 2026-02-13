@@ -250,8 +250,11 @@ export function DashboardPage() {
                       <div className="flex items-center gap-1.5">
                         <p className="text-sm font-medium text-[var(--color-text-primary)]">{folder.name}</p>
                         {isReadonly ? (
-                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                            Nur Lesen
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30" title="Nur Lesen">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-2.5 w-2.5 text-amber-700 dark:text-amber-400">
+                              <rect x="3" y="11" width="18" height="11" rx="2" />
+                              <path d="M7 11V7a5 5 0 0110 0v4" />
+                            </svg>
                           </span>
                         ) : null}
                       </div>

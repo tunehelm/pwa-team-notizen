@@ -825,11 +825,18 @@ function NoteEditor({
           <Link to={backPath} className="h-11 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-[var(--color-bg-card)]" style={{ color: 'var(--color-text-primary)' }}>
             ← Zurück
           </Link>
-          <p
-            className={`text-xs font-medium transition-opacity duration-300 ${readOnly ? 'text-amber-500' : saveIndicator === 'saving' ? 'text-blue-400' : 'text-emerald-600'}`}
-          >
-            {readOnly ? 'Nur Lesen' : saveIndicator === 'saving' ? 'Speichert...' : 'Gespeichert'}
-          </p>
+          {readOnly ? (
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-900/30" title="Nur Lesen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 text-amber-400">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0110 0v4" />
+              </svg>
+            </span>
+          ) : (
+            <p className={`text-xs font-medium transition-opacity duration-300 ${saveIndicator === 'saving' ? 'text-blue-400' : 'text-emerald-600'}`}>
+              {saveIndicator === 'saving' ? 'Speichert...' : 'Gespeichert'}
+            </p>
+          )}
           <div className="relative" ref={noteMenuRef}>
             <button
               type="button"
@@ -1222,11 +1229,6 @@ function NoteEditor({
         />
 
         <div className="relative mt-4">
-          {isEditorEmpty && !readOnly ? (
-            <p className="pointer-events-none absolute left-4 top-4 text-base" style={{ color: 'var(--color-text-muted)' }}>
-              Schreib hier...
-            </p>
-          ) : null}
           <div
             ref={setEditorNode}
             contentEditable={!readOnly}
