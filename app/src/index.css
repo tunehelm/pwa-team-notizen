@@ -24,16 +24,6 @@
   color-scheme: dark;
 }
 
-/*
- * iOS Standalone (Home-Screen PWA):
- * env(safe-area-inset-top) liefert beim ersten Paint manchmal 0.
- * Deshalb hardcoden wir 47px (iPhone Notch/Dynamic Island).
- */
-html.ios-standalone {
-  --app-safe-top: 47px;
-  --app-safe-bottom: 34px;
-}
-
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',

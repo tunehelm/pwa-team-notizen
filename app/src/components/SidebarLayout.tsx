@@ -21,9 +21,6 @@ function isDesktop() {
 /** Auto-Polling Intervall in ms */
 const POLL_INTERVAL = 30_000
 
-/** iOS Standalone: feste Werte verwenden, sonst env() */
-const isIOSStandalone = typeof document !== 'undefined' && document.documentElement.classList.contains('ios-standalone')
-const safeTop = isIOSStandalone ? '47px' : 'env(safe-area-inset-top, 0px)'
 
 export function SidebarLayout({ children, title }: SidebarLayoutProps) {
   // Auf Desktop standardmäßig offen, auf Mobile standardmäßig geschlossen
@@ -140,10 +137,8 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Top Header Bar – auf Mobile bei Notiz-Seite ausgeblendet (Menu+Refresh in NotePage) */}
           <header
-            className={`flex shrink-0 items-center gap-3 px-4 ${isNotePage ? 'hidden lg:flex' : ''}`}
+            className={`flex h-14 shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] ${isNotePage ? 'hidden lg:flex' : ''}`}
             style={{
-              paddingTop: safeTop,
-              minHeight: '56px',
               backgroundColor: 'var(--color-sidebar)',
               borderBottom: '1px solid var(--color-sidebar-border)',
             }}
@@ -264,8 +259,7 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
         {/* Scrollable Content */}
         <main
           ref={mainRef}
-          className={`flex-1 overflow-y-auto ${isNotePage ? 'lg:pt-0' : ''}`}
-          style={isNotePage ? { paddingTop: safeTop } : undefined}
+          className={`flex-1 overflow-y-auto ${isNotePage ? 'pt-[env(safe-area-inset-top)] lg:pt-0' : ''}`}
         >
           {children}
         </main>

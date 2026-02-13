@@ -8,7 +8,6 @@ import App from './App.tsx'
 registerSW()
 injectSpeedInsights()
 
-// iOS-Standalone-Erkennung passiert jetzt im <head> von index.html (vor React-Paint)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
