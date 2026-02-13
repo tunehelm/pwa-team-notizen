@@ -21,7 +21,20 @@
   --color-sidebar-border: rgba(51, 65, 85, 0.6);
   --color-sidebar-text: #e2e8f0;
   --color-sidebar-text-muted: #64748b;
+  --app-safe-top: env(safe-area-inset-top, 0px);
+  --app-safe-bottom: env(safe-area-inset-bottom, 0px);
   color-scheme: dark;
+}
+
+/* iOS Home-Screen (Standalone): stabiler Fallback beim ersten Start */
+html.ios-standalone {
+  --app-safe-top: max(env(safe-area-inset-top, 0px), 20px);
+}
+
+html,
+body,
+#root {
+  height: 100%;
 }
 
 body {
@@ -146,12 +159,11 @@ body {
 .note-editor .img-wrap {
   display: block;
 }
-/* Mobile: Kein Float – Zeichnungen bleiben im Editor sichtbar */
+/* Mobile: Kein Float – Zeichnungen bleiben im Editor sichtbar.
+   Nur float überschreiben, margin-left/top NICHT – sonst funktioniert Verschieben nicht. */
 @media (max-width: 1023px) {
   .note-editor .img-wrap {
     float: none !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
   }
 }
 .note-editor img.img-selected {

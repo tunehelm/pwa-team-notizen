@@ -128,7 +128,7 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
 
   return (
     <LayoutProvider value={layoutValue}>
-      <div className="flex h-screen overflow-hidden bg-[var(--color-bg-app)]">
+      <div className="flex h-dvh min-h-screen overflow-hidden bg-[var(--color-bg-app)]">
         {/* Sidebar */}
         <Sidebar isOpen={sidebarOpen} onClose={() => { if (!isDesktop()) setSidebarOpen(false) }} />
 
@@ -136,8 +136,9 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Top Header Bar – auf Mobile bei Notiz-Seite ausgeblendet (Menu+Refresh in NotePage) */}
           <header
-            className={`flex h-14 shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] ${isNotePage ? 'hidden lg:flex' : ''}`}
+            className={`flex h-14 shrink-0 items-center gap-3 px-4 ${isNotePage ? 'hidden lg:flex' : ''}`}
             style={{
+              paddingTop: 'var(--app-safe-top)',
               backgroundColor: 'var(--color-sidebar)',
               borderBottom: '1px solid var(--color-sidebar-border)',
             }}
@@ -258,7 +259,7 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
         {/* Scrollable Content – Safe-Area-Padding auf Mobile bei Notiz-Seite (Header ausgeblendet) */}
         <main
           ref={mainRef}
-          className={`flex-1 overflow-y-auto ${isNotePage ? 'pt-[env(safe-area-inset-top)] lg:pt-0' : ''}`}
+          className={`flex-1 overflow-y-auto ${isNotePage ? 'pt-[var(--app-safe-top)] lg:pt-0' : ''}`}
         >
           {children}
         </main>
