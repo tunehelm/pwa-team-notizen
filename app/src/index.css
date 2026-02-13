@@ -26,32 +26,38 @@
   color-scheme: dark;
 }
 
-/* iOS Home-Screen (Standalone): stabiler Fallback beim ersten Start */
+/* ── iOS Standalone (Home-Screen PWA) ── */
+
+/* Fallback: mindestens 47px oben (iPhone Dynamic Island / Notch) */
 html.ios-standalone {
-  --app-safe-top: max(env(safe-area-inset-top, 0px), 44px);
-}
-html.ios-standalone,
-html.ios-standalone body {
-  height: 100dvh;
-  overflow: hidden;
-  overscroll-behavior: none;
-}
-html.ios-standalone #root {
-  height: 100dvh;
-  overflow: hidden;
-}
-html.ios-standalone body,
-html.ios-standalone #root,
-html.ios-standalone .app-shell {
-  position: fixed;
-  inset: 0;
-  width: 100%;
+  --app-safe-top: max(env(safe-area-inset-top, 47px), 47px);
+  --app-safe-bottom: max(env(safe-area-inset-bottom, 34px), 34px);
 }
 
+/* Auch per Media-Query als Backup (greift ohne JS) */
+@media (display-mode: standalone) {
+  :root {
+    --app-safe-top: max(env(safe-area-inset-top, 47px), 47px);
+    --app-safe-bottom: max(env(safe-area-inset-bottom, 34px), 34px);
+  }
+}
+
+/* Bounce/Overscroll komplett unterbinden im Standalone-Modus */
+html.pwa-standalone,
+html.pwa-standalone body {
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Basis-Layout ── */
 html,
 body,
 #root {
   height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 body {

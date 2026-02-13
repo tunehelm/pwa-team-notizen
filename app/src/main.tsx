@@ -8,13 +8,7 @@ import App from './App.tsx'
 registerSW()
 injectSpeedInsights()
 
-const nav = window.navigator as Navigator & { standalone?: boolean }
-const isIOS = /iphone|ipad|ipod/i.test(window.navigator.userAgent)
-const isStandalone = window.matchMedia('(display-mode: standalone)').matches || nav.standalone === true
-
-if (isIOS && isStandalone) {
-  document.documentElement.classList.add('ios-standalone')
-}
+// iOS-Standalone-Erkennung passiert jetzt im <head> von index.html (vor React-Paint)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
