@@ -112,7 +112,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           // Basis – sidebar look via CSS vars
           'flex h-full w-64 shrink-0 flex-col border-r transition-all duration-300',
           // Mobile: Fixed Overlay
-          'fixed left-0 top-0 z-40 pt-[env(safe-area-inset-top)]',
+          'fixed left-0 top-0 z-40',
           // Desktop: Static, im Flex-Layout
           'lg:relative lg:z-0',
           // Toggle
