@@ -18,6 +18,19 @@ export const SELECTABLE_ICONS: { id: string; label: string }[] = [
   { id: 'camera', label: 'Kamera' },
   { id: 'music', label: 'Musik' },
   { id: 'plane', label: 'Reise' },
+  { id: 'car', label: 'Auto' },
+  { id: 'thought', label: 'Gedanke' },
+  { id: 'alert', label: 'Wichtig' },
+  { id: 'pill', label: 'Gesundheit' },
+  { id: 'bolt', label: 'Blitz' },
+  { id: 'clock', label: 'Uhr' },
+  { id: 'pencil', label: 'Stift' },
+  { id: 'key', label: 'Schlüssel' },
+  { id: 'users', label: 'Team' },
+  { id: 'check', label: 'Erledigt' },
+  { id: 'euro', label: 'Finanzen' },
+  { id: 'phone', label: 'Telefon' },
+  { id: 'mail', label: 'E-Mail' },
 ]
 
 /** Das einzigartige Readonly-Icon (Schild) – nicht auswählbar */
@@ -142,6 +155,89 @@ export function FolderIcon({ icon, className }: { icon: string; className: strin
       return (
         <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" />
+        </svg>
+      )
+    case 'car':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 17h14M5 17a2 2 0 01-2-2v-4l2.6-5.2A2 2 0 017.4 4h9.2a2 2 0 011.8 1.1L21 10v5a2 2 0 01-2 2M5 17a2 2 0 100 4 2 2 0 000-4zM19 17a2 2 0 100 4 2 2 0 000-4z" />
+          <path d="M3 10h18" />
+        </svg>
+      )
+    case 'thought':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+          <circle cx="9" cy="10" r="1" fill="currentColor" /><circle cx="12" cy="10" r="1" fill="currentColor" /><circle cx="15" cy="10" r="1" fill="currentColor" />
+        </svg>
+      )
+    case 'alert':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      )
+    case 'pill':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10.5 1.5l-8 8a5.66 5.66 0 008 8l8-8a5.66 5.66 0 00-8-8z" />
+          <line x1="6" y1="14" x2="14" y2="6" />
+        </svg>
+      )
+    case 'bolt':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+        </svg>
+      )
+    case 'clock':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+        </svg>
+      )
+    case 'pencil':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+        </svg>
+      )
+    case 'key':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+        </svg>
+      )
+    case 'users':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
+        </svg>
+      )
+    case 'check':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+      )
+    case 'euro':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17.5 7A6.5 6.5 0 007 12a6.5 6.5 0 0010.5 5" /><line x1="4" y1="10" x2="14" y2="10" /><line x1="4" y1="14" x2="14" y2="14" />
+        </svg>
+      )
+    case 'phone':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />
+        </svg>
+      )
+    case 'mail':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22 6 12 13 2 6" />
         </svg>
       )
     case 'shield':
