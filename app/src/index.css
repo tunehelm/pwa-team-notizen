@@ -140,8 +140,11 @@ body {
   user-drag: none;
 }
 .note-editor img {
-  display: inline-block;
   cursor: pointer;
+}
+/* Float-Bilder: Text fließt um das Bild, Bild bleibt beim Tippen stabil */
+.note-editor .img-wrap {
+  display: block;
 }
 .note-editor img.img-selected {
   outline: 2px solid var(--color-accent);

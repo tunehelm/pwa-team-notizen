@@ -30,15 +30,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const userName = currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'Team')
 
-  // Aktiver Ordner und Notiz aus URL ermitteln
+  // Aktiver Ordner aus URL ermitteln (für Hierarchie-Aufklappung)
   let activeFolderId: string | null = null
-  let activeNoteId: string | null = null
   if (location.pathname.startsWith('/folder/')) {
     activeFolderId = location.pathname.split('/folder/')[1]?.split('/')[0] || null
   } else if (location.pathname.startsWith('/note/')) {
     const noteId = location.pathname.split('/note/')[1]?.split('/')[0]
     if (noteId) {
-      activeNoteId = noteId
       const note = findNoteById(noteId)
       if (note?.folderId) {
         activeFolderId = note.folderId
@@ -162,19 +160,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 const color = isRo
                   ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
                   : FOLDER_COLOR_CYCLE[idx % FOLDER_COLOR_CYCLE.length]
-                const isActive = activeFolderId === folder.id
                 return (
                   <Link
                     key={folder.id}
                     to={`/folder/${folder.id}`}
                     onClick={onClose}
-                    className={`sidebar-link flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
-                      isActive ? 'bg-blue-500 text-white font-medium' : ''
-                    }`}
-                    style={isActive ? undefined : { color: 'var(--color-sidebar-text)' }}
+                    className="sidebar-link flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors"
+                    style={{ color: 'var(--color-sidebar-text)' }}
                   >
-                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${isActive ? 'bg-white/20' : color.bg}`}>
-                      <FolderIcon icon={iconId} className={`h-3.5 w-3.5 ${isActive ? 'stroke-white' : color.stroke}`} />
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${color.bg}`}>
+                      <FolderIcon icon={iconId} className={`h-3.5 w-3.5 ${color.stroke}`} />
                     </div>
                     <span className="truncate">{folder.name}</span>
                   </Link>
@@ -194,7 +189,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               const color = isRo
                 ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
                 : FOLDER_COLOR_CYCLE[idx % FOLDER_COLOR_CYCLE.length]
-              const isActive = activeFolderId === folder.id
               const children = allFolders.filter((f) => f.parentId === folder.id)
               const folderNotes = getFolderNoteItems(folder.id)
               const hasExpandableContent = children.length > 0 || folderNotes.length > 0
@@ -226,13 +220,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     <Link
                       to={`/folder/${folder.id}`}
                       onClick={onClose}
-                      className={`sidebar-link flex flex-1 items-center gap-2.5 rounded-r-lg px-2.5 py-2 text-sm transition-colors ${
-                        isActive ? 'bg-blue-500 text-white font-medium' : ''
-                      }`}
-                      style={isActive ? undefined : { color: 'var(--color-sidebar-text)' }}
+                      className="sidebar-link flex flex-1 items-center gap-2.5 rounded-r-lg px-2.5 py-2 text-sm transition-colors"
+                      style={{ color: 'var(--color-sidebar-text)' }}
                     >
-                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${isActive ? 'bg-white/20' : color.bg}`}>
-                        <FolderIcon icon={iconId} className={`h-3.5 w-3.5 ${isActive ? 'stroke-white' : color.stroke}`} />
+                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${color.bg}`}>
+                        <FolderIcon icon={iconId} className={`h-3.5 w-3.5 ${color.stroke}`} />
                       </div>
                       <span className="truncate">{folder.name}</span>
                       {isRo ? (
@@ -251,7 +243,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         const cColor = cIsRo
                           ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
                           : FOLDER_COLOR_CYCLE[childIdx % FOLDER_COLOR_CYCLE.length]
-                        const cIsActive = activeFolderId === child.id
                         const grandchildren = allFolders.filter((f) => f.parentId === child.id)
                         const childNotes = getFolderNoteItems(child.id)
                         const childHasExpandable = grandchildren.length > 0 || childNotes.length > 0
@@ -282,13 +273,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                               <Link
                                 to={`/folder/${child.id}`}
                                 onClick={onClose}
-                                className={`sidebar-link flex flex-1 items-center gap-2 rounded-r-md px-2 py-1.5 text-[13px] transition-colors ${
-                                  cIsActive ? 'bg-blue-500 text-white font-medium' : ''
-                                }`}
-                                style={cIsActive ? undefined : { color: 'var(--color-sidebar-text)' }}
+                                className="sidebar-link flex flex-1 items-center gap-2 rounded-r-md px-2 py-1.5 text-[13px] transition-colors"
+                                style={{ color: 'var(--color-sidebar-text)' }}
                               >
-                                <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${cIsActive ? 'bg-white/20' : cColor.bg}`}>
-                                  <FolderIcon icon={cIconId} className={`h-3 w-3 ${cIsActive ? 'stroke-white' : cColor.stroke}`} />
+                                <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${cColor.bg}`}>
+                                  <FolderIcon icon={cIconId} className={`h-3 w-3 ${cColor.stroke}`} />
                                 </div>
                                 <span className="truncate">{child.name}</span>
                               </Link>
@@ -302,7 +291,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                   const gcColor = gcIsRo
                                     ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
                                     : FOLDER_COLOR_CYCLE[gcIdx % FOLDER_COLOR_CYCLE.length]
-                                  const gcIsActive = activeFolderId === gc.id
                                   const gcNotes = getFolderNoteItems(gc.id)
                                   const gcHasExpandable = gcNotes.length > 0
                                   const gcIsExpanded = isFolderExpanded(gc.id)
@@ -332,42 +320,33 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                         <Link
                                           to={`/folder/${gc.id}`}
                                           onClick={onClose}
-                                          className={`sidebar-link flex flex-1 items-center gap-2 rounded-r-md px-2 py-1.5 text-[12px] transition-colors ${
-                                            gcIsActive ? 'bg-blue-500 text-white font-medium' : ''
-                                          }`}
-                                          style={gcIsActive ? undefined : { color: 'var(--color-sidebar-text)' }}
+                                          className="sidebar-link flex flex-1 items-center gap-2 rounded-r-md px-2 py-1.5 text-[12px] transition-colors"
+                                          style={{ color: 'var(--color-sidebar-text)' }}
                                         >
-                                          <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${gcIsActive ? 'bg-white/20' : gcColor.bg}`}>
-                                            <FolderIcon icon={gcIconId} className={`h-2.5 w-2.5 ${gcIsActive ? 'stroke-white' : gcColor.stroke}`} />
+                                          <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${gcColor.bg}`}>
+                                            <FolderIcon icon={gcIconId} className={`h-2.5 w-2.5 ${gcColor.stroke}`} />
                                           </div>
                                           <span className="truncate">{gc.name}</span>
                                         </Link>
                                       </div>
-                                      {/* Notizen im Grandchild-Ordner */}
-                                      {gcIsExpanded &&
-                                        gcNotes.map((note) => {
-                                          const noteIsActive = activeNoteId === note.id
-                                          return (
+                                      {/* Notizen im Grandchild-Ordner – eigene Ebene mit vertikaler Linie */}
+                                      {gcIsExpanded && gcNotes.length > 0 ? (
+                                        <div className="ml-3 mt-0.5 border-l border-slate-500/25 pl-3">
+                                          {gcNotes.map((note) => (
                                             <Link
                                               key={note.id}
                                               to={`/note/${note.id}`}
                                               onClick={onClose}
-                                              className={`sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 pl-4 text-[12px] transition-colors ${
-                                                noteIsActive ? 'bg-blue-500 text-white font-medium' : ''
-                                              }`}
-                                              style={noteIsActive ? undefined : { color: 'var(--color-sidebar-text)' }}
+                                              className="sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] transition-colors"
+                                              style={{ color: 'var(--color-sidebar-text)' }}
                                             >
-                                              <div
-                                                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded ${
-                                                  noteIsActive ? 'bg-white/20' : 'bg-blue-500/20'
-                                                }`}
-                                              >
+                                              <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-blue-500/20">
                                                 <svg
                                                   viewBox="0 0 24 24"
                                                   fill="none"
                                                   stroke="currentColor"
                                                   strokeWidth="1.8"
-                                                  className={`h-2 w-2 ${noteIsActive ? 'stroke-white' : 'stroke-blue-400'}`}
+                                                  className="h-2 w-2 stroke-blue-400"
                                                 >
                                                   <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
                                                   <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
@@ -375,82 +354,73 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                               </div>
                                               <span className="truncate">{note.title}</span>
                                             </Link>
-                                          )
-                                        })}
+                                          ))}
+                                        </div>
+                                      ) : null}
                                     </div>
                                   )
                                 })}
-                                {/* Notizen im Child-Ordner */}
-                                {childNotes.map((note) => {
-                                  const noteIsActive = activeNoteId === note.id
-                                  return (
-                                    <Link
-                                      key={note.id}
-                                      to={`/note/${note.id}`}
-                                      onClick={onClose}
-                                      className={`sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] transition-colors ${
-                                        noteIsActive ? 'bg-blue-500 text-white font-medium' : ''
-                                      }`}
-                                    style={noteIsActive ? undefined : { color: 'var(--color-sidebar-text)' }}
-                                  >
-                                    <div
-                                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
-                                        noteIsActive ? 'bg-white/20' : 'bg-blue-500/20'
-                                      }`}
-                                    >
-                                      <svg
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="1.8"
-                                        className={`h-2.5 w-2.5 ${noteIsActive ? 'stroke-white' : 'stroke-blue-400'}`}
+                                {/* Notizen im Child-Ordner – eigene Ebene mit vertikaler Linie */}
+                                {childNotes.length > 0 ? (
+                                  <div className="ml-3 mt-0.5 border-l border-slate-500/25 pl-3">
+                                    {childNotes.map((note) => (
+                                      <Link
+                                        key={note.id}
+                                        to={`/note/${note.id}`}
+                                        onClick={onClose}
+                                        className="sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] transition-colors"
+                                        style={{ color: 'var(--color-sidebar-text)' }}
                                       >
-                                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                                        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-                                      </svg>
-                                    </div>
-                                    <span className="truncate">{note.title}</span>
-                                  </Link>
-                                  )
-                                })}
+                                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-blue-500/20">
+                                          <svg
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="1.8"
+                                            className="h-2.5 w-2.5 stroke-blue-400"
+                                          >
+                                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                                            <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+                                          </svg>
+                                        </div>
+                                        <span className="truncate">{note.title}</span>
+                                      </Link>
+                                    ))}
+                                  </div>
+                                ) : null}
                             </div>
                           ) : null}
                           </div>
                         )
                       })}
-                      {/* Notizen im Root-Ordner */}
-                      {folderNotes.map((note) => {
-                        const noteIsActive = activeNoteId === note.id
-                        return (
-                          <Link
-                            key={note.id}
-                            to={`/note/${note.id}`}
-                            onClick={onClose}
-                            className={`sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
-                              noteIsActive ? 'bg-blue-500 text-white font-medium' : ''
-                            }`}
-                            style={noteIsActive ? undefined : { color: 'var(--color-sidebar-text)' }}
-                          >
-                            <div
-                              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
-                                noteIsActive ? 'bg-white/20' : 'bg-blue-500/20'
-                              }`}
+                      {/* Notizen im Root-Ordner – eigene Ebene mit vertikaler Linie */}
+                      {folderNotes.length > 0 ? (
+                        <div className="ml-3 mt-0.5 border-l border-slate-500/25 pl-3">
+                          {folderNotes.map((note) => (
+                            <Link
+                              key={note.id}
+                              to={`/note/${note.id}`}
+                              onClick={onClose}
+                              className="sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors"
+                              style={{ color: 'var(--color-sidebar-text)' }}
                             >
-                              <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.8"
-                                className={`h-3 w-3 ${noteIsActive ? 'stroke-white' : 'stroke-blue-400'}`}
-                              >
-                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-500/20">
+                                <svg
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                  className="h-3 w-3 stroke-blue-400"
+                                >
+                                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
                                 <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
                               </svg>
                             </div>
                             <span className="truncate">{note.title}</span>
                           </Link>
-                        )
-                      })}
+                        ))}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

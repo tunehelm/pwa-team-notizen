@@ -337,8 +337,9 @@ function NoteEditor({
       moveWrapper = wrap
       moveStartX = e.clientX
       moveStartY = e.clientY
-      moveStartLeft = parseFloat(wrap.style.left || '0')
-      moveStartTop = parseFloat(wrap.style.top || '0')
+      // Float-Element: margin für Position nutzen (bleibt stabil beim Tippen)
+      moveStartLeft = parseFloat(wrap.style.marginLeft || '0')
+      moveStartTop = parseFloat(wrap.style.marginTop || '0')
       document.addEventListener('pointermove', onMoveMove)
       document.addEventListener('pointerup', onMoveEnd)
     }
@@ -348,8 +349,8 @@ function NoteEditor({
       e.preventDefault()
       const dx = e.clientX - moveStartX
       const dy = e.clientY - moveStartY
-      moveWrapper.style.left = `${moveStartLeft + dx}px`
-      moveWrapper.style.top = `${moveStartTop + dy}px`
+      moveWrapper.style.marginLeft = `${moveStartLeft + dx}px`
+      moveWrapper.style.marginTop = `${moveStartTop + dy}px`
       positionHandle()
     }
 
@@ -628,11 +629,11 @@ function NoteEditor({
     if (!canvas) return
     const dataUrl = canvas.toDataURL('image/png')
     editorRef.current?.focus()
-    // Wrapper mit position:relative ermöglicht Verschieben; draggable="false" verhindert native Kopien
+    // Block-Wrapper: float:left + clear:both-Nachbar = Text kann oben, rechts, unten fließen; Bild bleibt stabil
     document.execCommand(
       'insertHTML',
       false,
-      `<span class="img-wrap" contenteditable="false" draggable="false" style="display:inline-block;position:relative;left:0;top:0;margin:8px 0"><img src="${dataUrl}" alt="Zeichnung" draggable="false" style="max-width:100%;width:300px;border-radius:12px;cursor:move" /></span><p><br></p>`,
+      `<div class="img-wrap" contenteditable="false" draggable="false" style="float:left;margin:8px 16px 8px 0"><img src="${dataUrl}" alt="Zeichnung" draggable="false" style="max-width:100%;width:300px;border-radius:12px;cursor:move;display:block" /></div><p><br></p>`,
     )
     syncEditorContent()
     setIsDrawing(false)
