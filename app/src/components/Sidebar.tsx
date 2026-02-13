@@ -236,7 +236,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   </div>
                   {/* Unterordner + Notizen – weiche Einrückung */}
                   {expanded && hasExpandableContent ? (
-                    <div className="ml-3 border-l border-slate-500/30 pl-3 mt-0.5">
+                    <div className="ml-3 pl-3 mt-0.5">
                       {children.map((child, childIdx) => {
                         const cIsRo = child.access === 'readonly'
                         const cIconId = cIsRo ? READONLY_ICON : (child.icon || 'folder')
@@ -284,7 +284,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                             </div>
                             {/* Grandchildren + Notizen im Child – weiche Einrückung */}
                             {cIsExpanded && (grandchildren.length > 0 || childNotes.length > 0) ? (
-                              <div className="ml-3 border-l border-slate-500/25 pl-3 mt-0.5">
+                              <div className="ml-3 pl-3 mt-0.5">
                                 {grandchildren.map((gc, gcIdx) => {
                                   const gcIsRo = gc.access === 'readonly'
                                   const gcIconId = gcIsRo ? READONLY_ICON : (gc.icon || 'folder')
@@ -331,7 +331,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                       </div>
                                       {/* Notizen im Grandchild-Ordner – eigene Ebene mit vertikaler Linie */}
                                       {gcIsExpanded && gcNotes.length > 0 ? (
-                                        <div className="ml-3 mt-0.5 border-l border-slate-500/25 pl-3">
+                                        <div className="ml-3 mt-0.5 pl-3">
                                           {gcNotes.map((note) => (
                                             <Link
                                               key={note.id}
@@ -362,7 +362,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 })}
                                 {/* Notizen im Child-Ordner – eigene Ebene mit vertikaler Linie */}
                                 {childNotes.length > 0 ? (
-                                  <div className="ml-3 mt-0.5 border-l border-slate-500/25 pl-3">
+                                  <div className="ml-3 mt-0.5 pl-3">
                                     {childNotes.map((note) => (
                                       <Link
                                         key={note.id}
@@ -395,7 +395,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       })}
                       {/* Notizen im Root-Ordner – eigene Ebene mit vertikaler Linie */}
                       {folderNotes.length > 0 ? (
-                        <div className="ml-3 mt-0.5 border-l border-slate-500/25 pl-3">
+                        <div className="ml-3 mt-0.5 pl-3">
                           {folderNotes.map((note) => (
                             <Link
                               key={note.id}

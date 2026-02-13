@@ -146,6 +146,14 @@ body {
 .note-editor .img-wrap {
   display: block;
 }
+/* Mobile: Kein Float – Zeichnungen bleiben im Editor sichtbar */
+@media (max-width: 1023px) {
+  .note-editor .img-wrap {
+    float: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+}
 .note-editor img.img-selected {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;

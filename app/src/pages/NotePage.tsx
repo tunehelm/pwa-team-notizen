@@ -11,6 +11,7 @@ import {
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { type NoteItem } from '../data/mockData'
 import { SidebarLayout } from '../components/SidebarLayout'
+import { useLayoutContext } from '../context/LayoutContext'
 import { MoveNoteModal } from '../components/MoveNoteModal'
 import { ShareModal } from '../components/ShareModal'
 import { useAppData } from '../state/useAppData'
@@ -753,10 +754,15 @@ function NoteEditor({
 
   /* ── Render ── */
 
+  const layout = useLayoutContext()
   const tbtn =
     'flex h-10 min-w-10 items-center justify-center rounded-xl border px-2.5 text-sm transition-colors'
   const tbtnDefault = 'border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card)] active:bg-[var(--color-border)]'
   const tbtnActive = 'border-blue-500 bg-blue-500 text-white'
+
+  const headerBtn =
+    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors lg:hidden'
+  const headerBtnStyle = { color: 'var(--color-sidebar-text-muted)' }
 
   return (
     <div className="mx-auto w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl" style={{ color: 'var(--color-text-primary)' }}>
@@ -766,6 +772,56 @@ function NoteEditor({
         style={{ paddingTop: '0.5rem', backgroundColor: 'color-mix(in srgb, var(--color-bg-app) 92%, transparent)', borderBottom: '1px solid var(--color-border)' } as CSSProperties}
       >
         <div className="flex items-center justify-between gap-2">
+          {/* Mobile: Menu + Refresh in derselben Zeile wie Zurück/Nur Lesen */}
+          {layout ? (
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => layout.setSidebarOpen((v) => !v)}
+                className={headerBtn}
+                style={headerBtnStyle}
+                aria-label="Sidebar"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="h-5 w-5">
+                  <path d="M3 12h18M3 6h18M3 18h18" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={layout.onRefresh}
+                disabled={layout.isRefreshing}
+                className={headerBtn}
+                style={headerBtnStyle}
+                aria-label="Aktualisieren"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`h-4.5 w-4.5 ${layout.isRefreshing ? 'animate-spin' : ''}`}
+                >
+                  <path d="M21 2v6h-6" />
+                  <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                  <path d="M3 22v-6h6" />
+                  <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={layout.onSearch}
+                className={headerBtn}
+                style={headerBtnStyle}
+                aria-label="Suche"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4.5 w-4.5">
+                  <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+                </svg>
+              </button>
+            </div>
+          ) : null}
           <Link to={backPath} className="h-11 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-[var(--color-bg-card)]" style={{ color: 'var(--color-text-primary)' }}>
             ← Zurück
           </Link>

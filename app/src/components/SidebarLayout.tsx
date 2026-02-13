@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { BottomNavigation } from './BottomNavigation'
+import { LayoutProvider } from '../context/LayoutContext'
 import { useAppData } from '../state/useAppData'
 
 interface SidebarLayoutProps {
@@ -109,21 +110,38 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
     }
   }
 
-  return (
-    <div className="flex h-screen overflow-hidden bg-[var(--color-bg-app)]">
-      {/* Sidebar */}
-      <Sidebar isOpen={sidebarOpen} onClose={() => { if (!isDesktop()) setSidebarOpen(false) }} />
+  const location = useLocation()
+  const isNotePage = /^\/note\/[^/]+$/.test(location.pathname)
 
-      {/* Main Content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top Header Bar */}
-        <header
-          className="flex h-14 shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)]"
-          style={{
-            backgroundColor: 'var(--color-sidebar)',
-            borderBottom: '1px solid var(--color-sidebar-border)',
-          }}
-        >
+  const layoutValue = {
+    setSidebarOpen,
+    onRefresh: () => void handleRefresh(),
+    isRefreshing,
+    onSearch: () => {
+      if (isDesktop()) {
+        setShowSearch(true)
+      } else {
+        navigate('/search')
+      }
+    },
+  }
+
+  return (
+    <LayoutProvider value={layoutValue}>
+      <div className="flex h-screen overflow-hidden bg-[var(--color-bg-app)]">
+        {/* Sidebar */}
+        <Sidebar isOpen={sidebarOpen} onClose={() => { if (!isDesktop()) setSidebarOpen(false) }} />
+
+        {/* Main Content */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Top Header Bar – auf Mobile bei Notiz-Seite ausgeblendet (Menu+Refresh in NotePage) */}
+          <header
+            className={`flex h-14 shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] ${isNotePage ? 'hidden lg:flex' : ''}`}
+            style={{
+              backgroundColor: 'var(--color-sidebar)',
+              borderBottom: '1px solid var(--color-sidebar-border)',
+            }}
+          >
           {/* Sidebar Toggle */}
           <button
             type="button"
@@ -237,8 +255,11 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
           </div>
         ) : null}
 
-        {/* Scrollable Content */}
-        <main ref={mainRef} className="flex-1 overflow-y-auto">
+        {/* Scrollable Content – Safe-Area-Padding auf Mobile bei Notiz-Seite (Header ausgeblendet) */}
+        <main
+          ref={mainRef}
+          className={`flex-1 overflow-y-auto ${isNotePage ? 'pt-[env(safe-area-inset-top)] lg:pt-0' : ''}`}
+        >
           {children}
         </main>
 
@@ -247,7 +268,7 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
           <BottomNavigation />
         </div>
       </div>
-
-    </div>
+      </div>
+    </LayoutProvider>
   )
 }
