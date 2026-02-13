@@ -327,13 +327,28 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
       },
       updateFolderAccess: async (folderId, access) => {
         const previous = folders
+        // Alle Unterordner rekursiv sammeln
+        function getDescendantIds(parentId: string, allFolders: typeof folders): string[] {
+          const children = allFolders.filter((f) => f.parentId === parentId)
+          const ids: string[] = []
+          for (const child of children) {
+            ids.push(child.id)
+            ids.push(...getDescendantIds(child.id, allFolders))
+          }
+          return ids
+        }
+        const allIds = new Set([folderId, ...getDescendantIds(folderId, folders)])
+        // Optimistisches Update für alle betroffenen Ordner
         setFolders((prev) =>
           prev.map((folder) =>
-            folder.id === folderId ? { ...folder, access } : folder,
+            allIds.has(folder.id) ? { ...folder, access } : folder,
           ),
         )
         try {
-          await updateFolderAccessApi(folderId, access)
+          // Alle betroffenen Ordner in Supabase updaten
+          await Promise.all(
+            Array.from(allIds).map((id) => updateFolderAccessApi(id, access)),
+          )
         } catch (error) {
           setFolders(previous)
           showApiError('Zugriffsmodus konnte nicht geändert werden.', error)
