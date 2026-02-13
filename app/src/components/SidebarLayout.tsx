@@ -128,7 +128,7 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
 
   return (
     <LayoutProvider value={layoutValue}>
-      <div className="flex h-dvh min-h-screen overflow-hidden bg-[var(--color-bg-app)]">
+      <div className="app-shell flex h-dvh overflow-hidden bg-[var(--color-bg-app)]">
         {/* Sidebar */}
         <Sidebar isOpen={sidebarOpen} onClose={() => { if (!isDesktop()) setSidebarOpen(false) }} />
 
@@ -260,6 +260,7 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
         <main
           ref={mainRef}
           className={`flex-1 overflow-y-auto ${isNotePage ? 'pt-[var(--app-safe-top)] lg:pt-0' : ''}`}
+          style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'none', touchAction: 'pan-y' }}
         >
           {children}
         </main>

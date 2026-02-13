@@ -28,7 +28,24 @@
 
 /* iOS Home-Screen (Standalone): stabiler Fallback beim ersten Start */
 html.ios-standalone {
-  --app-safe-top: max(env(safe-area-inset-top, 0px), 20px);
+  --app-safe-top: max(env(safe-area-inset-top, 0px), 44px);
+}
+html.ios-standalone,
+html.ios-standalone body {
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+html.ios-standalone #root {
+  height: 100dvh;
+  overflow: hidden;
+}
+html.ios-standalone body,
+html.ios-standalone #root,
+html.ios-standalone .app-shell {
+  position: fixed;
+  inset: 0;
+  width: 100%;
 }
 
 html,
