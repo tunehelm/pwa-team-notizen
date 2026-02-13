@@ -125,10 +125,10 @@ export function MoveNoteModal({ noteId, noteTitle, currentFolderId, onClose, onM
           <span className="min-w-0 flex-1 truncate">{folder.name}</span>
 
           {isReadonlyTarget ? (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 shrink-0 text-amber-400" title="Nur Lesen">
+            <span title="Nur Lesen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 shrink-0 text-amber-400">
               <rect x="3" y="11" width="18" height="11" rx="2" />
               <path d="M7 11V7a5 5 0 0110 0v4" />
-            </svg>
+            </svg></span>
           ) : isCurrent ? (
             <span className={`shrink-0 text-[10px] ${isSelected ? 'text-white/60' : 'text-[var(--color-text-muted)]'}`}>
               Aktuell
