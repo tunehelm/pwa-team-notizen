@@ -17,6 +17,7 @@ import { ShareModal } from '../components/ShareModal'
 import { useAppData } from '../state/useAppData'
 
 import { isAdminEmail } from '../lib/admin'
+import { SELECTABLE_ICONS, FolderIcon } from '../components/FolderIcons'
 
 export function NotePage() {
   const { id = '' } = useParams()
@@ -116,7 +117,7 @@ interface NoteEditorProps {
   onShareNote?: () => void
 }
 
-type ToolbarPanel = 'none' | 'format' | 'insert' | 'link' | 'draw' | 'table' | 'fontcolor'
+type ToolbarPanel = 'none' | 'format' | 'insert' | 'link' | 'draw' | 'table' | 'fontcolor' | 'symbols'
 
 /* ── Font color presets ── */
 const FONT_COLORS = [
@@ -832,12 +833,10 @@ function NoteEditor({
             ← Zurück
           </Link>
           {readOnly ? (
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-900/30" title="Nur Lesen">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 text-amber-400">
-                <rect x="3" y="11" width="18" height="11" rx="2" />
-                <path d="M7 11V7a5 5 0 0110 0v4" />
-              </svg>
-            </span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-amber-400" title="Nur Lesen">
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0110 0v4" />
+            </svg>
           ) : (
             <p className={`text-xs font-medium transition-opacity duration-300 ${saveIndicator === 'saving' ? 'text-blue-400' : 'text-emerald-600'}`}>
               {saveIndicator === 'saving' ? 'Speichert...' : 'Gespeichert'}
@@ -1092,6 +1091,48 @@ function NoteEditor({
             >
               — Linie
             </button>
+            <button type="button" onClick={() => setActivePanel('symbols')} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+              Symbole
+            </button>
+          </div>
+        ) : null}
+
+        {/* ── Symbols sub-panel ── */}
+        {activePanel === 'symbols' ? (
+          <div className="mt-1.5 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Symbol einfügen</p>
+              <button type="button" onClick={() => setActivePanel('insert')} className="text-xs" style={{ color: 'var(--color-text-muted)' }}>← Zurück</button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {SELECTABLE_ICONS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  title={item.label}
+                  onClick={() => {
+                    editorRef.current?.focus()
+                    // Emoji-basiert: schnell, sauber, und überall unterstützt
+                    const emojiMap: Record<string, string> = {
+                      folder: '📁', bulb: '💡', megaphone: '📢', palette: '🎨',
+                      gear: '⚙️', chart: '📊', star: '⭐', heart: '❤️',
+                      chat: '💬', calendar: '📅', book: '📖', code: '💻',
+                      globe: '🌍', camera: '📷', music: '🎵', plane: '✈️',
+                      car: '🚗', thought: '💭', alert: '⚠️', pill: '💊',
+                      bolt: '⚡', clock: '🕐', pencil: '✏️', key: '🔑',
+                      users: '👥', check: '✅', euro: '💶', phone: '📞', mail: '📧',
+                    }
+                    const emoji = emojiMap[item.id] || item.label
+                    document.execCommand('insertText', false, emoji)
+                    syncEditorContent()
+                  }}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-transparent bg-slate-100 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700"
+                >
+                  <FolderIcon icon={item.id} className="h-4.5 w-4.5 stroke-slate-600 dark:stroke-slate-300" />
+                </button>
+              ))}
+            </div>
           </div>
         ) : null}
 

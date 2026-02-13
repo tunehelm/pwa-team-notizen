@@ -36,19 +36,32 @@ export const SELECTABLE_ICONS: { id: string; label: string }[] = [
 /** Das einzigartige Readonly-Icon (Schild) – nicht auswählbar */
 export const READONLY_ICON = 'shield'
 
-/** Farb-Rotation für Ordner ohne explizites Icon */
+/** Farb-Rotation für Ordner und Notizen – nur Outline, kein Backdrop */
 export const FOLDER_COLOR_CYCLE = [
-  { bg: 'bg-violet-100 dark:bg-violet-900/30', stroke: 'stroke-violet-500' },
-  { bg: 'bg-rose-100 dark:bg-rose-900/30', stroke: 'stroke-rose-500' },
-  { bg: 'bg-cyan-100 dark:bg-cyan-900/30', stroke: 'stroke-cyan-500' },
-  { bg: 'bg-amber-100 dark:bg-amber-900/30', stroke: 'stroke-amber-500' },
-  { bg: 'bg-emerald-100 dark:bg-emerald-900/30', stroke: 'stroke-emerald-500' },
-  { bg: 'bg-blue-100 dark:bg-blue-900/30', stroke: 'stroke-blue-500' },
-  { bg: 'bg-pink-100 dark:bg-pink-900/30', stroke: 'stroke-pink-500' },
-  { bg: 'bg-teal-100 dark:bg-teal-900/30', stroke: 'stroke-teal-500' },
-  { bg: 'bg-indigo-100 dark:bg-indigo-900/30', stroke: 'stroke-indigo-500' },
-  { bg: 'bg-orange-100 dark:bg-orange-900/30', stroke: 'stroke-orange-500' },
+  { bg: 'bg-violet-100 dark:bg-violet-900/30', stroke: 'stroke-violet-500', text: 'text-violet-500' },
+  { bg: 'bg-rose-100 dark:bg-rose-900/30', stroke: 'stroke-rose-500', text: 'text-rose-500' },
+  { bg: 'bg-cyan-100 dark:bg-cyan-900/30', stroke: 'stroke-cyan-500', text: 'text-cyan-500' },
+  { bg: 'bg-amber-100 dark:bg-amber-900/30', stroke: 'stroke-amber-500', text: 'text-amber-500' },
+  { bg: 'bg-emerald-100 dark:bg-emerald-900/30', stroke: 'stroke-emerald-500', text: 'text-emerald-500' },
+  { bg: 'bg-blue-100 dark:bg-blue-900/30', stroke: 'stroke-blue-500', text: 'text-blue-500' },
+  { bg: 'bg-pink-100 dark:bg-pink-900/30', stroke: 'stroke-pink-500', text: 'text-pink-500' },
+  { bg: 'bg-teal-100 dark:bg-teal-900/30', stroke: 'stroke-teal-500', text: 'text-teal-500' },
+  { bg: 'bg-indigo-100 dark:bg-indigo-900/30', stroke: 'stroke-indigo-500', text: 'text-indigo-500' },
+  { bg: 'bg-orange-100 dark:bg-orange-900/30', stroke: 'stroke-orange-500', text: 'text-orange-500' },
 ]
+
+/** Notiz-Icon: Dokument mit Textlinien (wie Apple Notes / Layout-Idee) */
+export function NoteIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" strokeWidth="1.8" />
+      <path d="M14 2v6h6" strokeWidth="1.8" />
+      <line x1="16" y1="13" x2="8" y2="13" strokeWidth="1" />
+      <line x1="16" y1="17" x2="8" y2="17" strokeWidth="1" />
+      <line x1="10" y1="9" x2="8" y2="9" strokeWidth="1" />
+    </svg>
+  )
+}
 
 const svgBase = 'strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"'
 void svgBase // used conceptually below

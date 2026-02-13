@@ -1,12 +1,27 @@
 import { useState, useCallback, type DragEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAppData } from '../state/useAppData'
-import { FolderIcon, FOLDER_COLOR_CYCLE, READONLY_ICON } from './FolderIcons'
+import { FolderIcon, FOLDER_COLOR_CYCLE, NoteIcon } from './FolderIcons'
 import { isAdminEmail } from '../lib/admin'
+import { supabase } from '../lib/supabase'
 
 interface SidebarProps {
   isOpen: boolean
   onClose: () => void
+}
+
+const FOLDER_ORDER_KEY = 'sidebar-folder-order'
+
+function loadFolderOrder(): string[] {
+  try {
+    const raw = localStorage.getItem(FOLDER_ORDER_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch { /* ignore */ }
+  return []
+}
+
+function saveFolderOrder(ids: string[]) {
+  localStorage.setItem(FOLDER_ORDER_KEY, JSON.stringify(ids))
 }
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
@@ -25,14 +40,30 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const isAdmin = isAdminEmail(currentUserEmail)
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const [isEditingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [folderDragOverId, setFolderDragOverId] = useState<string | null>(null)
+  const [folderDragOverPosition, setFolderDragOverPosition] = useState<'above' | 'below' | null>(null)
+  const [folderOrder, setFolderOrder] = useState<string[]>(loadFolderOrder)
 
   const [manualState, setManualState] = useState<{
     expanded: Set<string>
     collapsed: Set<string>
   }>({ expanded: new Set(), collapsed: new Set() })
 
-  const rootFolders = getMainFolderItems()
+  const unsortedRootFolders = getMainFolderItems()
   const pinnedFolders = getPinnedFolderItems()
+
+  // Sortiere Root-Ordner nach gespeicherter Reihenfolge
+  const rootFolders = [...unsortedRootFolders].sort((a, b) => {
+    const aIdx = folderOrder.indexOf(a.id)
+    const bIdx = folderOrder.indexOf(b.id)
+    if (aIdx === -1 && bIdx === -1) return 0 // beide nicht in Order → Originalreihenfolge
+    if (aIdx === -1) return 1 // a nicht in Order → nach hinten
+    if (bIdx === -1) return -1 // b nicht in Order → nach hinten
+    return aIdx - bIdx
+  })
 
   const userName = currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'Team')
 
@@ -140,6 +171,50 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     }
   }
 
+  // ── Ordner-Reihenfolge Drag & Drop ──
+
+  function handleFolderReorderDragStart(e: DragEvent, folderId: string) {
+    e.dataTransfer.setData('text/folder-reorder-id', folderId)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleFolderReorderDragOver(e: DragEvent, targetFolderId: string) {
+    const hasFolderReorder = e.dataTransfer.types.includes('text/folder-reorder-id')
+    if (!hasFolderReorder) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    // Position bestimmen: obere Hälfte → above, untere → below
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const midY = rect.top + rect.height / 2
+    const pos = e.clientY < midY ? 'above' : 'below'
+    setFolderDragOverId(targetFolderId)
+    setFolderDragOverPosition(pos)
+  }
+
+  function handleFolderReorderDrop(e: DragEvent, targetFolderId: string) {
+    e.preventDefault()
+    const draggedId = e.dataTransfer.getData('text/folder-reorder-id')
+    setFolderDragOverId(null)
+    setFolderDragOverPosition(null)
+    if (!draggedId || draggedId === targetFolderId) return
+
+    // Neue Reihenfolge berechnen
+    const currentIds = rootFolders.map((f) => f.id)
+    const fromIdx = currentIds.indexOf(draggedId)
+    const toIdx = currentIds.indexOf(targetFolderId)
+    if (fromIdx === -1 || toIdx === -1) return
+
+    const newOrder = [...currentIds]
+    newOrder.splice(fromIdx, 1) // Entfernen
+    const insertIdx = folderDragOverPosition === 'above'
+      ? newOrder.indexOf(targetFolderId)
+      : newOrder.indexOf(targetFolderId) + 1
+    newOrder.splice(insertIdx, 0, draggedId) // Einfügen
+
+    setFolderOrder(newOrder)
+    saveFolderOrder(newOrder)
+  }
+
   return (
     <>
       {/* Mobile Overlay Backdrop */}
@@ -169,25 +244,85 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         }}
       >
         {/* User Header */}
-        <div className="flex items-center gap-3 px-4 py-4" style={{ borderBottom: '1px solid var(--color-sidebar-border)' }}>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-sm font-semibold text-white">
-            {userName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+        <div className="relative" style={{ borderBottom: '1px solid var(--color-sidebar-border)' }}>
+          <div className="flex items-center gap-3 px-4 py-4">
+            <button
+              type="button"
+              onClick={() => setShowUserMenu((v) => !v)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-sm font-semibold text-white transition-transform active:scale-95"
+            >
+              {userName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowUserMenu((v) => !v)}
+              className="min-w-0 flex-1 text-left"
+            >
+              <p className="truncate text-sm font-semibold" style={{ color: 'var(--color-sidebar-text)' }}>{userName}</p>
+              <p className="truncate text-[10px]" style={{ color: 'var(--color-sidebar-text-muted)' }}>{currentUserEmail}</p>
+            </button>
+            {/* Sidebar schließen (nur mobile) */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-7 w-7 items-center justify-center rounded-lg lg:hidden"
+              style={{ color: 'var(--color-sidebar-text-muted)' }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold" style={{ color: 'var(--color-sidebar-text)' }}>{userName}</p>
-            <p className="truncate text-[10px]" style={{ color: 'var(--color-sidebar-text-muted)' }}>{currentUserEmail}</p>
-          </div>
-          {/* Sidebar schließen (nur mobile) */}
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg lg:hidden"
-            style={{ color: 'var(--color-sidebar-text-muted)' }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
+
+          {/* User-Menü Dropdown */}
+          {showUserMenu ? (
+            <div className="absolute left-3 right-3 top-full z-50 mt-1 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-1 shadow-xl">
+              {isEditingName ? (
+                <form
+                  className="flex gap-1.5 px-2 py-1.5"
+                  onSubmit={async (e) => {
+                    e.preventDefault()
+                    const trimmed = nameInput.trim()
+                    if (!trimmed) return
+                    await supabase.auth.updateUser({ data: { display_name: trimmed } })
+                    window.location.reload()
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder="Vor- und Nachname"
+                    className="h-9 flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-app)] px-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-blue-400 focus:outline-none"
+                    autoFocus
+                  />
+                  <button type="submit" className="h-9 rounded-lg bg-blue-500 px-3 text-xs font-medium text-white active:bg-blue-600">
+                    OK
+                  </button>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setNameInput(currentUserName); setEditingName(true) }}
+                  className="flex h-10 w-full items-center gap-2 rounded-xl px-3 text-left text-sm text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-700"
+                >
+                  <span className="text-base">✏️</span>
+                  {currentUserName ? 'Name ändern' : 'Name eingeben'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowUserMenu(false)
+                  await supabase.auth.signOut()
+                }}
+                className="flex h-10 w-full items-center gap-2 rounded-xl px-3 text-left text-sm text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+              >
+                <span className="text-base">🚪</span>
+                Abmelden
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {/* Navigation Links */}
@@ -200,7 +335,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               </p>
               {pinnedFolders.map((folder, idx) => {
                 const isRo = folder.access === 'readonly'
-                const iconId = isRo ? READONLY_ICON : (folder.icon || 'folder')
+                const iconId = 'folder'
                 const color = isRo
                   ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
                   : FOLDER_COLOR_CYCLE[idx % FOLDER_COLOR_CYCLE.length]
@@ -215,9 +350,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     className={`sidebar-link flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${dragOverFolderId === folder.id ? 'ring-2 ring-inset ring-blue-400 bg-blue-500/10' : ''}`}
                     style={{ color: 'var(--color-sidebar-text)' }}
                   >
-                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${color.bg}`}>
-                      <FolderIcon icon={iconId} className={`h-3.5 w-3.5 ${color.stroke}`} />
-                    </div>
+                    <FolderIcon icon={iconId} className={`h-4 w-4 shrink-0 ${color.stroke}`} />
                     <span className="truncate">{folder.name}</span>
                   </Link>
                 )
@@ -232,7 +365,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </p>
             {rootFolders.map((folder, idx) => {
               const isRo = folder.access === 'readonly'
-              const iconId = isRo ? READONLY_ICON : (folder.icon || 'folder')
+              const iconId = 'folder'
               const color = isRo
                 ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
                 : FOLDER_COLOR_CYCLE[idx % FOLDER_COLOR_CYCLE.length]
@@ -240,13 +373,33 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               const folderNotes = getFolderNoteItems(folder.id)
               const hasExpandableContent = children.length > 0 || folderNotes.length > 0
               const expanded = isFolderExpanded(folder.id)
+              const isFolderReorderTarget = folderDragOverId === folder.id
+              const showReorderAbove = isFolderReorderTarget && folderDragOverPosition === 'above'
+              const showReorderBelow = isFolderReorderTarget && folderDragOverPosition === 'below'
               return (
-                <div key={folder.id} className="mb-0.5">
+                <div
+                  key={folder.id}
+                  className="mb-0.5 relative"
+                  draggable={isAdmin}
+                  onDragStart={isAdmin ? (e: DragEvent<HTMLDivElement>) => handleFolderReorderDragStart(e, folder.id) : undefined}
+                  onDragOver={(e: DragEvent<HTMLDivElement>) => {
+                    handleFolderReorderDragOver(e, folder.id)
+                    handleFolderDragOver(e, folder.id, folder.access, folder.ownerId)
+                  }}
+                  onDragLeave={() => { setDragOverFolderId(null); setFolderDragOverId(null); setFolderDragOverPosition(null) }}
+                  onDrop={(e: DragEvent<HTMLDivElement>) => {
+                    const hasFolderReorder = e.dataTransfer.types.includes('text/folder-reorder-id')
+                    if (hasFolderReorder) {
+                      handleFolderReorderDrop(e, folder.id)
+                    } else {
+                      handleFolderDrop(e, folder.id, folder.access, folder.ownerId)
+                    }
+                  }}
+                >
+                  {/* Reorder-Indikator oben */}
+                  {showReorderAbove ? <div className="absolute left-2 right-2 top-0 h-0.5 rounded-full bg-blue-400" /> : null}
                   <div
-                    className={`flex items-center rounded-lg transition-colors group ${dragOverFolderId === folder.id ? 'ring-2 ring-inset ring-blue-400 bg-blue-500/10' : ''}`}
-                    onDragOver={(e: DragEvent<HTMLDivElement>) => handleFolderDragOver(e, folder.id, folder.access, folder.ownerId)}
-                    onDragLeave={() => setDragOverFolderId(null)}
-                    onDrop={(e: DragEvent<HTMLDivElement>) => handleFolderDrop(e, folder.id, folder.access, folder.ownerId)}
+                    className={`flex items-center rounded-lg transition-colors group ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''} ${dragOverFolderId === folder.id ? 'ring-2 ring-inset ring-blue-400 bg-blue-500/10' : ''}`}
                   >
                     {/* Pfeil: indiziert Unterordner/Notizen, klickbar zum Auf-/Zuklappen */}
                     {hasExpandableContent ? (
@@ -275,26 +428,24 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       className="sidebar-link flex flex-1 items-center gap-2.5 rounded-r-lg px-2.5 py-2 text-sm transition-colors"
                       style={{ color: 'var(--color-sidebar-text)' }}
                     >
-                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${color.bg}`}>
-                        <FolderIcon icon={iconId} className={`h-3.5 w-3.5 ${color.stroke}`} />
-                      </div>
+                      <FolderIcon icon={iconId} className={`h-4 w-4 shrink-0 ${color.stroke}`} />
                       <span className="truncate">{folder.name}</span>
                       {isRo ? (
-                        <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-amber-900/30" title="Nur Lesen">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-2.5 w-2.5 text-amber-400">
-                            <rect x="3" y="11" width="18" height="11" rx="2" />
-                            <path d="M7 11V7a5 5 0 0110 0v4" />
-                          </svg>
-                        </span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="ml-auto h-3 w-3 shrink-0 text-amber-400" title="Nur Lesen">
+                          <rect x="3" y="11" width="18" height="11" rx="2" />
+                          <path d="M7 11V7a5 5 0 0110 0v4" />
+                        </svg>
                       ) : null}
                     </Link>
                   </div>
+                  {/* Reorder-Indikator unten */}
+                  {showReorderBelow ? <div className="absolute left-2 right-2 bottom-0 h-0.5 rounded-full bg-blue-400" /> : null}
                   {/* Unterordner + Notizen – weiche Einrückung */}
                   {expanded && hasExpandableContent ? (
                     <div className="ml-3 pl-3 mt-0.5">
                       {children.map((child, childIdx) => {
                         const cIsRo = child.access === 'readonly'
-                        const cIconId = cIsRo ? READONLY_ICON : (child.icon || 'folder')
+                        const cIconId = 'folder'
                         const cColor = cIsRo
                           ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
                           : FOLDER_COLOR_CYCLE[childIdx % FOLDER_COLOR_CYCLE.length]
@@ -336,9 +487,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 className="sidebar-link flex flex-1 items-center gap-2 rounded-r-md px-2 py-1.5 text-[13px] transition-colors"
                                 style={{ color: 'var(--color-sidebar-text)' }}
                               >
-                                <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${cColor.bg}`}>
-                                  <FolderIcon icon={cIconId} className={`h-3 w-3 ${cColor.stroke}`} />
-                                </div>
+                                <FolderIcon icon={cIconId} className={`h-3.5 w-3.5 shrink-0 ${cColor.stroke}`} />
                                 <span className="truncate">{child.name}</span>
                               </Link>
                             </div>
@@ -347,7 +496,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                               <div className="ml-3 pl-3 mt-0.5">
                                 {grandchildren.map((gc, gcIdx) => {
                                   const gcIsRo = gc.access === 'readonly'
-                                  const gcIconId = gcIsRo ? READONLY_ICON : (gc.icon || 'folder')
+                                  const gcIconId = 'folder'
                                   const gcColor = gcIsRo
                                     ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
                                     : FOLDER_COLOR_CYCLE[gcIdx % FOLDER_COLOR_CYCLE.length]
@@ -388,9 +537,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                           className="sidebar-link flex flex-1 items-center gap-2 rounded-r-md px-2 py-1.5 text-[12px] transition-colors"
                                           style={{ color: 'var(--color-sidebar-text)' }}
                                         >
-                                          <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${gcColor.bg}`}>
-                                            <FolderIcon icon={gcIconId} className={`h-2.5 w-2.5 ${gcColor.stroke}`} />
-                                          </div>
+                                          <FolderIcon icon={gcIconId} className={`h-3 w-3 shrink-0 ${gcColor.stroke}`} />
                                           <span className="truncate">{gc.name}</span>
                                         </Link>
                                       </div>
@@ -407,18 +554,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                               className="sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] transition-colors"
                                               style={{ color: 'var(--color-sidebar-text)' }}
                                             >
-                                              <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-blue-500/20">
-                                                <svg
-                                                  viewBox="0 0 24 24"
-                                                  fill="none"
-                                                  stroke="currentColor"
-                                                  strokeWidth="1.8"
-                                                  className="h-2 w-2 stroke-blue-400"
-                                                >
-                                                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                                                  <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-                                                </svg>
-                                              </div>
+                                              <NoteIcon className="h-3 w-3 shrink-0 stroke-blue-400" />
                                               <span className="truncate">{note.title}</span>
                                             </Link>
                                           ))}
@@ -440,18 +576,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                         className="sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] transition-colors"
                                         style={{ color: 'var(--color-sidebar-text)' }}
                                       >
-                                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-blue-500/20">
-                                          <svg
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1.8"
-                                            className="h-2.5 w-2.5 stroke-blue-400"
-                                          >
-                                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                                            <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-                                          </svg>
-                                        </div>
+                                        <NoteIcon className="h-3.5 w-3.5 shrink-0 stroke-blue-400" />
                                         <span className="truncate">{note.title}</span>
                                       </Link>
                                     ))}
@@ -475,18 +600,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                               className="sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors"
                               style={{ color: 'var(--color-sidebar-text)' }}
                             >
-                              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-500/20">
-                                <svg
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="1.8"
-                                  className="h-3 w-3 stroke-blue-400"
-                                >
-                                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                                <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-                              </svg>
-                            </div>
+                              <NoteIcon className="h-4 w-4 shrink-0 stroke-blue-400" />
                             <span className="truncate">{note.title}</span>
                           </Link>
                         ))}

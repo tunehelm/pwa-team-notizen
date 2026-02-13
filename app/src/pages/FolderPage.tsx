@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { SidebarLayout } from '../components/SidebarLayout'
-import { CreateItemModal } from '../components/CreateItemModal'
 import { MoveNoteModal } from '../components/MoveNoteModal'
-import { FolderIcon, FOLDER_COLOR_CYCLE, IconPicker, READONLY_ICON } from '../components/FolderIcons'
+import { FolderIcon, FOLDER_COLOR_CYCLE, NoteIcon } from '../components/FolderIcons'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
 
@@ -12,12 +11,10 @@ import { isAdminEmail } from '../lib/admin'
 export function FolderPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
-  const [isModalOpen, setModalOpen] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [isRenameMode, setRenameMode] = useState(false)
   const [isActionsMenuOpen, setActionsMenuOpen] = useState(false)
   const [renameValue, setRenameValue] = useState('')
-  const [showIconPicker, setShowIconPicker] = useState(false)
   const [moveNoteTarget, setMoveNoteTarget] = useState<{ id: string; title: string; folderId: string } | null>(null)
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
   const actionsMenuRef = useRef<HTMLDivElement>(null)
@@ -37,7 +34,6 @@ export function FolderPage() {
     renameFolder,
     toggleFolderPinned,
     updateFolderAccess,
-    updateFolderIcon,
   } = useAppData()
 
   const folder = findFolderById(id)
@@ -167,19 +163,6 @@ export function FolderPage() {
                       {isReadonly ? 'Schreibschutz aufheben' : 'Schreibschutz aktivieren'}
                     </button>
                   ) : null}
-                  {canEdit && !isReadonly ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowIconPicker(true)
-                        setActionsMenuOpen(false)
-                      }}
-                      className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-700"
-                    >
-                      <span className="text-base">🎨</span>
-                      Symbol ändern
-                    </button>
-                  ) : null}
                   {canEdit ? (
                     <button
                       type="button"
@@ -216,14 +199,46 @@ export function FolderPage() {
             </div>
 
             {canEdit ? (
-              <button
-                type="button"
-                onClick={() => setModalOpen(true)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500 text-lg font-medium text-white shadow-md shadow-blue-500/30 transition-transform active:scale-95"
-                aria-label="Neues Element"
-              >
-                +
-              </button>
+              <div className="flex items-center gap-1.5">
+                {/* Neuer Ordner */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const created = await createFolder('Neuer Ordner', {
+                      parentId: folder.id,
+                      access: folder.access,
+                    })
+                    if (created) navigate(`/folder/${created.id}`)
+                  }}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-text-muted)] transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
+                  aria-label="Neuer Ordner"
+                  title="Neuer Ordner"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+                    <line x1="12" y1="11" x2="12" y2="17" />
+                    <line x1="9" y1="14" x2="15" y2="14" />
+                  </svg>
+                </button>
+                {/* Neue Notiz */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const created = await createNote(folder.id, 'Neue Notiz')
+                    if (created) navigate(`/note/${created.id}`)
+                  }}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-text-muted)] transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
+                  aria-label="Neue Notiz"
+                  title="Neue Notiz"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                    <path d="M14 2v6h6" />
+                    <line x1="12" y1="11" x2="12" y2="17" />
+                    <line x1="9" y1="14" x2="15" y2="14" />
+                  </svg>
+                </button>
+              </div>
             ) : null}
           </div>
         </div>
@@ -233,12 +248,10 @@ export function FolderPage() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{folder.name}</h1>
             {isReadonly ? (
-              <span className="inline-flex items-center justify-center rounded-full bg-amber-100 p-1 dark:bg-amber-900/30" title="Nur Lesen">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400">
-                  <rect x="3" y="11" width="18" height="11" rx="2" />
-                  <path d="M7 11V7a5 5 0 0110 0v4" />
-                </svg>
-              </span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" title="Nur Lesen">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0110 0v4" />
+              </svg>
             ) : null}
           </div>
           <p className="mt-0.5 text-sm text-[var(--color-text-muted)]">
@@ -274,28 +287,6 @@ export function FolderPage() {
           </div>
         ) : null}
 
-        {/* Icon Picker */}
-        {showIconPicker ? (
-          <div className="mt-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 shadow-sm">
-            <p className="mb-3 text-xs font-medium text-[var(--color-text-muted)]">Symbol wählen</p>
-            <IconPicker
-              selected={folder.icon || 'folder'}
-              onSelect={async (icon) => {
-                await updateFolderIcon(folder.id, icon)
-                setShowIconPicker(false)
-                setFeedback('Symbol wurde geändert.')
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowIconPicker(false)}
-              className="mt-3 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-            >
-              Abbrechen
-            </button>
-          </div>
-        ) : null}
-
         {/* Breadcrumb */}
         {path.length > 1 ? (
           <nav className="mt-3 flex flex-wrap items-center gap-1 text-xs text-[var(--color-text-muted)]">
@@ -328,24 +319,19 @@ export function FolderPage() {
         {/* Unterordner */}
         {subfolders.length > 0 ? (
           <section className="mt-6">
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-              Unterordner
-            </h2>
-            <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-sm">
+            <div className="flex flex-col gap-3">
               {subfolders.map((entry, index) => {
                 const isSubReadonly = entry.access === 'readonly'
-                const iconId = isSubReadonly ? READONLY_ICON : (entry.icon || 'folder')
+                const iconId = 'folder'
                 const color = isSubReadonly
-                  ? { bg: 'bg-amber-100 dark:bg-amber-900/30', stroke: 'stroke-amber-600' }
+                  ? { bg: '', stroke: 'stroke-amber-500', text: 'text-amber-500' }
                   : FOLDER_COLOR_CYCLE[index % FOLDER_COLOR_CYCLE.length]
                 const isDragOver = dragOverFolderId === entry.id
                 return (
                   <Link
                     key={entry.id}
                     to={`/folder/${entry.id}`}
-                    className={`flex items-center gap-3 px-4 py-3 transition-colors active:bg-slate-100 dark:active:bg-slate-700 ${
-                      index > 0 ? 'border-t border-[var(--color-border)]' : ''
-                    } ${isDragOver ? 'ring-2 ring-inset ring-blue-400 bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                    className={`flex items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3.5 shadow-sm transition-colors active:bg-slate-100 dark:active:bg-slate-700 ${isDragOver ? 'ring-2 ring-inset ring-blue-400 bg-blue-50 dark:bg-blue-900/20' : ''}`}
                     onDragOver={(e: DragEvent) => {
                       e.preventDefault()
                       e.dataTransfer.dropEffect = 'move'
@@ -355,7 +341,7 @@ export function FolderPage() {
                     onDrop={(e: DragEvent) => {
                       e.preventDefault()
                       setDragOverFolderId(null)
-                      if (!canEdit) return // Readonly-Ordner: kein Verschieben erlaubt
+                      if (!canEdit) return
                       const noteId = e.dataTransfer.getData('text/note-id')
                       if (noteId) {
                         void moveNoteToFolder(noteId, entry.id).then(() => {
@@ -364,142 +350,68 @@ export function FolderPage() {
                       }
                     }}
                   >
-                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${color.bg}`}>
-                      <FolderIcon icon={iconId} className={`h-4.5 w-4.5 ${color.stroke}`} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-[var(--color-text-primary)]">{entry.name}</p>
-                    </div>
+                    <FolderIcon icon={iconId} className={`h-5 w-5 shrink-0 ${color.stroke}`} />
+                    <p className="min-w-0 flex-1 text-sm font-medium text-[var(--color-text-primary)]">{entry.name}</p>
                   </Link>
                 )
               })}
             </div>
           </section>
-        ) : (
-          <section className="mt-6">
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-              Unterordner
-            </h2>
-            {canEdit ? (
-              <button
-                type="button"
-                onClick={() => setModalOpen(true)}
-                className="w-full rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-6 text-center text-sm text-[var(--color-text-muted)] transition-colors hover:border-blue-300 hover:text-blue-500"
-              >
-                Tippe hier, um einen Unterordner zu erstellen
-              </button>
-            ) : (
-              <p className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-6 text-center text-sm text-[var(--color-text-muted)]">
-                Keine Unterordner vorhanden.
-              </p>
-            )}
-          </section>
-        )}
+        ) : null}
 
         {/* Notizen */}
-        <section className="mt-6">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-            Notizen
-          </h2>
-          {folderNotes.length === 0 ? (
-            canEdit ? (
-              <button
-                type="button"
-                onClick={async () => {
-                  const created = await createNote(folder.id, 'Neue Notiz')
-                  if (created) {
-                    navigate(`/note/${created.id}`)
-                  }
-                }}
-                className="w-full rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-6 text-center text-sm text-[var(--color-text-muted)] transition-colors hover:border-blue-300 hover:text-blue-500"
-              >
-                Noch keine Notizen. Tippe hier, um eine zu erstellen.
-              </button>
-            ) : (
-              <p className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-6 text-center text-sm text-[var(--color-text-muted)]">
-                Noch keine Notizen vorhanden.
-              </p>
-            )
-          ) : (
-            <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-sm">
-              {folderNotes.map((note, index) => (
-                <div
-                  key={note.id}
-                  draggable={canEdit}
-                  onDragStart={canEdit ? (e: DragEvent<HTMLDivElement>) => {
-                    e.dataTransfer.setData('text/note-id', note.id)
-                    e.dataTransfer.effectAllowed = 'move'
-                  } : undefined}
-                  className={`flex ${canEdit ? 'cursor-grab active:cursor-grabbing' : ''} items-center gap-0 ${
-                    index > 0 ? 'border-t border-[var(--color-border)]' : ''
-                  }`}
-                >
-                  <Link
-                    to={`/note/${note.id}`}
-                    className="block min-w-0 flex-1 px-4 py-3 transition-colors active:bg-slate-100 dark:active:bg-slate-700"
+        {folderNotes.length > 0 ? (
+          <section className={subfolders.length > 0 ? 'mt-4' : 'mt-6'}>
+            <div className="flex flex-col gap-3">
+              {folderNotes.map((note, index) => {
+                const noteColor = FOLDER_COLOR_CYCLE[(subfolders.length + index) % FOLDER_COLOR_CYCLE.length]
+                return (
+                  <div
+                    key={note.id}
+                    draggable={canEdit}
+                    onDragStart={canEdit ? (e: DragEvent<HTMLDivElement>) => {
+                      e.dataTransfer.setData('text/note-id', note.id)
+                      e.dataTransfer.effectAllowed = 'move'
+                    } : undefined}
+                    className={`flex items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-sm ${canEdit ? 'cursor-grab active:cursor-grabbing' : ''}`}
                   >
-                    <div>
-                      <p className="text-sm font-medium text-[var(--color-text-primary)]">{note.title}</p>
-                      <p className="mt-0.5 line-clamp-1 text-xs text-[var(--color-text-secondary)]">{note.excerpt}</p>
-                    </div>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <UserAvatar email={note.ownerId || undefined} size="sm" />
-                      <span className="text-[10px] text-[var(--color-text-muted)]">{note.updatedLabel}</span>
-                    </div>
-                  </Link>
-                  {/* Verschieben-Button – nur wenn Bearbeitungsrechte */}
-                  {canEdit ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMoveNoteTarget({
-                          id: note.id,
-                          title: note.title,
-                          folderId: note.folderId,
-                        })
-                      }
-                      className="flex h-full shrink-0 items-center px-3 text-[var(--color-text-muted)] transition-colors hover:text-blue-500"
-                      title="Notiz verschieben"
+                    <Link
+                      to={`/note/${note.id}`}
+                      className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3.5 transition-colors active:bg-slate-100 dark:active:bg-slate-700 rounded-2xl"
                     >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                        <path d="M15 3h6v6" />
-                        <path d="M10 14L21 3" />
-                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                      </svg>
-                    </button>
-                  ) : null}
-                </div>
-              ))}
+                      <NoteIcon className={`h-5 w-5 shrink-0 ${noteColor.stroke}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[var(--color-text-primary)]">{note.title}</p>
+                        <p className="mt-0.5 line-clamp-1 text-xs text-[var(--color-text-secondary)]">{note.excerpt}</p>
+                      </div>
+                    </Link>
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMoveNoteTarget({
+                            id: note.id,
+                            title: note.title,
+                            folderId: note.folderId,
+                          })
+                        }
+                        className="flex shrink-0 items-center px-3 text-[var(--color-text-muted)] transition-colors hover:text-blue-500"
+                        title="Notiz verschieben"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                          <path d="M15 3h6v6" />
+                          <path d="M10 14L21 3" />
+                          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                        </svg>
+                      </button>
+                    ) : null}
+                  </div>
+                )
+              })}
             </div>
-          )}
-        </section>
+          </section>
+        ) : null}
       </div>
-
-      {isModalOpen ? (
-        <CreateItemModal
-          title="Im Ordner erstellen"
-          options={['Unterordner', 'Notiz/Projekt']}
-          onClose={() => setModalOpen(false)}
-          onSubmit={async ({ type, name, icon }) => {
-            setModalOpen(false)
-            if (type === 'Notiz/Projekt') {
-              const createdNote = await createNote(folder.id, name)
-              if (createdNote) {
-                navigate(`/note/${createdNote.id}`)
-              }
-            } else {
-              const createdFolder = await createFolder(name, {
-                parentId: folder.id,
-                access: folder.access,
-                icon,
-              })
-              if (createdFolder) {
-                navigate(`/folder/${createdFolder.id}`)
-              }
-            }
-          }}
-        />
-      ) : null}
 
       {moveNoteTarget ? (
         <MoveNoteModal

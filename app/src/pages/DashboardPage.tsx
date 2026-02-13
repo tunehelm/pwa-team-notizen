@@ -1,24 +1,19 @@
 import { useCallback, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { SidebarLayout } from '../components/SidebarLayout'
-import { CreateItemModal } from '../components/CreateItemModal'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
-import { supabase } from '../lib/supabase'
-import { FolderIcon, FOLDER_COLOR_CYCLE, READONLY_ICON } from '../components/FolderIcons'
+import { FolderIcon, FOLDER_COLOR_CYCLE } from '../components/FolderIcons'
 import { isAdminEmail } from '../lib/admin'
 
 export function DashboardPage() {
-  const [showUserMenu, setShowUserMenu] = useState(false)
-  const [isEditingName, setEditingName] = useState(false)
-  const [nameInput, setNameInput] = useState('')
-  const [isModalOpen, setModalOpen] = useState(false)
   const {
     apiError,
     currentUserId,
     currentUserEmail,
     currentUserName,
     createFolder,
+    createNote,
     getMainFolderItems,
     getPinnedFolderItems,
     getPinnedNoteItems,
@@ -54,10 +49,6 @@ export function DashboardPage() {
     setPinnedScrollProgress(progress)
   }, [])
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-  }
-
   // Fixierte Elemente zusammen (Ordner + Notizen) wie im Mockup
   const hasPinned = pinnedFolders.length > 0 || pinnedNotes.length > 0
 
@@ -72,79 +63,54 @@ export function DashboardPage() {
               {userName || userEmail}
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            {/* + Button zum Erstellen */}
-            <button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white shadow-md transition-transform hover:bg-blue-700 active:scale-95"
-              aria-label="Erstellen"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-5 w-5">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowUserMenu((v) => !v)}
-              className="transition-transform active:scale-95"
-            >
-              <UserAvatar email={userEmail} name={userName} size="lg" />
-            </button>
-            {showUserMenu ? (
-              <div className="absolute right-0 top-14 z-50 w-64 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-1 shadow-xl">
-                <p className="truncate px-3 py-2 text-xs text-[var(--color-text-muted)]">
-                  {userEmail}
-                </p>
-                {userName ? (
-                  <p className="truncate px-3 pb-1 text-sm font-medium text-[var(--color-text-primary)]">
-                    {userName}
-                  </p>
-                ) : null}
-                {isEditingName ? (
-                  <form
-                    className="flex gap-1.5 px-2 py-1.5"
-                    onSubmit={async (e) => {
-                      e.preventDefault()
-                      const trimmed = nameInput.trim()
-                      if (!trimmed) return
-                      await supabase.auth.updateUser({ data: { display_name: trimmed } })
-                      window.location.reload()
-                    }}
-                  >
-                    <input
-                      type="text"
-                      value={nameInput}
-                      onChange={(e) => setNameInput(e.target.value)}
-                      placeholder="Vor- und Nachname"
-                      className="h-9 flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-app)] px-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-blue-400 focus:outline-none"
-                      autoFocus
-                    />
-                    <button type="submit" className="h-9 rounded-lg bg-blue-500 px-3 text-xs font-medium text-white active:bg-blue-600">
-                      OK
-                    </button>
-                  </form>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => { setNameInput(userName); setEditingName(true) }}
-                    className="flex h-10 w-full items-center rounded-xl px-3 text-left text-sm text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-700"
-                  >
-                    {userName ? 'Name ändern' : 'Name eingeben'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => void handleSignOut()}
-                  className="flex h-10 w-full items-center rounded-xl px-3 text-left text-sm text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20"
-                >
-                  Abmelden
-                </button>
-              </div>
-            ) : null}
-          </div>
-          </div>
+          {isAdmin ? (
+            <div className="flex items-center gap-1.5">
+              {/* Neuer Ordner */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const created = await createFolder('Neuer Ordner', { access: 'team' })
+                  if (created) navigate(`/folder/${created.id}`)
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-text-muted)] transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
+                aria-label="Neuer Ordner"
+                title="Neuer Ordner"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                  <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+                  <line x1="12" y1="11" x2="12" y2="17" />
+                  <line x1="9" y1="14" x2="15" y2="14" />
+                </svg>
+              </button>
+              {/* Neue Notiz */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const first = rootFolders.find((f) => f.access !== 'readonly')
+                  let targetId: string
+                  if (first) {
+                    targetId = first.id
+                  } else {
+                    const created = await createFolder('Allgemein', { access: 'team' })
+                    if (!created) return
+                    targetId = created.id
+                  }
+                  const note = await createNote(targetId, 'Neue Notiz')
+                  if (note) navigate(`/note/${note.id}`)
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-text-muted)] transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
+                aria-label="Neue Notiz"
+                title="Neue Notiz"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                  <path d="M14 2v6h6" />
+                  <line x1="12" y1="11" x2="12" y2="17" />
+                  <line x1="9" y1="14" x2="15" y2="14" />
+                </svg>
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {apiError ? (
@@ -185,7 +151,7 @@ export function DashboardPage() {
                 ))}
                 {pinnedFolders.map((folder, idx) => {
                   const isRo = folder.access === 'readonly'
-                  const fIcon = isRo ? READONLY_ICON : (folder.icon || 'folder')
+                  const fIcon = 'folder'
                   const fColor = isRo
                     ? { bg: 'bg-amber-100 dark:bg-amber-900/30', stroke: 'stroke-amber-600' }
                     : FOLDER_COLOR_CYCLE[idx % FOLDER_COLOR_CYCLE.length]
@@ -195,9 +161,7 @@ export function DashboardPage() {
                       to={`/folder/${folder.id}`}
                       className="flex w-56 shrink-0 flex-col rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 shadow-sm transition-transform active:scale-[0.98]"
                     >
-                      <div className={`mb-2 flex h-12 w-12 items-center justify-center rounded-xl ${fColor.bg}`}>
-                        <FolderIcon icon={fIcon} className={`h-6 w-6 ${fColor.stroke}`} />
-                      </div>
+                      <FolderIcon icon={fIcon} className={`mb-2 h-7 w-7 ${fColor.stroke}`} />
                       <p className="text-sm font-semibold text-[var(--color-text-primary)]">{folder.name}</p>
                       <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                         {getFolderNoteItems(folder.id).length} Notizen · {getSubfolderItems(folder.id).length} Ordner
@@ -227,13 +191,13 @@ export function DashboardPage() {
           </h2>
           {rootFolders.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-8 text-center text-sm text-[var(--color-text-muted)]">
-              Noch keine Ordner. Nutze das + oben rechts, um einen zu erstellen.
+              Noch keine Ordner vorhanden.
             </p>
           ) : (
             <div className="flex flex-col gap-3">
               {rootFolders.map((folder, index) => {
                 const isReadonly = folder.access === 'readonly'
-                const iconId = isReadonly ? READONLY_ICON : (folder.icon || 'folder')
+                const iconId = 'folder'
                 const color = isReadonly
                   ? { bg: 'bg-amber-100 dark:bg-amber-900/30', stroke: 'stroke-amber-600' }
                   : FOLDER_COLOR_CYCLE[index % FOLDER_COLOR_CYCLE.length]
@@ -243,19 +207,15 @@ export function DashboardPage() {
                     to={`/folder/${folder.id}`}
                     className="flex items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3.5 shadow-sm transition-colors active:bg-slate-100 dark:active:bg-slate-700"
                   >
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${color.bg}`}>
-                      <FolderIcon icon={iconId} className={`h-5 w-5 ${color.stroke}`} />
-                    </div>
+                    <FolderIcon icon={iconId} className={`h-5 w-5 shrink-0 ${color.stroke}`} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <p className="text-sm font-medium text-[var(--color-text-primary)]">{folder.name}</p>
                         {isReadonly ? (
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30" title="Nur Lesen">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-2.5 w-2.5 text-amber-700 dark:text-amber-400">
-                              <rect x="3" y="11" width="18" height="11" rx="2" />
-                              <path d="M7 11V7a5 5 0 0110 0v4" />
-                            </svg>
-                          </span>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 shrink-0 text-amber-600 dark:text-amber-400" title="Nur Lesen">
+                            <rect x="3" y="11" width="18" height="11" rx="2" />
+                            <path d="M7 11V7a5 5 0 0110 0v4" />
+                          </svg>
                         ) : null}
                       </div>
                       <p className="text-xs text-[var(--color-text-muted)]">
@@ -270,22 +230,6 @@ export function DashboardPage() {
         </section>
       </div>
 
-      {/* Create Item Modal */}
-      {isModalOpen ? (
-        <CreateItemModal
-          title="Erstellen"
-          options={isAdmin ? ['Ordner', 'Nur-Lesen Ordner'] : ['Ordner']}
-          onClose={() => setModalOpen(false)}
-          onSubmit={async ({ type, name, icon }) => {
-            const access = type === 'Nur-Lesen Ordner' ? 'readonly' : 'team'
-            const created = await createFolder(name, { access, icon })
-            setModalOpen(false)
-            if (created) {
-              navigate(`/folder/${created.id}`)
-            }
-          }}
-        />
-      ) : null}
     </SidebarLayout>
   )
 }
