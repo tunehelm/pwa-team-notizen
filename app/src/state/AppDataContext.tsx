@@ -14,6 +14,7 @@ import {
   restoreFolderFromTrash as restoreFolderFromTrashApi,
   restoreNoteFromTrash as restoreNoteFromTrashApi,
   togglePinFolder as togglePinFolderApi,
+  updateFolderAccess as updateFolderAccessApi,
   updateFolderIcon as updateFolderIconApi,
   updateNote as updateNoteApi,
   permanentlyDeleteFolder as permanentlyDeleteFolderApi,
@@ -322,6 +323,20 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
         } catch (error) {
           setFolders(previous)
           showApiError('Ordner konnte nicht umbenannt werden.', error)
+        }
+      },
+      updateFolderAccess: async (folderId, access) => {
+        const previous = folders
+        setFolders((prev) =>
+          prev.map((folder) =>
+            folder.id === folderId ? { ...folder, access } : folder,
+          ),
+        )
+        try {
+          await updateFolderAccessApi(folderId, access)
+        } catch (error) {
+          setFolders(previous)
+          showApiError('Zugriffsmodus konnte nicht geändert werden.', error)
         }
       },
       updateFolderIcon: async (folderId, icon) => {

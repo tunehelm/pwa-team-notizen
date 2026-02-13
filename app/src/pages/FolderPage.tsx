@@ -36,6 +36,7 @@ export function FolderPage() {
     moveFolderToTrash,
     renameFolder,
     toggleFolderPinned,
+    updateFolderAccess,
     updateFolderIcon,
   } = useAppData()
 
@@ -139,6 +140,23 @@ export function FolderPage() {
                     <span className="text-base">{folder.pinned ? '📌' : '📍'}</span>
                     {folder.pinned ? 'Fixierung lösen' : 'Fixieren'}
                   </button>
+                  {isAdmin ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void updateFolderAccess(folder.id, isReadonly ? 'team' : 'readonly')
+                        setActionsMenuOpen(false)
+                        setFeedback(isReadonly ? 'Ordner ist jetzt bearbeitbar.' : 'Ordner ist jetzt schreibgeschützt.')
+                      }}
+                      className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-700"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={`h-4 w-4 ${isReadonly ? 'text-amber-500' : 'text-[var(--color-text-muted)]'}`}>
+                        <rect x="3" y="11" width="18" height="11" rx="2" />
+                        <path d="M7 11V7a5 5 0 0110 0v4" />
+                      </svg>
+                      {isReadonly ? 'Schreibschutz aufheben' : 'Schreibschutz aktivieren'}
+                    </button>
+                  ) : null}
                   {canEdit && !isReadonly ? (
                     <button
                       type="button"

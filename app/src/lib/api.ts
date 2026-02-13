@@ -339,6 +339,11 @@ export async function renameFolder(folderId: string, title: string): Promise<voi
   if (error) throw error
 }
 
+export async function updateFolderAccess(folderId: string, access: 'team' | 'readonly'): Promise<void> {
+  const { error } = await supabase.from('folders').update({ kind: access }).eq('id', folderId)
+  if (error) throw error
+}
+
 export async function updateFolderIcon(folderId: string, icon: string): Promise<void> {
   const { error } = await supabase.from('folders').update({ icon }).eq('id', folderId)
   // Graceful: Wenn die icon-Spalte nicht existiert, ignorieren wir den Fehler

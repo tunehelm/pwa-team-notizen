@@ -24,6 +24,7 @@ export interface AppDataContextValue {
     title: string,
     options?: { pinned?: boolean; parentId?: string | null; access?: AccessType; icon?: string },
   ) => Promise<FolderItem | null>
+  updateFolderAccess: (folderId: string, access: 'team' | 'readonly') => Promise<void>
   updateFolderIcon: (folderId: string, icon: string) => Promise<void>
   createNote: (folderId: string, title: string) => Promise<NoteItem | null>
   moveFolderToParent: (folderId: string, parentId: string | null) => Promise<void>
