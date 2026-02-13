@@ -4,24 +4,39 @@ import { SidebarLayout } from '../components/SidebarLayout'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
 
+/** HTML-Tags aus Content entfernen für saubere Textsuche */
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')
+}
+
 export function SearchPage() {
   const [query, setQuery] = useState('')
-  const { notes, folders } = useAppData()
+  const { notes, folders, currentUserId, currentUserEmail, currentUserName } = useAppData()
+
+  /** Hilfsfunktion: Owner-Info für Avatar */
+  function ownerProps(ownerId: string | undefined) {
+    if (!ownerId || ownerId === currentUserId) {
+      return { email: currentUserEmail, name: currentUserName }
+    }
+    return { email: ownerId }
+  }
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (q.length < 2) return { notes: [], folders: [] }
 
-    const matchedNotes = notes.filter(
-      (n) =>
-        n.title.toLowerCase().includes(q) ||
-        n.content.toLowerCase().includes(q) ||
-        n.excerpt.toLowerCase().includes(q),
-    )
+    const matchedNotes = notes
+      .filter(
+        (n) =>
+          n.title.toLowerCase().includes(q) ||
+          stripHtml(n.content).toLowerCase().includes(q) ||
+          n.excerpt.toLowerCase().includes(q),
+      )
+      .slice(0, 30)
 
-    const matchedFolders = folders.filter((f) =>
-      f.name.toLowerCase().includes(q),
-    )
+    const matchedFolders = folders
+      .filter((f) => f.name.toLowerCase().includes(q))
+      .slice(0, 20)
 
     return { notes: matchedNotes, folders: matchedFolders }
   }, [query, notes, folders])
@@ -30,7 +45,7 @@ export function SearchPage() {
   const isSearching = query.trim().length >= 2
 
   return (
-    <SidebarLayout title="Suche" showCreate={false}>
+    <SidebarLayout title="Suche">
       <div className="mx-auto max-w-3xl px-4 py-6">
         <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Suche</h1>
 
@@ -132,7 +147,7 @@ export function SearchPage() {
                   <p className="text-sm font-medium text-[var(--color-text-primary)]">{note.title}</p>
                   <p className="mt-0.5 line-clamp-1 text-xs text-[var(--color-text-secondary)]">{note.excerpt}</p>
                   <div className="mt-1.5 flex items-center gap-2">
-                    <UserAvatar email={note.ownerId || undefined} size="sm" />
+                    <UserAvatar {...ownerProps(note.ownerId)} size="sm" />
                     <span className="text-[10px] text-[var(--color-text-muted)]">{note.updatedLabel}</span>
                   </div>
                 </Link>
