@@ -13,7 +13,6 @@ export function DashboardPage() {
   const [isEditingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [isModalOpen, setModalOpen] = useState(false)
-  const [feedback, setFeedback] = useState('')
   const {
     apiError,
     currentUserId,
@@ -138,11 +137,6 @@ export function DashboardPage() {
           </div>
           </div>
         </div>
-
-        {/* Feedback */}
-        {feedback ? (
-          <div className="mb-4 rounded-xl bg-emerald-600/90 px-4 py-2.5 text-sm text-white">{feedback}</div>
-        ) : null}
 
         {apiError ? (
           <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
