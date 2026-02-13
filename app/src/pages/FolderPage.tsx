@@ -455,12 +455,11 @@ export function FolderPage() {
           options={['Unterordner', 'Notiz/Projekt']}
           onClose={() => setModalOpen(false)}
           onSubmit={async ({ type, name, icon }) => {
+            setModalOpen(false)
             if (type === 'Notiz/Projekt') {
               const createdNote = await createNote(folder.id, name)
               if (createdNote) {
-                setFeedback(`Notiz "${createdNote.title}" wurde erstellt.`)
-              } else {
-                setFeedback('Notiz konnte nicht erstellt werden. Prüfe die Browser-Konsole für Details.')
+                navigate(`/note/${createdNote.id}`)
               }
             } else {
               const createdFolder = await createFolder(name, {
@@ -469,10 +468,9 @@ export function FolderPage() {
                 icon,
               })
               if (createdFolder) {
-                setFeedback(`Ordner "${createdFolder.name}" wurde erstellt.`)
+                navigate(`/folder/${createdFolder.id}`)
               }
             }
-            setModalOpen(false)
           }}
         />
       ) : null}

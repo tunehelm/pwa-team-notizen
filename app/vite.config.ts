@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => ({
         short_name: 'SM-TeamNotes',
         description: 'Kollaborative Team-Notizen App',
         theme_color: '#3b82f6',
-        background_color: '#f0f4f8',
+        background_color: '#0f172a',
         display: 'standalone',
         start_url: '/',
         icons: [

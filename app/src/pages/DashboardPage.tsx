@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { SidebarLayout } from '../components/SidebarLayout'
 import { CreateItemModal } from '../components/CreateItemModal'
 import { UserAvatar } from '../components/UserAvatar'
@@ -27,6 +27,7 @@ export function DashboardPage() {
     getSubfolderItems,
     getFolderNoteItems,
   } = useAppData()
+  const navigate = useNavigate()
   const isAdmin = isAdminEmail(currentUserEmail)
 
   const userEmail = currentUserEmail
@@ -296,14 +297,12 @@ export function DashboardPage() {
           options={isAdmin ? ['Ordner', 'Nur-Lesen Ordner'] : ['Ordner']}
           onClose={() => setModalOpen(false)}
           onSubmit={async ({ type, name, icon }) => {
-            if (type === 'Nur-Lesen Ordner') {
-              const created = await createFolder(name, { access: 'readonly', icon })
-              if (created) setFeedback(`Nur-Lesen Ordner "${created.name}" wurde erstellt.`)
-            } else {
-              const created = await createFolder(name, { access: 'team', icon })
-              if (created) setFeedback(`Ordner "${created.name}" wurde erstellt.`)
-            }
+            const access = type === 'Nur-Lesen Ordner' ? 'readonly' : 'team'
+            const created = await createFolder(name, { access, icon })
             setModalOpen(false)
+            if (created) {
+              navigate(`/folder/${created.id}`)
+            }
           }}
         />
       ) : null}
