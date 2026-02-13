@@ -184,6 +184,11 @@ body {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
+/* Bottom Safe Area – für Sidebar und andere fullscreen-Elemente */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* Bottom Navigation – safe area für iPhone Home-Indicator */
 .bottom-nav-safe {
   padding-bottom: 4px;
@@ -194,6 +199,9 @@ body {
 @media (display-mode: standalone) {
   .safe-area-top {
     padding-top: env(safe-area-inset-top, 20px);
+  }
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 20px);
   }
   .bottom-nav-safe {
     padding-bottom: 24px;

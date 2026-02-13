@@ -110,7 +110,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       <aside
         className={[
           // Basis – sidebar look via CSS vars
-          'flex h-full w-64 shrink-0 flex-col border-r transition-all duration-300',
+          'safe-area-top flex h-full w-64 shrink-0 flex-col border-r transition-all duration-300',
           // Mobile: Fixed Overlay
           'fixed left-0 top-0 z-40',
           // Desktop: Static, im Flex-Layout
@@ -433,7 +433,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </nav>
 
         {/* Bottom Nav Links – statisch fixiert */}
-        <div className="shrink-0 px-3 py-3" style={{ borderTop: '1px solid var(--color-sidebar-border)' }}>
+        <div className="safe-area-bottom shrink-0 px-3 py-3" style={{ borderTop: '1px solid var(--color-sidebar-border)' }}>
           <Link
             to="/"
             onClick={onClose}
