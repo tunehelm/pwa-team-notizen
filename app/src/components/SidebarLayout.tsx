@@ -129,12 +129,12 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
 
   return (
     <LayoutProvider value={layoutValue}>
-      <div className="flex h-screen overflow-hidden bg-[var(--color-bg-app)]">
+      <div className="flex h-dvh overflow-hidden bg-[var(--color-bg-app)]">
         {/* Sidebar */}
         <Sidebar isOpen={sidebarOpen} onClose={() => { if (!isDesktop()) setSidebarOpen(false) }} />
 
         {/* Main Content */}
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="safe-area-top flex flex-1 flex-col overflow-hidden">
           {/* Top Header Bar – auf Mobile bei Notiz-Seite ausgeblendet (Menu+Refresh in NotePage) */}
           <header
             className={`flex h-14 shrink-0 items-center gap-3 px-4 ${isNotePage ? 'hidden lg:flex' : ''}`}

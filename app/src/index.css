@@ -24,6 +24,10 @@
   color-scheme: dark;
 }
 
+html {
+  background-color: var(--color-bg-app);
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
@@ -175,13 +179,22 @@ body {
   caret-color: var(--color-accent);
 }
 
+/* Top Safe Area – für iPhone Notch / Dynamic Island */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
 /* Bottom Navigation – safe area für iPhone Home-Indicator */
 .bottom-nav-safe {
   padding-bottom: 4px;
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
 }
+
 /* iPhone PWA Standalone: Fallback falls env() 0 liefert */
 @media (display-mode: standalone) {
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 20px);
+  }
   .bottom-nav-safe {
     padding-bottom: 24px;
     padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 4px);
