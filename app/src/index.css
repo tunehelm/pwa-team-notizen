@@ -21,43 +21,17 @@
   --color-sidebar-border: rgba(51, 65, 85, 0.6);
   --color-sidebar-text: #e2e8f0;
   --color-sidebar-text-muted: #64748b;
-  --app-safe-top: env(safe-area-inset-top, 0px);
-  --app-safe-bottom: env(safe-area-inset-bottom, 0px);
   color-scheme: dark;
 }
 
-/* ── iOS Standalone (Home-Screen PWA) ── */
-
-/* Fallback: mindestens 47px oben (iPhone Dynamic Island / Notch) */
+/*
+ * iOS Standalone (Home-Screen PWA):
+ * env(safe-area-inset-top) liefert beim ersten Paint manchmal 0.
+ * Deshalb hardcoden wir 47px (iPhone Notch/Dynamic Island).
+ */
 html.ios-standalone {
-  --app-safe-top: max(env(safe-area-inset-top, 47px), 47px);
-  --app-safe-bottom: max(env(safe-area-inset-bottom, 34px), 34px);
-}
-
-/* Auch per Media-Query als Backup (greift ohne JS) */
-@media (display-mode: standalone) {
-  :root {
-    --app-safe-top: max(env(safe-area-inset-top, 47px), 47px);
-    --app-safe-bottom: max(env(safe-area-inset-bottom, 34px), 34px);
-  }
-}
-
-/* Bounce/Overscroll komplett unterbinden im Standalone-Modus */
-html.pwa-standalone,
-html.pwa-standalone body {
-  overflow: hidden;
-  overscroll-behavior: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* ── Basis-Layout ── */
-html,
-body,
-#root {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
+  --app-safe-top: 47px;
+  --app-safe-bottom: 34px;
 }
 
 body {

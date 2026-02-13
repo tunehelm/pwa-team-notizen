@@ -1157,7 +1157,7 @@ function NoteEditor({
 
       {/* ── Drawing overlay ── */}
       {isDrawing ? (
-        <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--color-bg-app)', paddingTop: 'var(--app-safe-top)' }}>
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--color-bg-app)', paddingTop: 'env(safe-area-inset-top)' }}>
           <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: '1px solid var(--color-border)' }}>
             <button type="button" onClick={() => { setIsDrawing(false); setActivePanel('none') }} className="rounded-xl px-3 py-2 text-sm transition-colors" style={{ color: 'var(--color-text-secondary)' }}>
               Abbrechen
