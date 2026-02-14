@@ -271,7 +271,11 @@ export function FolderIcon({ icon, className }: { icon: string; className: strin
     case 'handshake':
       return (
         <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M20.42 4.58a5.4 5.4 0 00-7.65 0l-.77.78-.77-.78a5.4 5.4 0 00-7.65 7.65l.78.77 7.64 7.65 7.65-7.65.77-.77a5.4 5.4 0 000-7.65z" />
+          <path d="M11 17l-1.5 1.5a2.12 2.12 0 01-3 0L4 16" />
+          <path d="M13 17l1.5 1.5a2.12 2.12 0 003 0L20 16" />
+          <path d="M2 10l3-3 4 1 3-3 3 3 1-1 4 4" />
+          <path d="M7 8l-5 5" />
+          <path d="M17 7l5 5" />
         </svg>
       )
     case 'target':
