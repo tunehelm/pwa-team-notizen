@@ -448,7 +448,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       <FolderIcon icon={iconId} className={`h-4 w-4 shrink-0 ${color.stroke}`} />
                       <span className="truncate">{folder.name}</span>
                       {isRo ? (
-                        <span title="Nur Lesen" className="ml-auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 shrink-0 text-amber-400">
+                        <span title="Nur Lesen" className="ml-auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-2.5 w-2.5 shrink-0 text-amber-400">
                           <rect x="3" y="11" width="18" height="11" rx="2" />
                           <path d="M7 11V7a5 5 0 0110 0v4" />
                         </svg></span>
