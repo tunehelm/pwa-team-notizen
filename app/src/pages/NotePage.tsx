@@ -172,8 +172,11 @@ function NoteEditor({
   const drawingRef = useRef(false)
   const drawHistoryRef = useRef<ImageData[]>([])
 
-  // Keyboard height for bottom toolbar (iOS)
+  // Keyboard / toolbar positioning (iOS-compatible)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [viewportBottom, setViewportBottom] = useState(0)
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
+  const toolbarRef = useRef<HTMLDivElement>(null)
 
   // Active font color tracking
   const [activeFontColor, setActiveFontColor] = useState('')
@@ -305,19 +308,24 @@ function NoteEditor({
     }
   }, [isNoteMenuOpen])
 
-  /* ── Keyboard height tracking (iOS) ── */
+  /* ── Keyboard height tracking (iOS-compatible) ── */
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
-    const onResize = () => {
+    const update = () => {
       const kbH = window.innerHeight - vv.height - vv.offsetTop
+      const kbOpen = kbH > 80 // threshold: keyboard is > 80px
       setKeyboardHeight(Math.max(0, Math.round(kbH)))
+      setIsKeyboardOpen(kbOpen)
+      // Bottom edge of visible area — used for top-positioning on iOS
+      setViewportBottom(Math.round(vv.offsetTop + vv.height))
     }
-    vv.addEventListener('resize', onResize)
-    vv.addEventListener('scroll', onResize)
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    update()
     return () => {
-      vv.removeEventListener('resize', onResize)
-      vv.removeEventListener('scroll', onResize)
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
     }
   }, [])
 
@@ -1084,12 +1092,17 @@ function NoteEditor({
       {/* ── Bottom Toolbar (above keyboard, like Apple Notes) ── */}
       {!readOnly ? (
         <div
+          ref={toolbarRef}
           className="fixed left-0 right-0 z-40 border-t backdrop-blur"
           style={{
-            bottom: `${keyboardHeight}px`,
+            // iOS: use top + translateY when keyboard is open (fixed bottom doesn't work on iOS)
+            // Desktop/no keyboard: use bottom: 0
+            ...(isKeyboardOpen
+              ? { top: `${viewportBottom}px`, bottom: 'auto', transform: 'translateY(-100%)' }
+              : { bottom: '0px', top: 'auto', transform: 'none' }),
             backgroundColor: 'color-mix(in srgb, var(--color-bg-app) 95%, transparent)',
             borderColor: 'var(--color-border)',
-            paddingBottom: keyboardHeight === 0 ? 'env(safe-area-inset-bottom, 0px)' : '0px',
+            paddingBottom: isKeyboardOpen ? '0px' : 'env(safe-area-inset-bottom, 0px)',
           } as CSSProperties}
         >
           {/* ── Sub-panels (open above toolbar) ── */}
