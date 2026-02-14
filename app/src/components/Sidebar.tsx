@@ -155,6 +155,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   }
 
   function handleFolderDragOver(e: DragEvent, folderId: string, folderAccess?: string, folderOwnerId?: string) {
+    // Nicht reagieren wenn es ein Folder-Reorder ist (nicht Notiz-Drop)
+    if (e.dataTransfer.types.includes('text/folder-reorder-id')) return
     if (!canDropInFolder(folderAccess, folderOwnerId)) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
@@ -162,6 +164,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   }
 
   function handleFolderDrop(e: DragEvent, folderId: string, folderAccess?: string, folderOwnerId?: string) {
+    // Nicht reagieren wenn es ein Folder-Reorder ist
+    if (e.dataTransfer.types.includes('text/folder-reorder-id')) return
     e.preventDefault()
     setDragOverFolderId(null)
     if (!canDropInFolder(folderAccess, folderOwnerId)) return
