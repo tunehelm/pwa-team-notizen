@@ -497,40 +497,10 @@ function NoteEditor({
     }
   }
 
-  /* ── Format block: apply to NEW paragraph when cursor is in existing content ── */
+  /* ── Format block: apply to current block ── */
   function runFormatBlock(tag: string) {
     if (!editorRef.current) return
     editorRef.current.focus()
-
-    const selection = document.getSelection()
-
-    // If cursor is collapsed (no selection) and current block has text,
-    // insert a NEW paragraph and apply format there — don't change the existing block.
-    if (selection && selection.isCollapsed) {
-      const anchor = selection.anchorNode
-      const block = anchor instanceof HTMLElement
-        ? anchor.closest('p, h1, h2, h3, div, blockquote')
-        : anchor?.parentElement?.closest('p, h1, h2, h3, div, blockquote')
-
-      if (block && block.textContent && block.textContent.trim().length > 0) {
-        // Move cursor to end of current block
-        const range = document.createRange()
-        range.selectNodeContents(block)
-        range.collapse(false) // collapse to end
-        selection.removeAllRanges()
-        selection.addRange(range)
-
-        // Insert a new empty paragraph after current block
-        document.execCommand('insertParagraph')
-        // Now apply the format to the new (empty) paragraph
-        document.execCommand('formatBlock', false, tag)
-        syncEditorContent()
-        updateFormatState()
-        return
-      }
-    }
-
-    // Selection exists or block is empty → apply format directly
     document.execCommand('formatBlock', false, tag)
     // Reset italic if it was not explicitly on
     if (document.queryCommandState('italic') && !formatState.italic) {
