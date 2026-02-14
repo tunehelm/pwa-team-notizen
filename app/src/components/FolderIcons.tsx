@@ -31,6 +31,18 @@ export const SELECTABLE_ICONS: { id: string; label: string }[] = [
   { id: 'euro', label: 'Finanzen' },
   { id: 'phone', label: 'Telefon' },
   { id: 'mail', label: 'E-Mail' },
+  { id: 'handshake', label: 'Deal' },
+  { id: 'target', label: 'Ziel' },
+  { id: 'trending', label: 'Wachstum' },
+  { id: 'briefcase', label: 'Geschäft' },
+  { id: 'award', label: 'Auszeichnung' },
+  { id: 'clipboard', label: 'Aufgaben' },
+  { id: 'cart', label: 'Warenkorb' },
+  { id: 'receipt', label: 'Rechnung' },
+  { id: 'tag', label: 'Angebot' },
+  { id: 'percent', label: 'Rabatt' },
+  { id: 'building', label: 'Firma' },
+  { id: 'handshake2', label: 'Vertrag' },
 ]
 
 /** Farb-Rotation für Ordner und Notizen – nur Outline, kein Backdrop */
@@ -254,6 +266,81 @@ export function FolderIcon({ icon, className }: { icon: string; className: strin
       return (
         <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22 6 12 13 2 6" />
+        </svg>
+      )
+    case 'handshake':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20.42 4.58a5.4 5.4 0 00-7.65 0l-.77.78-.77-.78a5.4 5.4 0 00-7.65 7.65l.78.77 7.64 7.65 7.65-7.65.77-.77a5.4 5.4 0 000-7.65z" />
+        </svg>
+      )
+    case 'target':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />
+        </svg>
+      )
+    case 'trending':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" />
+        </svg>
+      )
+    case 'briefcase':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" /><line x1="2" y1="13" x2="22" y2="13" />
+        </svg>
+      )
+    case 'award':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="8" r="7" /><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
+        </svg>
+      )
+    case 'clipboard':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" />
+          <line x1="9" y1="12" x2="15" y2="12" /><line x1="9" y1="16" x2="13" y2="16" />
+        </svg>
+      )
+    case 'cart':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
+        </svg>
+      )
+    case 'receipt':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2L19 4l-3-2-3 2-3-2-3 2L4 2z" />
+          <line x1="8" y1="10" x2="16" y2="10" /><line x1="8" y1="14" x2="14" y2="14" />
+        </svg>
+      )
+    case 'tag':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" />
+        </svg>
+      )
+    case 'percent':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="19" y1="5" x2="5" y2="19" /><circle cx="6.5" cy="6.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" />
+        </svg>
+      )
+    case 'building':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="2" width="16" height="20" rx="2" /><line x1="9" y1="6" x2="9.01" y2="6" /><line x1="15" y1="6" x2="15.01" y2="6" /><line x1="9" y1="10" x2="9.01" y2="10" /><line x1="15" y1="10" x2="15.01" y2="10" /><line x1="9" y1="14" x2="9.01" y2="14" /><line x1="15" y1="14" x2="15.01" y2="14" /><path d="M9 22v-4h6v4" />
+        </svg>
+      )
+    case 'handshake2':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 22a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v14a2 2 0 01-2 2H12z" /><path d="M6 2h2v20H6a2 2 0 01-2-2V4a2 2 0 012-2z" />
+          <line x1="14" y1="10" x2="18" y2="10" /><line x1="14" y1="14" x2="18" y2="14" /><line x1="14" y1="18" x2="16" y2="18" />
         </svg>
       )
     case 'shield':
