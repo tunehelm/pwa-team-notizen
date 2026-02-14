@@ -215,6 +215,14 @@ function NoteEditor({
           blockTag = tag
           break
         }
+        // Detect inline heading styles (span with font-size)
+        if (tag === 'span' && node.style.fontSize) {
+          const fs = parseFloat(node.style.fontSize)
+          if (fs >= 1.9) blockTag = 'h1'
+          else if (fs >= 1.4) blockTag = 'h2'
+          else if (fs >= 1.1) blockTag = 'h3'
+          break
+        }
         if (tag === 'p' || tag === 'div') {
           blockTag = 'p'
           break
@@ -486,26 +494,119 @@ function NoteEditor({
         const bq = (node instanceof HTMLElement ? node : node.parentElement)?.closest('blockquote')
         if (bq) {
           const text = bq.textContent || ''
-          // Wenn blockquote leer oder nur whitespace, raus aus blockquote
           if (text.trim() === '') {
             event.preventDefault()
             document.execCommand('formatBlock', false, '<p>')
             syncEditorContent()
+            return
           }
         }
+      }
+      // Nach Enter: Heading-Inline-Styles auf der neuen Zeile entfernen → "Text" wird Standard
+      if (!event.shiftKey) {
+        setTimeout(() => {
+          const s = document.getSelection()
+          if (!s || !s.anchorNode) return
+          let el = s.anchorNode instanceof HTMLElement ? s.anchorNode : s.anchorNode.parentElement
+          while (el && el !== editorRef.current) {
+            if (el instanceof HTMLSpanElement && el.style.fontSize) {
+              el.style.fontSize = ''
+              el.style.fontWeight = ''
+              break
+            }
+            el = el.parentElement
+          }
+          syncEditorContent()
+          updateFormatState()
+        }, 0)
       }
     }
   }
 
-  /* ── Format block: apply to current block ── */
+  /* ── Heading-Styles: inline font-size (same-line mixing), blockquote: block-level ── */
   function runFormatBlock(tag: string) {
     if (!editorRef.current) return
     editorRef.current.focus()
-    document.execCommand('formatBlock', false, tag)
-    // Reset italic if it was not explicitly on
-    if (document.queryCommandState('italic') && !formatState.italic) {
-      document.execCommand('italic', false)
+
+    // Blockquote → real block-level command
+    if (tag === '<blockquote>') {
+      document.execCommand('formatBlock', false, tag)
+      syncEditorContent()
+      updateFormatState()
+      return
     }
+
+    const selection = document.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+
+    // Inline style definitions for headings
+    const headingStyles: Record<string, { fontSize: string; fontWeight: string }> = {
+      '<h1>': { fontSize: '2em', fontWeight: '700' },
+      '<h2>': { fontSize: '1.5em', fontWeight: '600' },
+      '<h3>': { fontSize: '1.17em', fontWeight: '600' },
+    }
+
+    // "Text" → reset to normal (remove heading inline styles)
+    if (tag === '<p>') {
+      if (!selection.isCollapsed) {
+        // Selected text → remove format
+        document.execCommand('removeFormat')
+      } else {
+        // No selection → insert reset span so subsequent typing is normal
+        const span = document.createElement('span')
+        span.style.fontSize = '1em'
+        span.style.fontWeight = 'normal'
+        span.appendChild(document.createTextNode('\u200B'))
+        const range = selection.getRangeAt(0)
+        range.insertNode(span)
+        const nr = document.createRange()
+        nr.setStartAfter(span.firstChild!)
+        nr.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(nr)
+      }
+      syncEditorContent()
+      updateFormatState()
+      return
+    }
+
+    // H1 / H2 / H3 → inline font-size + font-weight
+    const style = headingStyles[tag]
+    if (!style) return
+
+    if (selection.isCollapsed) {
+      // No selection → insert styled span, subsequent typing inherits it
+      const span = document.createElement('span')
+      span.style.fontSize = style.fontSize
+      span.style.fontWeight = style.fontWeight
+      span.appendChild(document.createTextNode('\u200B'))
+      const range = selection.getRangeAt(0)
+      range.insertNode(span)
+      const nr = document.createRange()
+      nr.setStartAfter(span.firstChild!)
+      nr.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(nr)
+    } else {
+      // Text selected → wrap in styled span
+      const range = selection.getRangeAt(0)
+      const span = document.createElement('span')
+      span.style.fontSize = style.fontSize
+      span.style.fontWeight = style.fontWeight
+      try {
+        range.surroundContents(span)
+      } catch {
+        const fragment = range.extractContents()
+        span.appendChild(fragment)
+        range.insertNode(span)
+      }
+      const nr = document.createRange()
+      nr.selectNodeContents(span)
+      nr.collapse(false)
+      selection.removeAllRanges()
+      selection.addRange(nr)
+    }
+
     syncEditorContent()
     updateFormatState()
   }
