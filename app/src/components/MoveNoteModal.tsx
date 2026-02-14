@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAppData } from '../state/useAppData'
-import { FolderIcon, FOLDER_COLOR_CYCLE } from './FolderIcons'
+import { FolderIcon, getStableColor } from './FolderIcons'
 import { isAdminEmail } from '../lib/admin'
 
 interface MoveNoteModalProps {
@@ -61,12 +61,12 @@ export function MoveNoteModal({ noteId, noteTitle, currentFolderId, onClose, onM
     }
   }
 
-  function renderFolder(folder: typeof folders[0], index: number, depth: number) {
+  function renderFolder(folder: typeof folders[0], _index: number, depth: number) {
     const isRo = folder.access === 'readonly'
     const iconId = 'folder'
     const color = isRo
       ? { bg: 'bg-amber-100 dark:bg-amber-900/30', stroke: 'stroke-amber-600' }
-      : FOLDER_COLOR_CYCLE[index % FOLDER_COLOR_CYCLE.length]
+      : getStableColor(folder.id)
     const isCurrent = folder.id === currentFolderId
     const isSelected = folder.id === selectedFolderId
     const children = getChildren(folder.id)

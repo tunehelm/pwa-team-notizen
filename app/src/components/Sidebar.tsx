@@ -1,7 +1,7 @@
 import { useState, useCallback, type DragEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAppData } from '../state/useAppData'
-import { FolderIcon, FOLDER_COLOR_CYCLE, NoteIcon } from './FolderIcons'
+import { FolderIcon, getStableColor, NoteIcon } from './FolderIcons'
 import { isAdminEmail } from '../lib/admin'
 import { supabase } from '../lib/supabase'
 
@@ -350,12 +350,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--color-sidebar-text-muted)' }}>
                 Fixiert
               </p>
-              {pinnedFolders.map((folder, idx) => {
+              {pinnedFolders.map((folder) => {
                 const isRo = folder.access === 'readonly'
                 const iconId = 'folder'
                 const color = isRo
                   ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
-                  : FOLDER_COLOR_CYCLE[idx % FOLDER_COLOR_CYCLE.length]
+                  : getStableColor(folder.id)
                 return (
                   <Link
                     key={folder.id}
@@ -380,12 +380,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--color-sidebar-text-muted)' }}>
               Bereiche
             </p>
-            {rootFolders.map((folder, idx) => {
+            {rootFolders.map((folder) => {
               const isRo = folder.access === 'readonly'
               const iconId = 'folder'
               const color = isRo
                 ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
-                : FOLDER_COLOR_CYCLE[idx % FOLDER_COLOR_CYCLE.length]
+                : getStableColor(folder.id)
               const children = allFolders.filter((f) => f.parentId === folder.id)
               const folderNotes = getFolderNoteItems(folder.id)
               const hasExpandableContent = children.length > 0 || folderNotes.length > 0
@@ -460,12 +460,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   {/* Unterordner + Notizen – weiche Einrückung */}
                   {expanded && hasExpandableContent ? (
                     <div className="ml-3 pl-3 mt-0.5">
-                      {children.map((child, childIdx) => {
+                      {children.map((child) => {
                         const cIsRo = child.access === 'readonly'
                         const cIconId = 'folder'
                         const cColor = cIsRo
                           ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
-                          : FOLDER_COLOR_CYCLE[childIdx % FOLDER_COLOR_CYCLE.length]
+                          : getStableColor(child.id)
                         const grandchildren = allFolders.filter((f) => f.parentId === child.id)
                         const childNotes = getFolderNoteItems(child.id)
                         const childHasExpandable = grandchildren.length > 0 || childNotes.length > 0
@@ -511,12 +511,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                             {/* Grandchildren + Notizen im Child – weiche Einrückung */}
                             {cIsExpanded && (grandchildren.length > 0 || childNotes.length > 0) ? (
                               <div className="ml-3 pl-3 mt-0.5">
-                                {grandchildren.map((gc, gcIdx) => {
+                                {grandchildren.map((gc) => {
                                   const gcIsRo = gc.access === 'readonly'
                                   const gcIconId = 'folder'
                                   const gcColor = gcIsRo
                                     ? { bg: 'bg-amber-900/30', stroke: 'stroke-amber-500' }
-                                    : FOLDER_COLOR_CYCLE[gcIdx % FOLDER_COLOR_CYCLE.length]
+                                    : getStableColor(gc.id)
                                   const gcNotes = getFolderNoteItems(gc.id)
                                   const gcHasExpandable = gcNotes.length > 0
                                   const gcIsExpanded = isFolderExpanded(gc.id)

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { SidebarLayout } from '../components/SidebarLayout'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
-import { FolderIcon, FOLDER_COLOR_CYCLE } from '../components/FolderIcons'
+import { FolderIcon, getStableColor } from '../components/FolderIcons'
 import { isAdminEmail } from '../lib/admin'
 import { supabase } from '../lib/supabase'
 
@@ -169,12 +169,12 @@ export function DashboardPage() {
                     <p className="mt-0.5 line-clamp-2 text-[10px] text-[var(--color-text-secondary)]">{note.excerpt}</p>
                   </Link>
                 ))}
-                {pinnedFolders.map((folder, idx) => {
+                {pinnedFolders.map((folder) => {
                   const isRo = folder.access === 'readonly'
                   const fIcon = 'folder'
                   const fColor = isRo
                     ? { bg: 'bg-amber-100 dark:bg-amber-900/30', stroke: 'stroke-amber-600' }
-                    : FOLDER_COLOR_CYCLE[idx % FOLDER_COLOR_CYCLE.length]
+                    : getStableColor(folder.id)
                   return (
                     <Link
                       key={folder.id}
@@ -215,12 +215,12 @@ export function DashboardPage() {
             </p>
           ) : (
             <div className="flex flex-col gap-3">
-              {rootFolders.map((folder, index) => {
+              {rootFolders.map((folder) => {
                 const isReadonly = folder.access === 'readonly'
                 const iconId = 'folder'
                 const color = isReadonly
                   ? { bg: 'bg-amber-100 dark:bg-amber-900/30', stroke: 'stroke-amber-600' }
-                  : FOLDER_COLOR_CYCLE[index % FOLDER_COLOR_CYCLE.length]
+                  : getStableColor(folder.id)
                 return (
                   <Link
                     key={folder.id}

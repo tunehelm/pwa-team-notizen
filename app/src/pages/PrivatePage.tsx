@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { SidebarLayout } from '../components/SidebarLayout'
-import { FolderIcon, FOLDER_COLOR_CYCLE, NoteIcon } from '../components/FolderIcons'
+import { FolderIcon, getStableColor, NoteIcon } from '../components/FolderIcons'
 import { useAppData } from '../state/useAppData'
 
 export function PrivatePage() {
@@ -96,8 +96,8 @@ export function PrivatePage() {
         {privateFolders.length > 0 ? (
           <section className="mt-6">
             <div className="flex flex-col gap-3">
-              {privateFolders.map((folder, idx) => {
-                const color = FOLDER_COLOR_CYCLE[idx % FOLDER_COLOR_CYCLE.length]
+              {privateFolders.map((folder) => {
+                const color = getStableColor(folder.id)
                 return (
                   <Link
                     key={folder.id}
@@ -117,8 +117,8 @@ export function PrivatePage() {
         {privateNotes.length > 0 ? (
           <section className="mt-4">
             <div className="flex flex-col gap-3">
-              {privateNotes.map((note, i) => {
-                const noteColor = FOLDER_COLOR_CYCLE[(privateFolders.length + i) % FOLDER_COLOR_CYCLE.length]
+              {privateNotes.map((note) => {
+                const noteColor = getStableColor(note.id)
                 return (
                   <Link
                     key={note.id}

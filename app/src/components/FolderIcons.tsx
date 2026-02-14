@@ -47,6 +47,15 @@ export const FOLDER_COLOR_CYCLE = [
   { bg: 'bg-orange-100 dark:bg-orange-900/30', stroke: 'stroke-orange-500', text: 'text-orange-500' },
 ]
 
+/** Stabile Farbe basierend auf einer ID (Hash) – gleicher Ordner = gleiche Farbe überall */
+export function getStableColor(id: string) {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return FOLDER_COLOR_CYCLE[Math.abs(hash) % FOLDER_COLOR_CYCLE.length]
+}
+
 /** Notiz-Icon: Dokument mit Textlinien (wie Apple Notes / Layout-Idee) */
 export function NoteIcon({ className }: { className?: string }) {
   return (

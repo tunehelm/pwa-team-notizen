@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { SidebarLayout } from '../components/SidebarLayout'
 import { MoveNoteModal } from '../components/MoveNoteModal'
-import { FolderIcon, FOLDER_COLOR_CYCLE, NoteIcon } from '../components/FolderIcons'
+import { FolderIcon, getStableColor, NoteIcon } from '../components/FolderIcons'
 import { useAppData } from '../state/useAppData'
 
 import { isAdminEmail } from '../lib/admin'
@@ -319,12 +319,12 @@ export function FolderPage() {
         {subfolders.length > 0 ? (
           <section className="mt-6">
             <div className="flex flex-col gap-3">
-              {subfolders.map((entry, index) => {
+              {subfolders.map((entry) => {
                 const isSubReadonly = entry.access === 'readonly'
                 const iconId = 'folder'
                 const color = isSubReadonly
                   ? { bg: '', stroke: 'stroke-amber-500', text: 'text-amber-500' }
-                  : FOLDER_COLOR_CYCLE[index % FOLDER_COLOR_CYCLE.length]
+                  : getStableColor(entry.id)
                 const isDragOver = dragOverFolderId === entry.id
                 return (
                   <Link
@@ -362,8 +362,8 @@ export function FolderPage() {
         {folderNotes.length > 0 ? (
           <section className={subfolders.length > 0 ? 'mt-4' : 'mt-6'}>
             <div className="flex flex-col gap-3">
-              {folderNotes.map((note, index) => {
-                const noteColor = FOLDER_COLOR_CYCLE[(subfolders.length + index) % FOLDER_COLOR_CYCLE.length]
+              {folderNotes.map((note) => {
+                const noteColor = getStableColor(note.id)
                 return (
                   <div
                     key={note.id}
