@@ -51,11 +51,11 @@ export const FOLDER_COLOR_CYCLE = [
 export function NoteIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" strokeWidth="1.8" />
-      <path d="M14 2v6h6" strokeWidth="1.8" />
-      <line x1="16" y1="13" x2="8" y2="13" strokeWidth="1" />
-      <line x1="16" y1="17" x2="8" y2="17" strokeWidth="1" />
-      <line x1="10" y1="9" x2="8" y2="9" strokeWidth="1" />
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" strokeWidth="1.3" />
+      <path d="M14 2v6h6" strokeWidth="1.3" />
+      <line x1="16" y1="13" x2="8" y2="13" strokeWidth="0.75" />
+      <line x1="16" y1="17" x2="8" y2="17" strokeWidth="0.75" />
+      <line x1="10" y1="9" x2="8" y2="9" strokeWidth="0.75" />
     </svg>
   )
 }
