@@ -285,6 +285,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     const trimmed = nameInput.trim()
                     if (!trimmed) return
                     await supabase.auth.updateUser({ data: { display_name: trimmed } })
+                    // Also update profiles table so team members see the new name
+                    const { data } = await supabase.auth.getUser()
+                    if (data.user) {
+                      await supabase.from('profiles').upsert({
+                        id: data.user.id,
+                        email: data.user.email ?? '',
+                        display_name: trimmed,
+                        updated_at: new Date().toISOString(),
+                      }, { onConflict: 'id' })
+                    }
                     window.location.reload()
                   }}
                 >

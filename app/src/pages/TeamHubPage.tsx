@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { SidebarLayout } from '../components/SidebarLayout'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
-import { isAdminEmail } from '../lib/admin'
+import { supabase } from '../lib/supabase'
 
 interface TeamMember {
   id: string
@@ -14,38 +14,52 @@ export function TeamHubPage() {
   const { currentUserId, currentUserEmail, currentUserName, folders, notes } = useAppData()
   const [members, setMembers] = useState<TeamMember[]>([])
 
-  const isAdmin = isAdminEmail(currentUserEmail)
-
-  // Sammle eindeutige Owner-IDs aus den Daten und löse den aktuellen User auf
+  // Lade alle Profile aus der profiles-Tabelle und ergänze Owner-IDs
   useEffect(() => {
-    const ownerIds = new Set<string>()
-    for (const f of folders) {
-      if (f.ownerId) ownerIds.add(f.ownerId)
+    async function loadMembers() {
+      // 1. Alle Owner-IDs aus Ordnern und Notizen sammeln
+      const ownerIds = new Set<string>()
+      for (const f of folders) {
+        if (f.ownerId) ownerIds.add(f.ownerId)
+      }
+      for (const n of notes) {
+        if (n.ownerId) ownerIds.add(n.ownerId)
+      }
+      // Aktuellen User immer einschließen
+      if (currentUserId) ownerIds.add(currentUserId)
+
+      // 2. Profile aus Supabase laden
+      const profileMap = new Map<string, { email: string; name: string }>()
+      const { data: profiles } = await supabase.from('profiles').select('id, email, display_name')
+      if (profiles) {
+        for (const p of profiles) {
+          profileMap.set(p.id, { email: p.email || '', name: p.display_name || '' })
+        }
+      }
+
+      // 3. Mitglieder-Liste aufbauen mit Profil-Daten
+      const memberList: TeamMember[] = Array.from(ownerIds).map((id) => {
+        const profile = profileMap.get(id)
+        if (id === currentUserId) {
+          // Aktueller User: lokale Daten bevorzugen (immer aktuell)
+          return { id, email: currentUserEmail || profile?.email || id, name: currentUserName || profile?.name }
+        }
+        // Andere User: Profil-Daten verwenden
+        return { id, email: profile?.email || id, name: profile?.name || undefined }
+      })
+
+      // Aktuellen User nach oben sortieren
+      memberList.sort((a, b) => {
+        if (a.id === currentUserId) return -1
+        if (b.id === currentUserId) return 1
+        return (a.name || a.email).localeCompare(b.name || b.email)
+      })
+
+      setMembers(memberList)
     }
-    for (const n of notes) {
-      if (n.ownerId) ownerIds.add(n.ownerId)
-    }
 
-    // Admin-User nicht als Mitglied hinzufügen (nur wenn aktueller User Admin ist)
-    if (currentUserId && !isAdmin) ownerIds.add(currentUserId)
-    // Falls Admin: eigene ID aus der Liste entfernen
-    if (isAdmin && currentUserId) ownerIds.delete(currentUserId)
-
-    const memberList: TeamMember[] = Array.from(ownerIds).map((id) => ({
-      id,
-      email: id === currentUserId && currentUserEmail ? currentUserEmail : id,
-      name: id === currentUserId ? currentUserName : undefined,
-    }))
-
-    // Aktuellen User nach oben sortieren (falls nicht Admin)
-    memberList.sort((a, b) => {
-      if (a.id === currentUserId) return -1
-      if (b.id === currentUserId) return 1
-      return 0
-    })
-
-    setMembers(memberList)
-  }, [currentUserId, currentUserEmail, currentUserName, folders, notes, isAdmin])
+    void loadMembers()
+  }, [currentUserId, currentUserEmail, currentUserName, folders, notes])
 
   // Statistiken
   const teamFolders = folders.filter((f) => f.access !== 'private')

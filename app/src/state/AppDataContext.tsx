@@ -65,18 +65,23 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
   const [currentUserName, setCurrentUserName] = useState('')
 
   // Load current user profile (email + display_name from user_metadata)
+  // and upsert into profiles table so other team members can see the name
   useEffect(() => {
     if (!userId) return
     void supabase.auth.getUser().then(({ data }) => {
       const user = data.user
       if (!user) return
-      if (user.email) setCurrentUserEmail(user.email)
+      const email = user.email ?? ''
+      if (email) setCurrentUserEmail(email)
       const meta = user.user_metadata
-      if (meta?.display_name) {
-        setCurrentUserName(meta.display_name as string)
-      } else if (meta?.full_name) {
-        setCurrentUserName(meta.full_name as string)
-      }
+      const name = (meta?.display_name as string) || (meta?.full_name as string) || ''
+      if (name) setCurrentUserName(name)
+
+      // Upsert into profiles table (so team members can see each other's names)
+      void supabase
+        .from('profiles')
+        .upsert({ id: user.id, email, display_name: name, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+        .then(({ error }) => { if (error) console.warn('[profiles] upsert failed:', error.message) })
     })
   }, [userId])
 
