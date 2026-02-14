@@ -334,6 +334,7 @@ function NoteEditor({
       const imgRect = selectedImg.getBoundingClientRect()
       resizeHandle.style.left = `${imgRect.right - editorRect.left - 7 + editor.scrollLeft}px`
       resizeHandle.style.top = `${imgRect.bottom - editorRect.top - 7 + editor.scrollTop}px`
+      positionDeleteBtn()
     }
 
     function removeHandle() {
@@ -345,6 +346,10 @@ function NoteEditor({
       if (resizeHandle) {
         resizeHandle.remove()
         resizeHandle = null
+      }
+      if (deleteBtn) {
+        deleteBtn.remove()
+        deleteBtn = null
       }
       moveWrapper = null
     }
@@ -385,6 +390,28 @@ function NoteEditor({
       positionHandle()
     }
 
+    let deleteBtn: HTMLButtonElement | null = null
+
+    function positionDeleteBtn() {
+      if (!selectedImg || !deleteBtn || !editor) return
+      const editorRect = editor.getBoundingClientRect()
+      const imgRect = selectedImg.getBoundingClientRect()
+      deleteBtn.style.left = `${imgRect.right - editorRect.left - 28 + editor.scrollLeft}px`
+      deleteBtn.style.top = `${imgRect.top - editorRect.top + 4 + editor.scrollTop}px`
+    }
+
+    function deleteSelectedImage() {
+      if (!selectedImg) return
+      const wrap = selectedImg.closest('.img-wrap')
+      if (wrap) {
+        wrap.remove()
+      } else {
+        selectedImg.remove()
+      }
+      removeHandle()
+      syncEditorContent()
+    }
+
     function selectImage(img: HTMLImageElement) {
       removeHandle()
       selectedImg = img
@@ -395,6 +422,20 @@ function NoteEditor({
       editor!.style.position = 'relative'
       editor!.appendChild(resizeHandle)
       positionHandle()
+
+      // Löschen-Button
+      deleteBtn = document.createElement('button')
+      deleteBtn.type = 'button'
+      deleteBtn.className = 'img-delete-btn'
+      deleteBtn.innerHTML = '✕'
+      deleteBtn.title = 'Bild löschen'
+      deleteBtn.addEventListener('click', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        deleteSelectedImage()
+      })
+      editor!.appendChild(deleteBtn)
+      positionDeleteBtn()
 
       resizeHandle.addEventListener('pointerdown', onResizeStart)
       img.addEventListener('pointerdown', onImagePointerDown)
@@ -448,6 +489,16 @@ function NoteEditor({
     editor.addEventListener('dragstart', preventNativeDrag)
 
     editor.addEventListener('click', handleClick)
+
+    // Delete/Backspace löscht selektiertes Bild
+    function handleKeyDown(e: KeyboardEvent) {
+      if (selectedImg && (e.key === 'Delete' || e.key === 'Backspace')) {
+        e.preventDefault()
+        deleteSelectedImage()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+
     // Also deselect when clicking outside editor
     function handleOutsideClick(e: Event) {
       if (!editor!.contains(e.target as Node) && (e.target as HTMLElement) !== resizeHandle) {
@@ -459,6 +510,7 @@ function NoteEditor({
     return () => {
       editor.removeEventListener('dragstart', preventNativeDrag)
       editor.removeEventListener('click', handleClick)
+      document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('click', handleOutsideClick)
       removeHandle()
     }
