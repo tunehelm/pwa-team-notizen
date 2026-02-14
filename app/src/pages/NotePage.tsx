@@ -1293,7 +1293,7 @@ function NoteEditor({
             onInput={readOnly ? undefined : syncEditorContent}
             onKeyDown={readOnly ? undefined : handleEditorKeyDown}
             onFocus={readOnly ? undefined : () => updateFormatState()}
-            className={`note-editor min-h-[40vh] lg:min-h-[55vh] w-full overflow-hidden rounded-2xl border p-4 text-base leading-7 outline-none ${readOnly ? 'cursor-default' : ''}`}
+            className={`note-editor min-h-[40vh] lg:min-h-[55vh] w-full overflow-x-hidden rounded-2xl border p-4 text-base leading-7 outline-none ${readOnly ? 'cursor-default' : ''}`}
             style={{
               borderColor: 'var(--color-border)',
               backgroundColor: 'var(--color-bg-card)',
