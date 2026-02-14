@@ -1,1 +1,21 @@
+# Vercel
 .vercel
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules
+
+# Build output
+dist
+dev-dist
+
+# Local env
+*.local
+.env*.local
+
+# Editor
+.idea
+*.sw?

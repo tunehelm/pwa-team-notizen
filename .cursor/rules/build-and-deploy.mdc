@@ -1,0 +1,47 @@
+---
+description: Build-Validierung und Projekt-Konventionen für PWA Team Notizen
+alwaysApply: true
+---
+
+# Projekt: PWA Team Notizen
+
+## Tech-Stack
+- React 19 + TypeScript (strict)
+- Vite als Bundler
+- Tailwind CSS 4
+- Supabase (Auth + DB)
+- Vercel Deployment (auto-deploy bei git push)
+
+## Build-Validierung (KRITISCH)
+
+Nach JEDER Code-Änderung `npm run build` im `app/`-Verzeichnis ausführen — NICHT nur `tsc --noEmit`.
+Vercel führt `tsc -b && vite build` aus, was strenger ist.
+
+```bash
+cd app && npm run build
+```
+
+Erst wenn der Build fehlerfrei ist, darf committet werden.
+
+## Häufige Build-Fehler vermeiden
+
+### SVG: Kein `title`-Attribut direkt auf `<svg>`
+```tsx
+// FALSCH — TypeScript-Fehler auf Vercel
+<svg title="Info">...</svg>
+
+// RICHTIG — title auf Wrapper-Element
+<span title="Info"><svg>...</svg></span>
+```
+
+### Ungenutzte Imports sofort entfernen
+Nach dem Entfernen von Code IMMER prüfen, ob zugehörige Imports noch gebraucht werden.
+
+### Ungenutzte Variablen/States entfernen
+`TS6133: 'X' is declared but its value is never read` — nach Refactoring alle States und Variablen prüfen.
+
+## Commit-Workflow
+1. Code ändern
+2. `cd app && npm run build` — muss fehlerfrei sein
+3. `git add` + `git commit`
+4. User führt `git push` in seinem Terminal aus (Sandbox hat keinen GitHub-Zugang)

@@ -1,0 +1,81 @@
+---
+description: Projekt-Wissen PWA Team Notizen — Datenbank, RLS, Berechtigungen, Architektur
+alwaysApply: true
+---
+
+# Projekt-Wissen: PWA Team Notizen
+
+## Supabase-Tabellen
+
+### `folders`
+| Spalte | Typ | Beschreibung |
+|--------|-----|-------------|
+| id | uuid | Primary Key |
+| title | text | Ordnername |
+| pinned | boolean | Fixiert in Sidebar |
+| created_at | timestamp | Erstellzeitpunkt |
+| owner_id | uuid | Ersteller (auth.uid) |
+| parent_id | uuid / null | Elternordner (null = Root) |
+| kind | text | `'team'`, `'private'`, `'readonly'` |
+| icon | text / null | Custom Icon ID (wird aktuell nicht mehr genutzt — alle Ordner zeigen einheitliches Ordner-Icon) |
+
+### `notes`
+| Spalte | Typ | Beschreibung |
+|--------|-----|-------------|
+| id | uuid | Primary Key |
+| folder_id | uuid | Zugehöriger Ordner |
+| title | text | Notiz-Titel |
+| content | text | HTML-Inhalt (contenteditable) |
+| excerpt | text | Kurzvorschau |
+| updated_label | text | Zeitstempel-Label |
+| pinned | boolean | Fixiert |
+| owner_id / user_id | uuid | Ersteller |
+
+### `trash_folders` / `trash_notes`
+Gleiche Struktur + `deleted_at` timestamp. Papierkorb-Logik: Soft-Delete per Upsert.
+
+## Berechtigungs-System
+
+### Admin
+- Definiert in `lib/admin.ts` via `ADMIN_EMAILS` (aktuell: `tunehelm@gmail.com`)
+- Kann ALLES: Ordner erstellen/löschen, Schreibschutz setzen, Inhalte bearbeiten
+- Kann readonly-Ordner trotzdem bearbeiten
+
+### Readonly-Ordner (`kind = 'readonly'`)
+- **Ancestor-Chain-Check**: Wenn ein Elternordner readonly ist, sind ALLE Unterordner/Notizen ebenfalls readonly
+- Prüfung erfolgt in `FolderPage.tsx` und `NotePage.tsx` durch rekursive Parent-Traversierung
+- Nicht-Admins dürfen in readonly-Ordnern NUR: lesen, fixieren, teilen, herunterladen
+- Nicht-Admins dürfen NICHT: umbenennen, bearbeiten, verschieben, löschen, neue Elemente erstellen
+- `updateFolderAccess()` setzt den Status rekursiv auf alle Unterordner
+
+### Private Ordner (`kind = 'private'`)
+- Nur sichtbar für den Ersteller (`owner_id`)
+
+## RLS (Row Level Security) — BEKANNTE PROBLEME
+- RLS-Policies in Supabase müssen mit der Frontend-Logik übereinstimmen
+- Bei Updates kann RLS den Schreibzugriff blockieren → `api.ts` hat Fallback-Logik (Zeile ~667)
+- Wenn RLS-Fehler auftreten: IMMER zuerst die Supabase-Policies prüfen, nicht nur den Frontend-Code
+- Spalten-Fallbacks existieren für `icon` (ältere DB-Versionen ohne diese Spalte)
+
+## Wichtige Code-Stellen
+
+| Datei | Verantwortung |
+|-------|---------------|
+| `lib/api.ts` | Alle Supabase CRUD-Operationen |
+| `lib/admin.ts` | Admin-E-Mail-Check |
+| `state/AppDataContext.tsx` | Globaler State, optimistic Updates |
+| `state/appDataStore.ts` | TypeScript Interfaces |
+| `data/mockData.ts` | FolderItem/NoteItem Interfaces, Sortier-Hilfsfunktionen |
+| `components/FolderIcons.tsx` | Icon-System, Farbzyklus, NoteIcon |
+| `components/Sidebar.tsx` | Sidebar mit DnD (Notizen + Ordner-Reihenfolge), User-Menü |
+| `pages/FolderPage.tsx` | Ordner-Ansicht mit Berechtigungs-Checks |
+| `pages/NotePage.tsx` | Note-Editor (contenteditable), Symbol-Palette |
+| `pages/DashboardPage.tsx` | Start-Übersicht |
+
+## UI-Konventionen
+- Ordner = immer einheitliches Ordner-Icon (farbige Outlines, kein Backdrop)
+- Notizen = immer NoteIcon (Dokument mit dünnen Textlinien, kein Backdrop)
+- Farbzyklus in `FOLDER_COLOR_CYCLE` (10 Farben, nur Stroke)
+- Schloss-Icon für Readonly = nur Outline, kein Backdrop, in `<span title="Nur Lesen">` gewrappt
+- Karten-Layout mit `gap-3` überall (Dashboard, FolderPage, PrivatePage)
+- Sidebar Ordner-Reihenfolge via localStorage (`sidebar-folder-order`)

@@ -33,9 +33,6 @@ export const SELECTABLE_ICONS: { id: string; label: string }[] = [
   { id: 'mail', label: 'E-Mail' },
 ]
 
-/** Das einzigartige Readonly-Icon (Schild) – nicht auswählbar */
-export const READONLY_ICON = 'shield'
-
 /** Farb-Rotation für Ordner und Notizen – nur Outline, kein Backdrop */
 export const FOLDER_COLOR_CYCLE = [
   { bg: 'bg-violet-100 dark:bg-violet-900/30', stroke: 'stroke-violet-500', text: 'text-violet-500' },
@@ -62,9 +59,6 @@ export function NoteIcon({ className }: { className?: string }) {
     </svg>
   )
 }
-
-const svgBase = 'strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"'
-void svgBase // used conceptually below
 
 /** Renders a folder icon SVG by ID */
 export function FolderIcon({ icon, className }: { icon: string; className: string }) {
@@ -276,31 +270,3 @@ export function getFolderColor(index: number) {
   return FOLDER_COLOR_CYCLE[index % FOLDER_COLOR_CYCLE.length]
 }
 
-/** Icon-Auswahl-Komponente */
-export function IconPicker({
-  selected,
-  onSelect,
-}: {
-  selected: string
-  onSelect: (icon: string) => void
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {SELECTABLE_ICONS.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => onSelect(item.id)}
-          title={item.label}
-          className={`flex h-10 w-10 items-center justify-center rounded-xl border-2 transition-colors ${
-            selected === item.id
-              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-              : 'border-transparent bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700'
-          }`}
-        >
-          <FolderIcon icon={item.id} className="h-5 w-5 stroke-slate-600 dark:stroke-slate-300" />
-        </button>
-      ))}
-    </div>
-  )
-}
