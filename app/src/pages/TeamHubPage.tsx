@@ -30,7 +30,10 @@ export function TeamHubPage() {
 
       // 2. Profile aus Supabase laden
       const profileMap = new Map<string, { email: string; name: string }>()
-      const { data: profiles } = await supabase.from('profiles').select('id, email, display_name')
+      const { data: profiles, error } = await supabase.from('profiles').select('id, email, display_name')
+      if (error) {
+        console.warn('[TeamHub] Profile konnten nicht geladen werden:', error.message)
+      }
       if (profiles) {
         for (const p of profiles) {
           profileMap.set(p.id, { email: p.email || '', name: p.display_name || '' })

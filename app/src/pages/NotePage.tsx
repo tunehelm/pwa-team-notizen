@@ -504,7 +504,8 @@ function NoteEditor({
       }
       // Nach Enter: Heading-Inline-Styles auf der neuen Zeile entfernen → "Text" wird Standard
       if (!event.shiftKey) {
-        setTimeout(() => {
+        window.setTimeout(() => {
+          if (!editorRef.current) return // Guard: Component might have unmounted
           const s = document.getSelection()
           if (!s || !s.anchorNode) return
           let el = s.anchorNode instanceof HTMLElement ? s.anchorNode : s.anchorNode.parentElement
@@ -559,11 +560,13 @@ function NoteEditor({
         span.appendChild(document.createTextNode('\u200B'))
         const range = selection.getRangeAt(0)
         range.insertNode(span)
-        const nr = document.createRange()
-        nr.setStartAfter(span.firstChild!)
-        nr.collapse(true)
-        selection.removeAllRanges()
-        selection.addRange(nr)
+        if (span.firstChild) {
+          const nr = document.createRange()
+          nr.setStartAfter(span.firstChild)
+          nr.collapse(true)
+          selection.removeAllRanges()
+          selection.addRange(nr)
+        }
       }
       syncEditorContent()
       updateFormatState()
@@ -582,11 +585,13 @@ function NoteEditor({
       span.appendChild(document.createTextNode('\u200B'))
       const range = selection.getRangeAt(0)
       range.insertNode(span)
-      const nr = document.createRange()
-      nr.setStartAfter(span.firstChild!)
-      nr.collapse(true)
-      selection.removeAllRanges()
-      selection.addRange(nr)
+      if (span.firstChild) {
+        const nr = document.createRange()
+        nr.setStartAfter(span.firstChild)
+        nr.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(nr)
+      }
     } else {
       // Text selected → wrap in styled span
       const range = selection.getRangeAt(0)

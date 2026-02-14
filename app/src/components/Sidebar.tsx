@@ -284,18 +284,25 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     e.preventDefault()
                     const trimmed = nameInput.trim()
                     if (!trimmed) return
-                    await supabase.auth.updateUser({ data: { display_name: trimmed } })
-                    // Also update profiles table so team members see the new name
-                    const { data } = await supabase.auth.getUser()
-                    if (data.user) {
-                      await supabase.from('profiles').upsert({
-                        id: data.user.id,
-                        email: data.user.email ?? '',
-                        display_name: trimmed,
-                        updated_at: new Date().toISOString(),
-                      }, { onConflict: 'id' })
+                    try {
+                      const { error: updateErr } = await supabase.auth.updateUser({ data: { display_name: trimmed } })
+                      if (updateErr) throw updateErr
+                      // Also update profiles table so team members see the new name
+                      const { data, error: getUserErr } = await supabase.auth.getUser()
+                      if (getUserErr) throw getUserErr
+                      if (data.user) {
+                        await supabase.from('profiles').upsert({
+                          id: data.user.id,
+                          email: data.user.email ?? '',
+                          display_name: trimmed,
+                          updated_at: new Date().toISOString(),
+                        }, { onConflict: 'id' })
+                      }
+                      window.location.reload()
+                    } catch (err) {
+                      console.error('[Sidebar] Name konnte nicht gespeichert werden:', err)
+                      alert('Name konnte nicht gespeichert werden. Bitte erneut versuchen.')
                     }
-                    window.location.reload()
                   }}
                 >
                   <input

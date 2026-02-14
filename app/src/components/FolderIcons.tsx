@@ -265,8 +265,4 @@ export function FolderIcon({ icon, className }: { icon: string; className: strin
   }
 }
 
-/** Gibt die Farbe für einen Ordner basierend auf Index zurück */
-export function getFolderColor(index: number) {
-  return FOLDER_COLOR_CYCLE[index % FOLDER_COLOR_CYCLE.length]
-}
 
