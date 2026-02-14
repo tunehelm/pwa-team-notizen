@@ -172,12 +172,6 @@ function NoteEditor({
   const drawingRef = useRef(false)
   const drawHistoryRef = useRef<ImageData[]>([])
 
-  // Keyboard / toolbar positioning (iOS-compatible)
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
-  const [viewportBottom, setViewportBottom] = useState(0)
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
-  const toolbarRef = useRef<HTMLDivElement>(null)
-
   // Active font color tracking
   const [activeFontColor, setActiveFontColor] = useState('')
 
@@ -307,27 +301,6 @@ function NoteEditor({
       document.removeEventListener('touchstart', handleOutside)
     }
   }, [isNoteMenuOpen])
-
-  /* ── Keyboard height tracking (iOS-compatible) ── */
-  useEffect(() => {
-    const vv = window.visualViewport
-    if (!vv) return
-    const update = () => {
-      const kbH = window.innerHeight - vv.height - vv.offsetTop
-      const kbOpen = kbH > 80 // threshold: keyboard is > 80px
-      setKeyboardHeight(Math.max(0, Math.round(kbH)))
-      setIsKeyboardOpen(kbOpen)
-      // Bottom edge of visible area — used for top-positioning on iOS
-      setViewportBottom(Math.round(vv.offsetTop + vv.height))
-    }
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    update()
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-    }
-  }, [])
 
   /* ── Image Resize + Move Handler ── */
   useEffect(() => {
@@ -989,6 +962,176 @@ function NoteEditor({
           </div>
         </div>
 
+        {/* ── Primary toolbar row ── */}
+        <div className={`mt-2 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none ${readOnly ? 'hidden' : ''}`}>
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('undo')} className={`${tbtn} ${tbtnDefault}`} aria-label="Undo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 10h10a5 5 0 015 5v0a5 5 0 01-5 5H8" /><path d="M7 14l-4-4 4-4" /></svg>
+          </button>
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('redo')} className={`${tbtn} ${tbtnDefault}`} aria-label="Redo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M21 10H11a5 5 0 00-5 5v0a5 5 0 005 5h5" /><path d="M17 14l4-4-4-4" /></svg>
+          </button>
+          <div className="h-6 w-px shrink-0" style={{ backgroundColor: 'var(--color-border)' }} />
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('bold')} className={`${tbtn} ${formatState.bold ? tbtnActive : tbtnDefault} font-bold`} aria-label="Fett">B</button>
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('italic')} className={`${tbtn} ${formatState.italic ? tbtnActive : tbtnDefault} italic`} aria-label="Kursiv">I</button>
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('underline')} className={`${tbtn} ${formatState.underline ? tbtnActive : tbtnDefault} underline`} aria-label="Unterstrichen">U</button>
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('strikeThrough')} className={`${tbtn} ${formatState.strikeThrough ? tbtnActive : tbtnDefault} line-through`} aria-label="Durchgestrichen">S</button>
+          <div className="h-6 w-px shrink-0" style={{ backgroundColor: 'var(--color-border)' }} />
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => setActivePanel((p) => (p === 'fontcolor' ? 'none' : 'fontcolor'))} className={`${tbtn} ${activePanel === 'fontcolor' ? tbtnActive : tbtnDefault} relative`} aria-label="Schriftfarbe">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><path d="M4 20h16" /><path d="M9.5 4h5l4.5 12h-2l-1.2-3H8.2L7 16H5L9.5 4z" /></svg>
+            {activeFontColor ? <span className="absolute -bottom-0.5 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full" style={{ backgroundColor: activeFontColor }} /> : null}
+          </button>
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => setActivePanel((p) => (p === 'format' ? 'none' : 'format'))} className={`${tbtn} ${activePanel === 'format' ? tbtnActive : tbtnDefault}`} aria-label="Format">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M4 7V4h16v3" /><path d="M9 20h6" /><path d="M12 4v16" /></svg>
+          </button>
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => setActivePanel((p) => (p === 'insert' ? 'none' : 'insert'))} className={`${tbtn} ${activePanel === 'insert' ? tbtnActive : tbtnDefault}`} aria-label="Einfügen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="12" r="10" /><path d="M12 8v8M8 12h8" /></svg>
+          </button>
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => setActivePanel((p) => (p === 'link' ? 'none' : 'link'))} className={`${tbtn} ${activePanel === 'link' ? tbtnActive : tbtnDefault}`} aria-label="Link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg>
+          </button>
+          <button type="button" onClick={openDrawing} className={`${tbtn} ${tbtnDefault}`} aria-label="Zeichnen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M12 19l7-7 3 3-7 7-3-3z" /><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" /><path d="M2 2l7.586 7.586" /><circle cx="11" cy="11" r="2" /></svg>
+          </button>
+          <div className="h-6 w-px shrink-0" style={{ backgroundColor: 'var(--color-border)' }} />
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => { editorRef.current?.focus(); document.execCommand('insertHTML', false, '<div style="display:flex;align-items:flex-start;gap:6px;margin:4px 0"><input type="checkbox" style="margin-top:4px;width:16px;height:16px;accent-color:#3b82f6" /><span>Aufgabe</span></div><p><br></p>'); syncEditorContent() }} className={`${tbtn} ${tbtnDefault}`} aria-label="Aufgabe">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>
+          </button>
+        </div>
+
+        {/* ── Font color sub-panel ── */}
+        {activePanel === 'fontcolor' ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
+            {FONT_COLORS.map((c) => (
+              <button
+                key={c.value || 'default'}
+                type="button"
+                onMouseDown={keepEditorFocus}
+                onClick={() => {
+                  if (c.value) {
+                    runCommand('foreColor', c.value)
+                    setActiveFontColor(c.value)
+                  } else {
+                    const editor = editorRef.current
+                    if (editor) {
+                      editor.focus()
+                      const defaultColor = getComputedStyle(editor).color
+                      document.execCommand('foreColor', false, defaultColor)
+                      syncEditorContent()
+                      updateFormatState()
+                    }
+                    setActiveFontColor('')
+                  }
+                  setActivePanel('none')
+                }}
+                className={`flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors ${activeFontColor === c.value ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-[var(--color-border)] hover:bg-[var(--color-bg-card)]'}`}
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                <span className="h-3.5 w-3.5 rounded-full border" style={{ backgroundColor: c.value || 'var(--color-text-primary)', borderColor: activeFontColor === c.value ? '#3b82f6' : 'var(--color-border)' }} />
+                {c.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {/* ── Format sub-panel ── */}
+        {activePanel === 'format' ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<h1>')} className={`${tbtn} ${formatState.block === 'h1' ? tbtnActive : tbtnDefault} text-xs`}>H1</button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<h2>')} className={`${tbtn} ${formatState.block === 'h2' ? tbtnActive : tbtnDefault} text-xs`}>H2</button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<h3>')} className={`${tbtn} ${formatState.block === 'h3' ? tbtnActive : tbtnDefault} text-xs`}>H3</button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<p>')} className={`${tbtn} ${formatState.block === 'p' && formatState.list === '' ? tbtnActive : tbtnDefault} text-xs`}>Text</button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<blockquote>')} className={`${tbtn} ${formatState.block === 'blockquote' ? tbtnActive : tbtnDefault} text-xs`}>Zitat</button>
+            <div className="h-6 w-px shrink-0" style={{ backgroundColor: 'var(--color-border)' }} />
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('insertUnorderedList')} className={`${tbtn} ${formatState.list === 'ul' ? tbtnActive : tbtnDefault}`} aria-label="Aufzählung">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><circle cx="4" cy="6" r="1" fill="currentColor" /><circle cx="4" cy="12" r="1" fill="currentColor" /><circle cx="4" cy="18" r="1" fill="currentColor" /></svg>
+            </button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('insertOrderedList')} className={`${tbtn} ${formatState.list === 'ol' ? tbtnActive : tbtnDefault}`} aria-label="Nummerierung">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><line x1="10" y1="6" x2="21" y2="6" /><line x1="10" y1="12" x2="21" y2="12" /><line x1="10" y1="18" x2="21" y2="18" /><text x="2" y="7" fontSize="7" fill="currentColor" stroke="none" fontFamily="system-ui">1</text><text x="2" y="13" fontSize="7" fill="currentColor" stroke="none" fontFamily="system-ui">2</text><text x="2" y="19" fontSize="7" fill="currentColor" stroke="none" fontFamily="system-ui">3</text></svg>
+            </button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('indent')} className={`${tbtn} ${tbtnDefault}`} aria-label="Einrücken">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><line x1="3" y1="4" x2="21" y2="4" /><line x1="11" y1="10" x2="21" y2="10" /><line x1="11" y1="16" x2="21" y2="16" /><line x1="3" y1="22" x2="21" y2="22" /><polyline points="3 10 7 13 3 16" /></svg>
+            </button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('outdent')} className={`${tbtn} ${tbtnDefault}`} aria-label="Ausrücken">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><line x1="3" y1="4" x2="21" y2="4" /><line x1="11" y1="10" x2="21" y2="10" /><line x1="11" y1="16" x2="21" y2="16" /><line x1="3" y1="22" x2="21" y2="22" /><polyline points="7 10 3 13 7 16" /></svg>
+            </button>
+          </div>
+        ) : null}
+
+        {/* ── Insert sub-panel ── */}
+        {activePanel === 'insert' ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <button type="button" onClick={() => setActivePanel('table')} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" /></svg>
+              Tabelle
+            </button>
+            <button type="button" onClick={() => handleFileUpload('image/*')} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
+              Foto
+            </button>
+            <button type="button" onClick={() => handleFileUpload('video/*')} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>
+              Video
+            </button>
+            <button type="button" onClick={startAudioRecording} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
+              Audio
+            </button>
+            <button type="button" onClick={() => handleFileUpload('*/*')} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg>
+              Datei
+            </button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => { editorRef.current?.focus(); document.execCommand('insertHorizontalRule'); syncEditorContent() }} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>— Linie</button>
+            <button type="button" onClick={() => setActivePanel('symbols')} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+              Symbole
+            </button>
+          </div>
+        ) : null}
+
+        {/* ── Symbols sub-panel ── */}
+        {activePanel === 'symbols' ? (
+          <div className="mt-1.5 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Symbol einfügen</p>
+              <button type="button" onClick={() => setActivePanel('insert')} className="text-xs" style={{ color: 'var(--color-text-muted)' }}>← Zurück</button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {SELECTABLE_ICONS.map((item) => (
+                <button key={item.id} type="button" title={item.label} onClick={() => { editorRef.current?.focus(); const emojiMap: Record<string, string> = { folder: '📁', bulb: '💡', megaphone: '📢', palette: '🎨', gear: '⚙️', chart: '📊', star: '⭐', heart: '❤️', chat: '💬', calendar: '📅', book: '📖', code: '💻', globe: '🌍', camera: '📷', music: '🎵', plane: '✈️', car: '🚗', thought: '💭', alert: '⚠️', pill: '💊', bolt: '⚡', clock: '🕐', pencil: '✏️', key: '🔑', users: '👥', check: '✅', euro: '💶', phone: '📞', mail: '📧' }; document.execCommand('insertText', false, emojiMap[item.id] || item.label); syncEditorContent() }} className="flex h-9 w-9 items-center justify-center rounded-lg border border-transparent bg-slate-100 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700">
+                  <FolderIcon icon={item.id} className="h-4.5 w-4.5 stroke-slate-600 dark:stroke-slate-300" />
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/* ── Table size dialog ── */}
+        {activePanel === 'table' ? (
+          <div className="mt-1.5 flex flex-col gap-2 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <p className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Tabelle einfügen</p>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--color-text-primary)' }}>Zeilen <input type="number" min={1} max={20} value={tableRows} onChange={(e) => setTableRows(Math.max(1, Number(e.target.value)))} className="h-9 w-16 rounded-lg border px-2 text-center text-sm focus:border-blue-400 focus:outline-none" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-primary)' }} /></label>
+              <span style={{ color: 'var(--color-text-muted)' }}>×</span>
+              <label className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--color-text-primary)' }}>Spalten <input type="number" min={1} max={10} value={tableCols} onChange={(e) => setTableCols(Math.max(1, Number(e.target.value)))} className="h-9 w-16 rounded-lg border px-2 text-center text-sm focus:border-blue-400 focus:outline-none" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-primary)' }} /></label>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => insertTable(tableRows, tableCols)} className="h-9 rounded-xl bg-blue-500 px-4 text-sm font-medium text-white active:bg-blue-600">Einfügen</button>
+              <button type="button" onClick={() => setActivePanel('insert')} className="h-9 rounded-xl border px-4 text-sm" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>Zurück</button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* ── Link sub-panel ── */}
+        {activePanel === 'link' ? (
+          <div className="mt-1.5 flex flex-col gap-2 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <input type="url" placeholder="https://..." value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} className="h-10 rounded-xl border px-3 text-sm focus:border-blue-400 focus:outline-none" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-primary)' }} />
+            <input type="text" placeholder="Angezeigter Name (optional)" value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} className="h-10 rounded-xl border px-3 text-sm focus:border-blue-400 focus:outline-none" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-primary)' }} />
+            <div className="flex gap-2">
+              <button type="button" onClick={insertLink} className="h-10 rounded-xl bg-blue-500 px-4 text-sm font-medium text-white active:bg-blue-600">Einfügen</button>
+              <button type="button" onClick={() => setActivePanel('none')} className="h-10 rounded-xl border px-4 text-sm" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>Abbrechen</button>
+            </div>
+          </div>
+        ) : null}
       </header>
 
       {/* ── Drawing overlay ── */}
@@ -1045,7 +1188,7 @@ function NoteEditor({
       ) : null}
 
       {/* ── Content ── */}
-      <section className="px-4 pt-5" style={{ paddingBottom: readOnly ? '2.5rem' : `${64 + keyboardHeight}px` }}>
+      <section className="px-4 pb-10 pt-5">
         {note ? (
           <p className="mb-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>Zuletzt aktualisiert: {note.updatedLabel}</p>
         ) : (
@@ -1089,196 +1232,6 @@ function NoteEditor({
         </div>
       </section>
 
-      {/* ── Bottom Toolbar (above keyboard, like Apple Notes) ── */}
-      {!readOnly ? (
-        <div
-          ref={toolbarRef}
-          className="fixed left-0 right-0 z-40 border-t backdrop-blur"
-          style={{
-            // iOS: use top + translateY when keyboard is open (fixed bottom doesn't work on iOS)
-            // Desktop/no keyboard: use bottom: 0
-            ...(isKeyboardOpen
-              ? { top: `${viewportBottom}px`, bottom: 'auto', transform: 'translateY(-100%)' }
-              : { bottom: '0px', top: 'auto', transform: 'none' }),
-            backgroundColor: 'color-mix(in srgb, var(--color-bg-app) 95%, transparent)',
-            borderColor: 'var(--color-border)',
-            paddingBottom: isKeyboardOpen ? '0px' : 'env(safe-area-inset-bottom, 0px)',
-          } as CSSProperties}
-        >
-          {/* ── Sub-panels (open above toolbar) ── */}
-
-          {/* Font color */}
-          {activePanel === 'fontcolor' ? (
-            <div className="flex flex-wrap items-center gap-1.5 border-b px-2 py-2" style={{ borderColor: 'var(--color-border)' }}>
-              {FONT_COLORS.map((c) => (
-                <button
-                  key={c.value || 'default'}
-                  type="button"
-                  onMouseDown={keepEditorFocus}
-                  onClick={() => {
-                    if (c.value) {
-                      runCommand('foreColor', c.value)
-                      setActiveFontColor(c.value)
-                    } else {
-                      const editor = editorRef.current
-                      if (editor) {
-                        editor.focus()
-                        const defaultColor = getComputedStyle(editor).color
-                        document.execCommand('foreColor', false, defaultColor)
-                        syncEditorContent()
-                        updateFormatState()
-                      }
-                      setActiveFontColor('')
-                    }
-                    setActivePanel('none')
-                  }}
-                  className={`flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors ${activeFontColor === c.value ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-[var(--color-border)] hover:bg-[var(--color-bg-card)]'}`}
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  <span className="h-3.5 w-3.5 rounded-full border" style={{ backgroundColor: c.value || 'var(--color-text-primary)', borderColor: activeFontColor === c.value ? '#3b82f6' : 'var(--color-border)' }} />
-                  {c.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          {/* Format */}
-          {activePanel === 'format' ? (
-            <div className="flex flex-wrap items-center gap-1.5 border-b px-2 py-2" style={{ borderColor: 'var(--color-border)' }}>
-              <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<h1>')} className={`${tbtn} ${formatState.block === 'h1' ? tbtnActive : tbtnDefault} text-xs`}>H1</button>
-              <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<h2>')} className={`${tbtn} ${formatState.block === 'h2' ? tbtnActive : tbtnDefault} text-xs`}>H2</button>
-              <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<h3>')} className={`${tbtn} ${formatState.block === 'h3' ? tbtnActive : tbtnDefault} text-xs`}>H3</button>
-              <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<p>')} className={`${tbtn} ${formatState.block === 'p' && formatState.list === '' ? tbtnActive : tbtnDefault} text-xs`}>Text</button>
-              <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runFormatBlock('<blockquote>')} className={`${tbtn} ${formatState.block === 'blockquote' ? tbtnActive : tbtnDefault} text-xs`}>Zitat</button>
-              <div className="h-6 w-px shrink-0" style={{ backgroundColor: 'var(--color-border)' }} />
-              <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('insertUnorderedList')} className={`${tbtn} ${formatState.list === 'ul' ? tbtnActive : tbtnDefault}`} aria-label="Aufzählung">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><circle cx="4" cy="6" r="1" fill="currentColor" /><circle cx="4" cy="12" r="1" fill="currentColor" /><circle cx="4" cy="18" r="1" fill="currentColor" /></svg>
-              </button>
-              <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('insertOrderedList')} className={`${tbtn} ${formatState.list === 'ol' ? tbtnActive : tbtnDefault}`} aria-label="Nummerierung">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><line x1="10" y1="6" x2="21" y2="6" /><line x1="10" y1="12" x2="21" y2="12" /><line x1="10" y1="18" x2="21" y2="18" /><text x="2" y="7" fontSize="7" fill="currentColor" stroke="none" fontFamily="system-ui">1</text><text x="2" y="13" fontSize="7" fill="currentColor" stroke="none" fontFamily="system-ui">2</text><text x="2" y="19" fontSize="7" fill="currentColor" stroke="none" fontFamily="system-ui">3</text></svg>
-              </button>
-              <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('indent')} className={`${tbtn} ${tbtnDefault}`} aria-label="Einrücken">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><line x1="3" y1="4" x2="21" y2="4" /><line x1="11" y1="10" x2="21" y2="10" /><line x1="11" y1="16" x2="21" y2="16" /><line x1="3" y1="22" x2="21" y2="22" /><polyline points="3 10 7 13 3 16" /></svg>
-              </button>
-              <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('outdent')} className={`${tbtn} ${tbtnDefault}`} aria-label="Ausrücken">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><line x1="3" y1="4" x2="21" y2="4" /><line x1="11" y1="10" x2="21" y2="10" /><line x1="11" y1="16" x2="21" y2="16" /><line x1="3" y1="22" x2="21" y2="22" /><polyline points="7 10 3 13 7 16" /></svg>
-              </button>
-            </div>
-          ) : null}
-
-          {/* Insert */}
-          {activePanel === 'insert' ? (
-            <div className="flex flex-wrap items-center gap-1.5 border-b px-2 py-2" style={{ borderColor: 'var(--color-border)' }}>
-              <button type="button" onClick={() => setActivePanel('table')} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" /></svg>
-                Tabelle
-              </button>
-              <button type="button" onClick={() => handleFileUpload('image/*')} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
-                Foto
-              </button>
-              <button type="button" onClick={() => handleFileUpload('video/*')} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>
-                Video
-              </button>
-              <button type="button" onClick={startAudioRecording} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
-                Audio
-              </button>
-              <button type="button" onClick={() => handleFileUpload('*/*')} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg>
-                Datei
-              </button>
-              <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => { editorRef.current?.focus(); document.execCommand('insertHorizontalRule'); syncEditorContent() }} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>— Linie</button>
-              <button type="button" onClick={() => setActivePanel('symbols')} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
-                Symbole
-              </button>
-            </div>
-          ) : null}
-
-          {/* Symbols */}
-          {activePanel === 'symbols' ? (
-            <div className="border-b px-2 py-2" style={{ borderColor: 'var(--color-border)' }}>
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Symbol einfügen</p>
-                <button type="button" onClick={() => setActivePanel('insert')} className="text-xs" style={{ color: 'var(--color-text-muted)' }}>← Zurück</button>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {SELECTABLE_ICONS.map((item) => (
-                  <button key={item.id} type="button" title={item.label} onClick={() => { editorRef.current?.focus(); const emojiMap: Record<string, string> = { folder: '📁', bulb: '💡', megaphone: '📢', palette: '🎨', gear: '⚙️', chart: '📊', star: '⭐', heart: '❤️', chat: '💬', calendar: '📅', book: '📖', code: '💻', globe: '🌍', camera: '📷', music: '🎵', plane: '✈️', car: '🚗', thought: '💭', alert: '⚠️', pill: '💊', bolt: '⚡', clock: '🕐', pencil: '✏️', key: '🔑', users: '👥', check: '✅', euro: '💶', phone: '📞', mail: '📧' }; document.execCommand('insertText', false, emojiMap[item.id] || item.label); syncEditorContent() }} className="flex h-9 w-9 items-center justify-center rounded-lg border border-transparent bg-slate-100 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700">
-                    <FolderIcon icon={item.id} className="h-4.5 w-4.5 stroke-slate-600 dark:stroke-slate-300" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {/* Table */}
-          {activePanel === 'table' ? (
-            <div className="flex flex-col gap-2 border-b px-2 py-2" style={{ borderColor: 'var(--color-border)' }}>
-              <p className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Tabelle einfügen</p>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--color-text-primary)' }}>Zeilen <input type="number" min={1} max={20} value={tableRows} onChange={(e) => setTableRows(Math.max(1, Number(e.target.value)))} className="h-9 w-16 rounded-lg border px-2 text-center text-sm" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-primary)' }} /></label>
-                <span style={{ color: 'var(--color-text-muted)' }}>×</span>
-                <label className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--color-text-primary)' }}>Spalten <input type="number" min={1} max={10} value={tableCols} onChange={(e) => setTableCols(Math.max(1, Number(e.target.value)))} className="h-9 w-16 rounded-lg border px-2 text-center text-sm" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-primary)' }} /></label>
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => insertTable(tableRows, tableCols)} className="h-9 rounded-xl bg-blue-500 px-4 text-sm font-medium text-white">Einfügen</button>
-                <button type="button" onClick={() => setActivePanel('insert')} className="h-9 rounded-xl border px-4 text-sm" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>Zurück</button>
-              </div>
-            </div>
-          ) : null}
-
-          {/* Link */}
-          {activePanel === 'link' ? (
-            <div className="flex flex-col gap-2 border-b px-2 py-2" style={{ borderColor: 'var(--color-border)' }}>
-              <input type="url" placeholder="https://..." value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} className="h-10 rounded-xl border px-3 text-sm" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-primary)' }} />
-              <input type="text" placeholder="Angezeigter Name (optional)" value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} className="h-10 rounded-xl border px-3 text-sm" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-primary)' }} />
-              <div className="flex gap-2">
-                <button type="button" onClick={insertLink} className="h-10 rounded-xl bg-blue-500 px-4 text-sm font-medium text-white">Einfügen</button>
-                <button type="button" onClick={() => setActivePanel('none')} className="h-10 rounded-xl border px-4 text-sm" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>Abbrechen</button>
-              </div>
-            </div>
-          ) : null}
-
-          {/* ── Primary toolbar row ── */}
-          <div className="flex items-center gap-1.5 overflow-x-auto px-2 py-1.5 scrollbar-none">
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('undo')} className={`${tbtn} ${tbtnDefault}`} aria-label="Undo">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 10h10a5 5 0 015 5v0a5 5 0 01-5 5H8" /><path d="M7 14l-4-4 4-4" /></svg>
-            </button>
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('redo')} className={`${tbtn} ${tbtnDefault}`} aria-label="Redo">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M21 10H11a5 5 0 00-5 5v0a5 5 0 005 5h5" /><path d="M17 14l4-4-4-4" /></svg>
-            </button>
-            <div className="h-6 w-px shrink-0" style={{ backgroundColor: 'var(--color-border)' }} />
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('bold')} className={`${tbtn} ${formatState.bold ? tbtnActive : tbtnDefault} font-bold`} aria-label="Fett">B</button>
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('italic')} className={`${tbtn} ${formatState.italic ? tbtnActive : tbtnDefault} italic`} aria-label="Kursiv">I</button>
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('underline')} className={`${tbtn} ${formatState.underline ? tbtnActive : tbtnDefault} underline`} aria-label="Unterstrichen">U</button>
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => runCommand('strikeThrough')} className={`${tbtn} ${formatState.strikeThrough ? tbtnActive : tbtnDefault} line-through`} aria-label="Durchgestrichen">S</button>
-            <div className="h-6 w-px shrink-0" style={{ backgroundColor: 'var(--color-border)' }} />
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => setActivePanel((p) => (p === 'fontcolor' ? 'none' : 'fontcolor'))} className={`${tbtn} ${activePanel === 'fontcolor' ? tbtnActive : tbtnDefault}`} aria-label="Schriftfarbe">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><path d="M4 20h16" /><path d="M9.5 4h5l4.5 12h-2l-1.2-3H8.2L7 16H5L9.5 4z" /></svg>
-              {activeFontColor ? <span className="absolute -bottom-0.5 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full" style={{ backgroundColor: activeFontColor }} /> : null}
-            </button>
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => setActivePanel((p) => (p === 'format' ? 'none' : 'format'))} className={`${tbtn} ${activePanel === 'format' ? tbtnActive : tbtnDefault}`} aria-label="Format">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M4 7V4h16v3" /><path d="M9 20h6" /><path d="M12 4v16" /></svg>
-            </button>
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => setActivePanel((p) => (p === 'insert' ? 'none' : 'insert'))} className={`${tbtn} ${activePanel === 'insert' ? tbtnActive : tbtnDefault}`} aria-label="Einfügen">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="12" r="10" /><path d="M12 8v8M8 12h8" /></svg>
-            </button>
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => setActivePanel((p) => (p === 'link' ? 'none' : 'link'))} className={`${tbtn} ${activePanel === 'link' ? tbtnActive : tbtnDefault}`} aria-label="Link">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg>
-            </button>
-            <button type="button" onClick={openDrawing} className={`${tbtn} ${tbtnDefault}`} aria-label="Zeichnen">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M12 19l7-7 3 3-7 7-3-3z" /><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" /><path d="M2 2l7.586 7.586" /><circle cx="11" cy="11" r="2" /></svg>
-            </button>
-            <div className="h-6 w-px shrink-0" style={{ backgroundColor: 'var(--color-border)' }} />
-            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => { editorRef.current?.focus(); document.execCommand('insertHTML', false, '<div style="display:flex;align-items:flex-start;gap:6px;margin:4px 0"><input type="checkbox" style="margin-top:4px;width:16px;height:16px;accent-color:#3b82f6" /><span>Aufgabe</span></div><p><br></p>'); syncEditorContent() }} className={`${tbtn} ${tbtnDefault}`} aria-label="Aufgabe">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>
-            </button>
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }
