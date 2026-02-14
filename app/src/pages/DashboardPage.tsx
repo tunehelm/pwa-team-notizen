@@ -160,17 +160,13 @@ export function DashboardPage() {
                   <Link
                     key={note.id}
                     to={`/note/${note.id}`}
-                    className="flex w-44 shrink-0 flex-col justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3 shadow-sm transition-transform active:scale-[0.98]"
+                    className="flex w-40 shrink-0 flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-2.5 shadow-sm transition-transform active:scale-[0.98]"
                   >
-                    <div className="mb-1.5">
+                    <div className="mb-1">
                       <UserAvatar {...ownerProps(note.ownerId)} size="sm" />
                     </div>
                     <p className="text-xs font-semibold text-[var(--color-text-primary)]">{note.title}</p>
                     <p className="mt-0.5 line-clamp-2 text-[10px] text-[var(--color-text-secondary)]">{note.excerpt}</p>
-                    <div className="mt-2 flex items-center gap-1">
-                      <UserAvatar {...ownerProps(note.ownerId)} size="sm" />
-                      <span className="text-[9px] text-[var(--color-text-muted)]">{note.updatedLabel}</span>
-                    </div>
                   </Link>
                 ))}
                 {pinnedFolders.map((folder, idx) => {
@@ -183,9 +179,9 @@ export function DashboardPage() {
                     <Link
                       key={folder.id}
                       to={`/folder/${folder.id}`}
-                      className="flex w-44 shrink-0 flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3 shadow-sm transition-transform active:scale-[0.98]"
+                      className="flex w-40 shrink-0 flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-2.5 shadow-sm transition-transform active:scale-[0.98]"
                     >
-                      <FolderIcon icon={fIcon} className={`mb-1.5 h-6 w-6 ${fColor.stroke}`} />
+                      <FolderIcon icon={fIcon} className={`mb-1 h-5 w-5 ${fColor.stroke}`} />
                       <p className="text-xs font-semibold text-[var(--color-text-primary)]">{folder.name}</p>
                       <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
                         {getFolderNoteItems(folder.id).length} Notizen · {getSubfolderItems(folder.id).length} Ordner
@@ -194,7 +190,7 @@ export function DashboardPage() {
                   )
                 })}
               </div>
-              <div className="mx-4 mt-1.5 h-1 overflow-hidden rounded-full bg-[var(--color-border)]">
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[var(--color-border)]">
                 <div
                   className="h-full rounded-full bg-[var(--color-text-muted)] transition-all duration-150"
                   style={{ width: `${pinnedScrollProgress}%` }}
