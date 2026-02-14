@@ -34,6 +34,38 @@ alwaysApply: true
 ### `trash_folders` / `trash_notes`
 Gleiche Struktur + `deleted_at` timestamp. Papierkorb-Logik: Soft-Delete per Upsert.
 
+### `profiles`
+| Spalte | Typ | Beschreibung |
+|--------|-----|-------------|
+| id | uuid | PK, referenziert auth.users |
+| email | text | E-Mail des Users |
+| display_name | text | Anzeigename |
+| updated_at | timestamptz | Letzte Aktualisierung |
+
+- Wird automatisch per Trigger (`on_auth_user_created`) bei Registrierung erstellt
+- Wird bei Login und Namensänderung per Upsert aktualisiert (`AppDataContext.tsx`, `Sidebar.tsx`)
+- RLS: Jeder kann alle Profile lesen, nur eigenes updaten/inserten
+- SQL-Setup: `docs/supabase-profiles-setup.sql`
+
+### `messages`
+| Spalte | Typ | Beschreibung |
+|--------|-----|-------------|
+| id | uuid | PK |
+| sender_id | uuid | Absender (auth.uid) |
+| sender_name | text | Name des Absenders |
+| sender_email | text | E-Mail des Absenders |
+| content | text | Nachrichtentext |
+| created_at | timestamptz | Zeitstempel |
+| read | boolean | Gelesen-Status |
+
+- Team-Mitglieder senden Nachrichten an Admin über Team-Seite
+- Admin sieht alle Nachrichten mit Ungelesen-Badge, kann als gelesen markieren
+- RLS: User kann eigene INSERT + SELECT, Admin kann alle SELECT + UPDATE
+- E-Mail-Benachrichtigung: Supabase Edge Function `notify-admin` → Resend API
+- Database Webhook triggert Edge Function bei INSERT
+- SQL-Setup: `docs/supabase-messages-setup.sql`
+- Edge Function: `supabase/functions/notify-admin/index.ts`
+
 ## Berechtigungs-System
 
 ### Admin
@@ -63,19 +95,34 @@ Gleiche Struktur + `deleted_at` timestamp. Papierkorb-Logik: Soft-Delete per Ups
 |-------|---------------|
 | `lib/api.ts` | Alle Supabase CRUD-Operationen |
 | `lib/admin.ts` | Admin-E-Mail-Check |
-| `state/AppDataContext.tsx` | Globaler State, optimistic Updates |
+| `state/AppDataContext.tsx` | Globaler State, optimistic Updates, Profil-Upsert bei Login |
 | `state/appDataStore.ts` | TypeScript Interfaces |
 | `data/mockData.ts` | FolderItem/NoteItem Interfaces, Sortier-Hilfsfunktionen |
-| `components/FolderIcons.tsx` | Icon-System, Farbzyklus, NoteIcon |
-| `components/Sidebar.tsx` | Sidebar mit DnD (Notizen + Ordner-Reihenfolge), User-Menü |
+| `components/FolderIcons.tsx` | Icon-System, `getStableColor(id)`, NoteIcon, Sales-Icons |
+| `components/Sidebar.tsx` | Sidebar mit DnD (Notizen + Ordner-Reihenfolge), User-Menü, Namensänderung |
+| `components/MoveNoteModal.tsx` | Notiz verschieben Dialog |
+| `components/UserAvatar.tsx` | Avatar mit stabilen Initialen + Farben aus Profil-Daten |
 | `pages/FolderPage.tsx` | Ordner-Ansicht mit Berechtigungs-Checks |
-| `pages/NotePage.tsx` | Note-Editor (contenteditable), Symbol-Palette |
-| `pages/DashboardPage.tsx` | Start-Übersicht |
+| `pages/NotePage.tsx` | Note-Editor (contenteditable), Zeichnen, Bild einfügen/löschen/resize, Symbol-Palette |
+| `pages/DashboardPage.tsx` | Start-Übersicht, fixierte Karten, Profil-Lookup für Avatare |
+| `pages/TeamHubPage.tsx` | Team-Mitglieder, Nachricht an Admin, Admin-Nachrichteneingang |
+| `pages/SearchPage.tsx` | Suche mit Profil-Lookup für Avatare |
+| `pages/PrivatePage.tsx` | Private Ordner/Notizen |
+| `supabase/functions/notify-admin/index.ts` | Edge Function: E-Mail via Resend bei neuer Nachricht |
 
 ## UI-Konventionen
 - Ordner = immer einheitliches Ordner-Icon (farbige Outlines, kein Backdrop)
-- Notizen = immer NoteIcon (Dokument mit dünnen Textlinien, kein Backdrop)
-- Farbzyklus in `FOLDER_COLOR_CYCLE` (10 Farben, nur Stroke)
-- Schloss-Icon für Readonly = nur Outline, kein Backdrop, in `<span title="Nur Lesen">` gewrappt
+- Notizen = immer NoteIcon (Dokument mit dünnen Textlinien, strokeWidth 1.3/0.75)
+- **Stabile Farben**: `getStableColor(id)` berechnet Farbe per ID-Hash — gleicher Ordner = gleiche Farbe überall
+- Schloss-Icon für Readonly = h-2.5 w-2.5, nur Outline, in `<span title="Nur Lesen">` gewrappt
 - Karten-Layout mit `gap-3` überall (Dashboard, FolderPage, PrivatePage)
+- Fixierte Karten: kompakt (w-40, p-2.5, nur Avatar + Titel + Excerpt)
 - Sidebar Ordner-Reihenfolge via localStorage (`sidebar-folder-order`)
+- Bilder im Editor: löschbar per rotem X-Button oder Delete/Backspace-Taste
+- Headings (H1/H2/H3) als Inline-Spans mit font-size, nicht als Block-Elemente
+- Toolbar: sticky top im Header (Bottom-Ansatz auf iOS nicht machbar wegen nativer Input-Leiste)
+
+## Externe Dienste
+- **Vercel**: Hosting + Deployment (auto-deploy bei git push)
+- **Supabase**: Auth, Database, Storage, Edge Functions
+- **Resend**: E-Mail-Versand (API-Key als Supabase Secret `RESEND_API_KEY`)
