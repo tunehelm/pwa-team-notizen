@@ -1,10 +1,11 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { SidebarLayout } from '../components/SidebarLayout'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
 import { FolderIcon, FOLDER_COLOR_CYCLE } from '../components/FolderIcons'
 import { isAdminEmail } from '../lib/admin'
+import { supabase } from '../lib/supabase'
 
 export function DashboardPage() {
   const {
@@ -26,10 +27,33 @@ export function DashboardPage() {
   const userEmail = currentUserEmail
   const userName = currentUserName
 
-  /** Returns {email, name} for a given ownerId – if it's the current user, use their profile name */
+  // Profile-Daten für alle User laden (damit Avatare korrekte Initialen zeigen)
+  const [profileMap, setProfileMap] = useState<Map<string, { email: string; name: string }>>(new Map())
+
+  useEffect(() => {
+    void supabase.from('profiles').select('id, email, display_name').then(({ data, error }) => {
+      if (error) {
+        console.warn('[Dashboard] Profile laden fehlgeschlagen:', error.message)
+        return
+      }
+      if (data) {
+        const map = new Map<string, { email: string; name: string }>()
+        for (const p of data) {
+          map.set(p.id, { email: p.email || '', name: p.display_name || '' })
+        }
+        setProfileMap(map)
+      }
+    })
+  }, [])
+
+  /** Returns {email, name} for a given ownerId – uses profile data for correct avatars */
   function ownerProps(ownerId: string | undefined) {
     if (!ownerId || ownerId === currentUserId) {
       return { email: userEmail, name: userName }
+    }
+    const profile = profileMap.get(ownerId)
+    if (profile) {
+      return { email: profile.email, name: profile.name || undefined }
     }
     return { email: ownerId }
   }
@@ -136,16 +160,16 @@ export function DashboardPage() {
                   <Link
                     key={note.id}
                     to={`/note/${note.id}`}
-                    className="flex w-56 shrink-0 flex-col justify-between rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 shadow-sm transition-transform active:scale-[0.98]"
+                    className="flex w-44 shrink-0 flex-col justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3 shadow-sm transition-transform active:scale-[0.98]"
                   >
-                    <div className="mb-2">
-                      <UserAvatar {...ownerProps(note.ownerId)} size="md" />
-                    </div>
-                    <p className="text-sm font-semibold text-[var(--color-text-primary)]">{note.title}</p>
-                    <p className="mt-1 line-clamp-2 text-xs text-[var(--color-text-secondary)]">{note.excerpt}</p>
-                    <div className="mt-3 flex items-center gap-1.5">
+                    <div className="mb-1.5">
                       <UserAvatar {...ownerProps(note.ownerId)} size="sm" />
-                      <span className="text-[10px] text-[var(--color-text-muted)]">{note.updatedLabel}</span>
+                    </div>
+                    <p className="text-xs font-semibold text-[var(--color-text-primary)]">{note.title}</p>
+                    <p className="mt-0.5 line-clamp-2 text-[10px] text-[var(--color-text-secondary)]">{note.excerpt}</p>
+                    <div className="mt-2 flex items-center gap-1">
+                      <UserAvatar {...ownerProps(note.ownerId)} size="sm" />
+                      <span className="text-[9px] text-[var(--color-text-muted)]">{note.updatedLabel}</span>
                     </div>
                   </Link>
                 ))}
@@ -159,11 +183,11 @@ export function DashboardPage() {
                     <Link
                       key={folder.id}
                       to={`/folder/${folder.id}`}
-                      className="flex w-56 shrink-0 flex-col rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 shadow-sm transition-transform active:scale-[0.98]"
+                      className="flex w-44 shrink-0 flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3 shadow-sm transition-transform active:scale-[0.98]"
                     >
-                      <FolderIcon icon={fIcon} className={`mb-2 h-7 w-7 ${fColor.stroke}`} />
-                      <p className="text-sm font-semibold text-[var(--color-text-primary)]">{folder.name}</p>
-                      <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                      <FolderIcon icon={fIcon} className={`mb-1.5 h-6 w-6 ${fColor.stroke}`} />
+                      <p className="text-xs font-semibold text-[var(--color-text-primary)]">{folder.name}</p>
+                      <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
                         {getFolderNoteItems(folder.id).length} Notizen · {getSubfolderItems(folder.id).length} Ordner
                       </p>
                     </Link>

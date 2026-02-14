@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { SidebarLayout } from '../components/SidebarLayout'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
+import { supabase } from '../lib/supabase'
 
 /** HTML-Tags aus Content entfernen für saubere Textsuche */
 function stripHtml(html: string): string {
@@ -13,10 +14,29 @@ export function SearchPage() {
   const [query, setQuery] = useState('')
   const { notes, folders, currentUserId, currentUserEmail, currentUserName } = useAppData()
 
+  // Profile-Daten laden
+  const [profileMap, setProfileMap] = useState<Map<string, { email: string; name: string }>>(new Map())
+
+  useEffect(() => {
+    void supabase.from('profiles').select('id, email, display_name').then(({ data }) => {
+      if (data) {
+        const map = new Map<string, { email: string; name: string }>()
+        for (const p of data) {
+          map.set(p.id, { email: p.email || '', name: p.display_name || '' })
+        }
+        setProfileMap(map)
+      }
+    })
+  }, [])
+
   /** Hilfsfunktion: Owner-Info für Avatar */
   function ownerProps(ownerId: string | undefined) {
     if (!ownerId || ownerId === currentUserId) {
       return { email: currentUserEmail, name: currentUserName }
+    }
+    const profile = profileMap.get(ownerId)
+    if (profile) {
+      return { email: profile.email, name: profile.name || undefined }
     }
     return { email: ownerId }
   }
