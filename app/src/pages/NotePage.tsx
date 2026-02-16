@@ -1248,6 +1248,9 @@ function NoteEditor({
           <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => setActivePanel((p) => (p === 'insert' ? 'none' : 'insert'))} className={`${tbtn} ${activePanel === 'insert' ? tbtnActive : tbtnDefault}`} aria-label="Einfügen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="12" r="10" /><path d="M12 8v8M8 12h8" /></svg>
           </button>
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => setActivePanel((p) => (p === 'table' ? 'none' : 'table'))} className={`${tbtn} ${activePanel === 'table' ? tbtnActive : tbtnDefault}`} aria-label="Tabelle einfügen" title="Tabelle einfügen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" /></svg>
+          </button>
           <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => setActivePanel((p) => (p === 'link' ? 'none' : 'link'))} className={`${tbtn} ${activePanel === 'link' ? tbtnActive : tbtnDefault}`} aria-label="Link">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg>
           </button>
@@ -1378,7 +1381,7 @@ function NoteEditor({
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => insertTable(tableRows, tableCols)} className="h-9 rounded-xl bg-blue-500 px-4 text-sm font-medium text-white active:bg-blue-600">Einfügen</button>
-              <button type="button" onClick={() => setActivePanel('insert')} className="h-9 rounded-xl border px-4 text-sm" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>Zurück</button>
+              <button type="button" onClick={() => setActivePanel('none')} className="h-9 rounded-xl border px-4 text-sm" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>Zurück</button>
             </div>
           </div>
         ) : null}
