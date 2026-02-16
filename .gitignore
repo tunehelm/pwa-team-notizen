@@ -19,3 +19,4 @@ dev-dist
 # Editor
 .idea
 *.sw?
+*.bak
