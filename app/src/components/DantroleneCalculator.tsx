@@ -43,6 +43,11 @@ export function DantroleneCalculator({ config }: DantroleneCalculatorProps) {
   }, [weight, c.doseMgPerKg, c.vialMg, c.finalVialVolumeMl, c.maxDoseMg])
 
   const title = c.label ?? 'Dantrolen-Rechner'
+  const doseMeta = c.maxDoseMg != null
+    ? `${deFormat(c.doseMgPerKg, 1)} mg/kg (max. ${c.maxDoseMg} mg)`
+    : `${deFormat(c.doseMgPerKg, 1)} mg/kg`
+  const metaParts = [doseMeta, `${c.vialMg} mg/Vial`, `${deFormat(c.finalVialVolumeMl, 1)} ml/Vial`]
+  const metaLine = metaParts.join(' · ')
 
   return (
     <div
@@ -53,8 +58,13 @@ export function DantroleneCalculator({ config }: DantroleneCalculatorProps) {
         color: 'var(--color-text-primary)',
       }}
     >
-      <div className="mb-3 text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-        {title}
+      <div className="mb-3">
+        <div className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+          {title}
+        </div>
+        <div className="mt-0.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          {metaLine}
+        </div>
       </div>
       <div className="flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-1">
