@@ -1,5 +1,6 @@
 import {
   type CSSProperties,
+  type ClipboardEvent as ReactClipboardEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
   type TouchEvent,
@@ -606,6 +607,74 @@ function NoteEditor({
         }, 0)
       }
     }
+  }
+
+  function parseMarkdownTableRow(row: string): string[] | null {
+    if (!row.includes('|')) return null
+    let normalized = row.trim()
+    if (normalized.startsWith('|')) normalized = normalized.slice(1)
+    if (normalized.endsWith('|')) normalized = normalized.slice(0, -1)
+    const cells = normalized.split('|').map((cell) => cell.trim())
+    return cells.length >= 2 ? cells : null
+  }
+
+  function escapeHtml(text: string) {
+    return text
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;')
+  }
+
+  function markdownTableToHtml(text: string): string | null {
+    const lines = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    if (lines.length < 2) return null
+
+    const headerCells = parseMarkdownTableRow(lines[0])
+    const separatorCells = parseMarkdownTableRow(lines[1])
+    if (!headerCells || !separatorCells || headerCells.length !== separatorCells.length) return null
+
+    const isSeparator = separatorCells.every((cell) => /^:?-{3,}:?$/.test(cell))
+    if (!isSeparator) return null
+
+    const bodyRows = lines.slice(2).map(parseMarkdownTableRow)
+    if (bodyRows.some((row) => row === null)) return null
+
+    const colCount = headerCells.length
+    const normalize = (cells: string[]) => cells.slice(0, colCount).concat(Array(Math.max(0, colCount - cells.length)).fill(''))
+
+    let html = '<table style="width:100%;border-collapse:collapse;margin:8px 0"><thead><tr>'
+    for (const cell of normalize(headerCells)) {
+      html += `<th style="border:1px solid var(--color-border,#cbd5e1);padding:6px 10px;text-align:left">${escapeHtml(cell)}</th>`
+    }
+    html += '</tr></thead><tbody>'
+    for (const row of bodyRows as string[][]) {
+      html += '<tr>'
+      for (const cell of normalize(row)) {
+        html += `<td style="border:1px solid var(--color-border,#cbd5e1);padding:6px 10px">${escapeHtml(cell)}</td>`
+      }
+      html += '</tr>'
+    }
+    html += '</tbody></table><p><br></p>'
+    return html
+  }
+
+  function handleEditorPaste(event: ReactClipboardEvent<HTMLDivElement>) {
+    const text = event.clipboardData.getData('text/plain')
+    if (!text) return
+
+    const tableHtml = markdownTableToHtml(text)
+    if (!tableHtml) return
+
+    event.preventDefault()
+    editorRef.current?.focus()
+    document.execCommand('insertHTML', false, tableHtml)
+    syncEditorContent()
   }
 
   /* ── Heading-Styles: inline font-size (same-line mixing), blockquote: block-level ── */
@@ -1414,6 +1483,7 @@ function NoteEditor({
             onBlur={readOnly ? undefined : syncEditorContent}
             onInput={readOnly ? undefined : syncEditorContent}
             onKeyDown={readOnly ? undefined : handleEditorKeyDown}
+            onPaste={readOnly ? undefined : handleEditorPaste}
             onFocus={readOnly ? undefined : () => updateFormatState()}
             className={`note-editor min-h-[40vh] lg:min-h-[55vh] w-full overflow-x-hidden rounded-2xl border p-4 text-base leading-7 outline-none ${readOnly ? 'cursor-default' : ''}`}
             style={{
