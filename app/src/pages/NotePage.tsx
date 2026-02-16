@@ -105,6 +105,43 @@ export function NotePage() {
 
 /* ─────────────────────── Types ─────────────────────── */
 
+/* ── Draft Autosave (localStorage, survives reload) ── */
+const DRAFT_KEY_PREFIX = 'pwa_notes_draft:'
+
+type Draft = { title: string; content: string; updatedAt: number }
+
+function getDraftKey(noteId: string): string {
+  return `${DRAFT_KEY_PREFIX}${noteId}`
+}
+
+function loadDraft(noteId: string): Draft | null {
+  try {
+    const raw = localStorage.getItem(getDraftKey(noteId))
+    if (!raw) return null
+    const data = JSON.parse(raw) as Draft
+    if (typeof data.title !== 'string' || typeof data.content !== 'string' || typeof data.updatedAt !== 'number') return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+function saveDraft(noteId: string, draft: Draft): void {
+  try {
+    localStorage.setItem(getDraftKey(noteId), JSON.stringify(draft))
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function clearDraft(noteId: string): void {
+  try {
+    localStorage.removeItem(getDraftKey(noteId))
+  } catch {
+    // ignore
+  }
+}
+
 interface NoteEditorProps {
   note?: NoteItem
   canDelete: boolean
@@ -149,8 +186,27 @@ function NoteEditor({
   onShareNote,
 }: NoteEditorProps) {
   const [titleValue, setTitleValue] = useState(note?.title ?? 'Neue Notiz')
+  const [draftRestored, setDraftRestored] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
+  const latestTitleRef = useRef(note?.title ?? 'Neue Notiz')
   const didInitEditorRef = useRef(false)
+
+  useEffect(() => {
+    latestTitleRef.current = titleValue
+  }, [titleValue])
+
+  // Apply draft title when draft was used for content (setEditorNode already set innerHTML)
+  useEffect(() => {
+    if (!note?.id) return
+    const draft = loadDraft(note.id)
+    if (draft) {
+      setTitleValue(draft.title)
+      latestTitleRef.current = draft.title
+      setDraftRestored(true)
+      const t = window.setTimeout(() => setDraftRestored(false), 4000)
+      return () => window.clearTimeout(t)
+    }
+  }, [note?.id])
   const noteMenuRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isNoteMenuOpen, setNoteMenuOpen] = useState(false)
@@ -181,12 +237,21 @@ function NoteEditor({
     (node: HTMLDivElement | null) => {
       if (!node) return
       editorRef.current = node
-      if (!didInitEditorRef.current) {
+      if (!didInitEditorRef.current && note?.id) {
+        const draft = loadDraft(note.id)
+        if (draft) {
+          node.innerHTML = draft.content
+        } else {
+          node.innerHTML = note?.content ?? ''
+          clearDraft(note.id)
+        }
+        didInitEditorRef.current = true
+      } else if (!didInitEditorRef.current) {
         node.innerHTML = note?.content ?? ''
         didInitEditorRef.current = true
       }
     },
-    [note?.content],
+    [note?.id, note?.content],
   )
 
   function syncEditorContent() {
@@ -271,25 +336,43 @@ function NoteEditor({
       hasPendingChangeRef.current = true
       setSaveIndicator('saving')
       originalOnContentChange(html)
-      // Show "saved" after debounce+buffer
+      if (note?.id && !readOnly) {
+        saveDraft(note.id, {
+          title: latestTitleRef.current,
+          content: html,
+          updatedAt: Date.now(),
+        })
+      }
       if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current)
       saveTimeoutRef.current = window.setTimeout(() => setSaveIndicator('saved'), 900)
     },
-    [originalOnContentChange],
+    [originalOnContentChange, note?.id, readOnly],
   )
 
   // Flush pending content on unmount (before navigation)
   useEffect(() => {
     return () => {
-      // Content change callback is debounced in AppDataContext,
-      // but we want the latest content to go through immediately.
-      // The debounce mechanism in context will handle deduplication.
       if (hasPendingChangeRef.current) {
         originalOnContentChange(latestContentRef.current)
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // beforeunload: persist current state to draft so reload doesn't lose data
+  useEffect(() => {
+    if (!note?.id || readOnly) return
+    const handler = () => {
+      const content = editorRef.current?.innerHTML ?? latestContentRef.current
+      saveDraft(note.id, {
+        title: latestTitleRef.current,
+        content,
+        updatedAt: Date.now(),
+      })
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [note?.id, readOnly])
 
   useEffect(() => {
     const handler = () => updateFormatState()
@@ -1144,6 +1227,11 @@ function NoteEditor({
               {saveIndicator === 'saving' ? 'Speichert...' : 'Gespeichert'}
             </p>
           )}
+          {draftRestored ? (
+            <p className="text-xs font-medium text-amber-600 dark:text-amber-400" role="status">
+              Draft wiederhergestellt
+            </p>
+          ) : null}
           <div className="relative" ref={noteMenuRef}>
             <button
               type="button"
@@ -1472,6 +1560,13 @@ function NoteEditor({
             const nextTitle = event.target.value
             setTitleValue(nextTitle)
             void onTitleChange(nextTitle)
+            if (note?.id) {
+              saveDraft(note.id, {
+                title: nextTitle,
+                content: latestContentRef.current,
+                updatedAt: Date.now(),
+              })
+            }
           }}
           className={`w-full border-0 bg-transparent text-3xl font-semibold leading-tight placeholder:text-[var(--color-text-muted)] focus:outline-none ${readOnly ? 'cursor-default' : ''}`}
           style={{ color: 'var(--color-text-primary)' }}
