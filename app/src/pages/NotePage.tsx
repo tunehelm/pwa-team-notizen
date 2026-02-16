@@ -554,21 +554,52 @@ function NoteEditor({
           }
         }
       }
-      // Nach Enter: Heading-Inline-Styles auf der neuen Zeile entfernen → "Text" wird Standard
+      // Nach Enter: Heading-Inline-Styles auf der neuen Zeile neutralisieren → "Text" wird Standard
       if (!event.shiftKey) {
         window.setTimeout(() => {
-          if (!editorRef.current) return // Guard: Component might have unmounted
+          if (!editorRef.current) return
           const s = document.getSelection()
           if (!s || !s.anchorNode) return
+
+          // Prüfe ob der Cursor in einem Heading-Span liegt
+          let headingSpan: HTMLSpanElement | null = null
           let el = s.anchorNode instanceof HTMLElement ? s.anchorNode : s.anchorNode.parentElement
           while (el && el !== editorRef.current) {
             if (el instanceof HTMLSpanElement && el.style.fontSize) {
-              el.style.fontSize = ''
-              el.style.fontWeight = ''
+              headingSpan = el
               break
             }
             el = el.parentElement
           }
+
+          if (headingSpan) {
+            const content = headingSpan.textContent || ''
+            if (content.replace(/[\u200B\s]/g, '') === '') {
+              // Leerer Span auf neuer Zeile (Browser hat korrekt gesplittet) → Styles entfernen
+              headingSpan.style.fontSize = ''
+              headingSpan.style.fontWeight = ''
+            } else {
+              // Span enthält noch den alten H1-Text → nicht anfassen!
+              // Stattdessen Reset-Span am Cursor einfügen, damit neuer Text normal ist
+              const resetSpan = document.createElement('span')
+              resetSpan.style.fontSize = '1em'
+              resetSpan.style.fontWeight = 'normal'
+              resetSpan.appendChild(document.createTextNode('\u200B'))
+
+              const range = s.getRangeAt(0)
+              range.collapse(false)
+              range.insertNode(resetSpan)
+
+              if (resetSpan.firstChild) {
+                const nr = document.createRange()
+                nr.setStartAfter(resetSpan.firstChild)
+                nr.collapse(true)
+                s.removeAllRanges()
+                s.addRange(nr)
+              }
+            }
+          }
+
           syncEditorContent()
           updateFormatState()
         }, 0)
