@@ -705,33 +705,73 @@ function NoteEditor({
       .replaceAll("'", '&#39;')
   }
 
-  function markdownTableToHtml(text: string): string | null {
-    const lines = text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
+  function isSeparatorRow(cells: string[]): boolean {
+    return cells.every((cell) => /^:?-{3,}:?$/.test(cell))
+  }
 
-    if (lines.length < 2) return null
+  /** Finds 0..n markdown table blocks in pasted text. Each block = header + separator + 0..n body rows. */
+  function findMarkdownTableBlocks(text: string): { startLine: number; endLine: number; lines: string[] }[] {
+    const allLines = text.split(/\r?\n/)
+    const blocks: { startLine: number; endLine: number; lines: string[] }[] = []
+    let i = 0
 
-    const headerCells = parseMarkdownTableRow(lines[0])
-    const separatorCells = parseMarkdownTableRow(lines[1])
-    if (!headerCells || !separatorCells || headerCells.length !== separatorCells.length) return null
+    while (i < allLines.length) {
+      while (i < allLines.length && allLines[i].trim() === '') i++
+      if (i >= allLines.length) break
 
-    const isSeparator = separatorCells.every((cell) => /^:?-{3,}:?$/.test(cell))
-    if (!isSeparator) return null
+      const headerCells = parseMarkdownTableRow(allLines[i].trim())
+      if (!headerCells || headerCells.length < 2) {
+        i++
+        continue
+      }
+      if (i + 1 >= allLines.length) {
+        i++
+        continue
+      }
 
-    const bodyRows = lines.slice(2).map(parseMarkdownTableRow)
-    if (bodyRows.some((row) => row === null)) return null
+      const sepTrimmed = allLines[i + 1].trim()
+      const sepCells = parseMarkdownTableRow(sepTrimmed)
+      if (!sepCells || sepCells.length !== headerCells.length || !isSeparatorRow(sepCells)) {
+        i++
+        continue
+      }
 
+      const startLine = i
+      const blockLines: string[] = [allLines[i].trim(), allLines[i + 1].trim()]
+      let j = i + 2
+
+      while (j < allLines.length) {
+        const trimmed = allLines[j].trim()
+        if (trimmed === '') break
+        const row = parseMarkdownTableRow(trimmed)
+        if (row === null || row.length !== headerCells.length) break
+        blockLines.push(trimmed)
+        j++
+      }
+
+      blocks.push({ startLine, endLine: j, lines: blockLines })
+      i = j
+    }
+
+    return blocks
+  }
+
+  /** Converts a single table block (header + separator + body lines) to HTML. */
+  function markdownTableBlockToHtml(lines: string[]): string {
+    if (lines.length < 2) return ''
+    const headerCells = parseMarkdownTableRow(lines[0])!
     const colCount = headerCells.length
-    const normalize = (cells: string[]) => cells.slice(0, colCount).concat(Array(Math.max(0, colCount - cells.length)).fill(''))
+    const normalize = (cells: string[]) =>
+      cells.slice(0, colCount).concat(Array(Math.max(0, colCount - cells.length)).fill(''))
 
     let html = '<table style="width:100%;border-collapse:collapse;margin:8px 0"><thead><tr>'
     for (const cell of normalize(headerCells)) {
       html += `<th style="border:1px solid var(--color-border,#cbd5e1);padding:6px 10px;text-align:left">${escapeHtml(cell)}</th>`
     }
     html += '</tr></thead><tbody>'
-    for (const row of bodyRows as string[][]) {
+    for (let r = 2; r < lines.length; r++) {
+      const row = parseMarkdownTableRow(lines[r])
+      if (!row) break
       html += '<tr>'
       for (const cell of normalize(row)) {
         html += `<td style="border:1px solid var(--color-border,#cbd5e1);padding:6px 10px">${escapeHtml(cell)}</td>`
@@ -742,16 +782,45 @@ function NoteEditor({
     return html
   }
 
+  /** Builds combined HTML from paste: text segments as <p> with <br>, table blocks as <table>. */
+  function buildPasteHtml(
+    allLines: string[],
+    blocks: { startLine: number; endLine: number; lines: string[] }[],
+  ): string {
+    let result = ''
+    let lastEnd = 0
+
+    function appendTextSegment(lineStart: number, lineEnd: number) {
+      const segmentLines = allLines.slice(lineStart, lineEnd)
+      const paragraph = segmentLines.join('\n').trim()
+      if (!paragraph) return
+      const paras = paragraph.split(/\n\n+/).filter(Boolean)
+      result += paras
+        .map((p) => '<p>' + escapeHtml(p).replace(/\n/g, '<br>') + '</p>')
+        .join('')
+    }
+
+    for (const block of blocks) {
+      appendTextSegment(lastEnd, block.startLine)
+      result += markdownTableBlockToHtml(block.lines)
+      lastEnd = block.endLine
+    }
+    appendTextSegment(lastEnd, allLines.length)
+    return result
+  }
+
   function handleEditorPaste(event: ReactClipboardEvent<HTMLDivElement>) {
     const text = event.clipboardData.getData('text/plain')
     if (!text) return
 
-    const tableHtml = markdownTableToHtml(text)
-    if (!tableHtml) return
+    const allLines = text.split(/\r?\n/)
+    const blocks = findMarkdownTableBlocks(text)
+    if (blocks.length === 0) return
 
     event.preventDefault()
     editorRef.current?.focus()
-    document.execCommand('insertHTML', false, tableHtml)
+    const html = buildPasteHtml(allLines, blocks)
+    document.execCommand('insertHTML', false, html || '<p><br></p>')
     syncEditorContent()
   }
 
