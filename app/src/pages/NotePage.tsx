@@ -17,10 +17,12 @@ import { MoveNoteModal } from '../components/MoveNoteModal'
 import { ShareModal } from '../components/ShareModal'
 import { useAppData } from '../state/useAppData'
 
+import { createRoot } from 'react-dom/client'
 import { isAdminEmail } from '../lib/admin'
 import { SELECTABLE_ICONS, FolderIcon } from '../components/FolderIcons'
 import { uploadMedia, dataUrlToBlob } from '../lib/storage'
 import { sanitizeHtmlTable } from '../lib/sanitizeTable'
+import { type DantroleneCalculatorConfig, DantroleneCalculator } from '../components/DantroleneCalculator'
 
 export function NotePage() {
   const { id = '' } = useParams()
@@ -230,6 +232,30 @@ function NoteEditor({
     setEditorMounted(!!node)
   }, [])
 
+  /** Mounts Smart Blocks ([data-smart-block]) as React components. Fallback: kaputter JSON → Block ignorieren. */
+  function mountSmartBlocks(container: HTMLElement) {
+    const blocks = container.querySelectorAll<HTMLElement>('[data-smart-block="calculator"]')
+    blocks.forEach((el) => {
+      el.setAttribute('contenteditable', 'false')
+      let config: Record<string, unknown> = {}
+      try {
+        const raw = el.getAttribute('data-config')
+        if (raw) config = JSON.parse(raw) as Record<string, unknown>
+      } catch {
+        return
+      }
+      const root = (el as unknown as { __smartBlockRoot?: ReturnType<typeof createRoot> }).__smartBlockRoot
+      const component = <DantroleneCalculator config={config as DantroleneCalculatorConfig} />
+      if (root) {
+        root.render(component)
+      } else {
+        const r = createRoot(el)
+        ;(el as unknown as { __smartBlockRoot?: ReturnType<typeof createRoot> }).__smartBlockRoot = r
+        r.render(component)
+      }
+    })
+  }
+
   // Apply draft or server content once per note when editor is mounted (fixes reload: draft visible immediately)
   useEffect(() => {
     if (!note?.id || !editorRef.current || !editorMounted) return
@@ -245,12 +271,18 @@ function NoteEditor({
       latestContentRef.current = draft.content
       setDraftRestored(true)
       const t = window.setTimeout(() => setDraftRestored(false), 4000)
-      return () => window.clearTimeout(t)
+      const mountId = window.setTimeout(() => { const ed = editorRef.current; if (ed) mountSmartBlocks(ed) }, 0)
+      return () => {
+        window.clearTimeout(t)
+        window.clearTimeout(mountId)
+      }
     }
 
     editorRef.current.innerHTML = note.content ?? ''
     latestContentRef.current = note.content ?? ''
     clearDraft(note.id)
+    const mountId = window.setTimeout(() => { const ed = editorRef.current; if (ed) mountSmartBlocks(ed) }, 0)
+    return () => window.clearTimeout(mountId)
   }, [note?.id, note?.content, editorMounted])
 
   function syncEditorContent() {
@@ -971,11 +1003,59 @@ function NoteEditor({
     return result
   }
 
+  /** Paste Quality Guard: TSV = mind. ein Tab und mind. zwei Zeilen (Excel/Sheets/Numbers). */
+  function isTSV(text: string): boolean {
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
+    return lines.length >= 2 && lines.some((l) => l.includes('\t'))
+  }
+
+  /** Paste Quality Guard: Markdown-Tabelle = Pipe-Syntax mit Separator-Zeile. */
+  function isMarkdownTable(text: string): boolean {
+    return findMarkdownTableBlocks(text).length > 0
+  }
+
+  /**
+   * Paste-Pipeline (Priorität: 1 TSV, 2 Markdown-Tabelle, 3 HTML-Table, 4 normales Paste).
+   * Nur bei 1–3: preventDefault + insertHTML. Sonst: Browser-Standard-Paste.
+   */
   function handleEditorPaste(event: ReactClipboardEvent<HTMLDivElement>) {
-    const htmlData = event.clipboardData.getData('text/html')
     const text = event.clipboardData.getData('text/plain')
 
-    // 1) HTML mit <table> (Excel, Websites)
+    // STEP 1 — TSV (Primary Path, stabilster Weg für Excel/Sheets/Numbers)
+    if (text && isTSV(text)) {
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
+      const rows = lines.map((line) => line.split('\t').map((cell) => escapeHtml(cell.trim())))
+      const colCount = Math.max(...rows.map((r) => r.length), 1)
+      let tsvHtml = '<table style="width:100%;border-collapse:collapse;margin:8px 0"><tbody>'
+      for (const row of rows) {
+        tsvHtml += '<tr>'
+        for (let c = 0; c < colCount; c++) {
+          tsvHtml += `<td style="border:1px solid var(--color-border,#cbd5e1);padding:6px 10px">${row[c] ?? ''}</td>`
+        }
+        tsvHtml += '</tr>'
+      }
+      tsvHtml += '</tbody></table><p><br></p>'
+      event.preventDefault()
+      editorRef.current?.focus()
+      document.execCommand('insertHTML', false, tsvHtml)
+      syncEditorContent()
+      return
+    }
+
+    // STEP 2 — Markdown-Tabelle (Pipe-Syntax + Separator)
+    if (text && isMarkdownTable(text)) {
+      const allLines = text.split(/\r?\n/)
+      const blocks = findMarkdownTableBlocks(text)
+      event.preventDefault()
+      editorRef.current?.focus()
+      const html = buildPasteHtml(allLines, blocks)
+      document.execCommand('insertHTML', false, html || '<p><br></p>')
+      syncEditorContent()
+      return
+    }
+
+    // STEP 3 — HTML-Table (nur wenn echte <table> im Clipboard)
+    const htmlData = event.clipboardData.getData('text/html')
     if (htmlData && /<table[\s>]/i.test(htmlData)) {
       const parsed = new DOMParser().parseFromString(htmlData, 'text/html')
       const firstTable = parsed.querySelector('table')
@@ -994,43 +1074,7 @@ function NoteEditor({
       }
     }
 
-    // 2) TSV (Excel/Sheets: text/plain mit Tabs + Newlines)
-    if (text) {
-      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
-      const hasTabs = lines.some((l) => l.includes('\t'))
-      if (lines.length >= 2 && hasTabs) {
-        const rows = lines.map((line) => line.split('\t').map((cell) => escapeHtml(cell.trim())))
-        const colCount = Math.max(...rows.map((r) => r.length), 1)
-        let tsvHtml = '<table style="width:100%;border-collapse:collapse;margin:8px 0"><tbody>'
-        for (const row of rows) {
-          tsvHtml += '<tr>'
-          for (let c = 0; c < colCount; c++) {
-            tsvHtml += `<td style="border:1px solid var(--color-border,#cbd5e1);padding:6px 10px">${row[c] ?? ''}</td>`
-          }
-          tsvHtml += '</tr>'
-        }
-        tsvHtml += '</tbody></table><p><br></p>'
-        event.preventDefault()
-        editorRef.current?.focus()
-        document.execCommand('insertHTML', false, tsvHtml)
-        syncEditorContent()
-        return
-      }
-    }
-
-    // 3) Markdown-Tabellen (bestehende Logik)
-    if (text) {
-      const allLines = text.split(/\r?\n/)
-      const blocks = findMarkdownTableBlocks(text)
-      if (blocks.length > 0) {
-        event.preventDefault()
-        editorRef.current?.focus()
-        const html = buildPasteHtml(allLines, blocks)
-        document.execCommand('insertHTML', false, html || '<p><br></p>')
-        syncEditorContent()
-      }
-    }
-    // 4) Keine Tabelle erkannt: normales Paste (kein preventDefault)
+    // STEP 4 — Fallback: kein preventDefault → Browser-Standard-Paste (inkl. normaler Rich-Text / OCR-Text)
   }
 
   /* ── Heading-Styles: inline font-size (same-line mixing), blockquote: block-level ── */
@@ -1154,6 +1198,23 @@ function NoteEditor({
     editorRef.current?.focus()
     document.execCommand('insertHTML', false, html)
     syncEditorContent()
+    setActivePanel('none')
+  }
+
+  function insertCalculatorBlock() {
+    const config = JSON.stringify({
+      doseMgPerKg: 2.5,
+      vialMg: 120,
+      finalVialVolumeMl: 22.6,
+      maxDoseMg: 300,
+      label: 'Dantrolen (Agilus) 120 mg',
+    })
+    const html = `<div data-smart-block="calculator" contenteditable="false" data-config="${config.replace(/"/g, '&quot;')}"></div><p><br></p>`
+    editorRef.current?.focus()
+    document.execCommand('insertHTML', false, html)
+    syncEditorContent()
+    const ed = editorRef.current
+    if (ed) mountSmartBlocks(ed)
     setActivePanel('none')
   }
 
@@ -1784,6 +1845,10 @@ function NoteEditor({
         {/* ── Insert sub-panel ── */}
         {activePanel === 'insert' ? (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <button type="button" onClick={insertCalculatorBlock} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`} title="Dantrolen-Rechner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M8 6h8M8 10h8M8 14h4" /></svg>
+              Rechner
+            </button>
             <button type="button" onClick={() => setActivePanel('table')} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" /></svg>
               Tabelle
