@@ -187,26 +187,14 @@ function NoteEditor({
 }: NoteEditorProps) {
   const [titleValue, setTitleValue] = useState(note?.title ?? 'Neue Notiz')
   const [draftRestored, setDraftRestored] = useState(false)
+  const [editorMounted, setEditorMounted] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
   const latestTitleRef = useRef(note?.title ?? 'Neue Notiz')
-  const didInitEditorRef = useRef(false)
+  const initAppliedForNoteIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     latestTitleRef.current = titleValue
   }, [titleValue])
-
-  // Apply draft title when draft was used for content (setEditorNode already set innerHTML)
-  useEffect(() => {
-    if (!note?.id) return
-    const draft = loadDraft(note.id)
-    if (draft) {
-      setTitleValue(draft.title)
-      latestTitleRef.current = draft.title
-      setDraftRestored(true)
-      const t = window.setTimeout(() => setDraftRestored(false), 4000)
-      return () => window.clearTimeout(t)
-    }
-  }, [note?.id])
   const noteMenuRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isNoteMenuOpen, setNoteMenuOpen] = useState(false)
@@ -233,26 +221,33 @@ function NoteEditor({
   // Active font color tracking
   const [activeFontColor, setActiveFontColor] = useState('')
 
-  const setEditorNode = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (!node) return
-      editorRef.current = node
-      if (!didInitEditorRef.current && note?.id) {
-        const draft = loadDraft(note.id)
-        if (draft) {
-          node.innerHTML = draft.content
-        } else {
-          node.innerHTML = note?.content ?? ''
-          clearDraft(note.id)
-        }
-        didInitEditorRef.current = true
-      } else if (!didInitEditorRef.current) {
-        node.innerHTML = note?.content ?? ''
-        didInitEditorRef.current = true
-      }
-    },
-    [note?.id, note?.content],
-  )
+  const setEditorNode = useCallback((node: HTMLDivElement | null) => {
+    editorRef.current = node
+    setEditorMounted(!!node)
+  }, [])
+
+  // Apply draft or server content once per note when editor is mounted (fixes reload: draft visible immediately)
+  useEffect(() => {
+    if (!note?.id || !editorRef.current || !editorMounted) return
+    if (initAppliedForNoteIdRef.current === note.id) return
+
+    initAppliedForNoteIdRef.current = note.id
+    const draft = loadDraft(note.id)
+
+    if (draft) {
+      editorRef.current.innerHTML = draft.content
+      setTitleValue(draft.title)
+      latestTitleRef.current = draft.title
+      latestContentRef.current = draft.content
+      setDraftRestored(true)
+      const t = window.setTimeout(() => setDraftRestored(false), 4000)
+      return () => window.clearTimeout(t)
+    }
+
+    editorRef.current.innerHTML = note.content ?? ''
+    latestContentRef.current = note.content ?? ''
+    clearDraft(note.id)
+  }, [note?.id, note?.content, editorMounted])
 
   function syncEditorContent() {
     const html = editorRef.current?.innerHTML ?? ''
