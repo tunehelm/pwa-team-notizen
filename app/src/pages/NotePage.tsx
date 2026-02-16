@@ -20,6 +20,7 @@ import { useAppData } from '../state/useAppData'
 import { isAdminEmail } from '../lib/admin'
 import { SELECTABLE_ICONS, FolderIcon } from '../components/FolderIcons'
 import { uploadMedia, dataUrlToBlob } from '../lib/storage'
+import { sanitizeHtmlTable } from '../lib/sanitizeTable'
 
 export function NotePage() {
   const { id = '' } = useParams()
@@ -200,6 +201,9 @@ function NoteEditor({
   const [isNoteMenuOpen, setNoteMenuOpen] = useState(false)
   const [saveIndicator, setSaveIndicator] = useState<'saved' | 'saving'>('saved')
   const [activePanel, setActivePanel] = useState<ToolbarPanel>('none')
+  const [tableSelected, setTableSelected] = useState(false)
+  const selectedTableRef = useRef<HTMLTableElement | null>(null)
+  const selectedCellRef = useRef<HTMLTableCellElement | null>(null)
   const [formatState, setFormatState] = useState({ bold: false, italic: false, underline: false, strikeThrough: false, block: 'p' as string, list: '' as string })
 
   // Link-Dialog state
@@ -597,6 +601,164 @@ function NoteEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /* ── Table selection + column resize handles ── */
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    let overlay: HTMLDivElement | null = null
+    let resizeColIndex = -1
+    let resizeStartX = 0
+    let resizeStartWidths: number[] = []
+
+    function clearTableSelection() {
+      const tbl = selectedTableRef.current
+      const cell = selectedCellRef.current
+      if (tbl) {
+        tbl.classList.remove('table-selected')
+        tbl.querySelectorAll('.cell-selected').forEach((el) => el.classList.remove('cell-selected'))
+      }
+      if (cell) cell.classList.remove('cell-selected')
+      selectedTableRef.current = null
+      selectedCellRef.current = null
+      setTableSelected(false)
+      if (overlay) {
+        overlay.remove()
+        overlay = null
+      }
+    }
+
+    function getColumnCount(table: HTMLTableElement): number {
+      const firstRow = table.querySelector('tr')
+      if (!firstRow) return 0
+      return firstRow.querySelectorAll('th, td').length
+    }
+
+    function getCellsInColumn(table: HTMLTableElement, colIndex: number): HTMLTableCellElement[] {
+      const cells: HTMLTableCellElement[] = []
+      table.querySelectorAll('tr').forEach((tr) => {
+        const cell = tr.querySelectorAll('th, td')[colIndex] as HTMLTableCellElement | undefined
+        if (cell) cells.push(cell)
+      })
+      return cells
+    }
+
+    function positionHandles() {
+      const table = selectedTableRef.current
+      if (!table || !overlay || !editor) return
+      const colCount = getColumnCount(table)
+      const firstRow = table.querySelector('tr')
+      if (!firstRow) return
+      const editorRect = editor.getBoundingClientRect()
+      const rowCells = firstRow.querySelectorAll('th, td')
+      overlay.innerHTML = ''
+      for (let c = 0; c < colCount; c++) {
+        const cell = rowCells[c] as HTMLTableCellElement
+        if (!cell) continue
+        const cellRect = cell.getBoundingClientRect()
+        const handle = document.createElement('div')
+        handle.className = 'table-col-resize-handle'
+        handle.setAttribute('data-col', String(c))
+        handle.style.left = `${cellRect.right - editorRect.left - 4 + editor.scrollLeft}px`
+        handle.style.top = `${cellRect.top - editorRect.top + editor.scrollTop}px`
+        handle.style.height = `${cellRect.height}px`
+        handle.addEventListener('pointerdown', (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          resizeColIndex = c
+          resizeStartX = e.clientX
+          resizeStartWidths = Array.from({ length: colCount }, (_, i) => {
+            const cells = getCellsInColumn(table, i)
+            const w = cells[0]?.offsetWidth ?? 80
+            return w
+          })
+          document.addEventListener('pointermove', onResizeMove)
+          document.addEventListener('pointerup', onResizeEnd)
+          ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+        })
+        overlay.appendChild(handle)
+      }
+    }
+
+    function onResizeMove(e: PointerEvent) {
+      if (resizeColIndex < 0 || !selectedTableRef.current) return
+      e.preventDefault()
+      const table = selectedTableRef.current
+      const dx = e.clientX - resizeStartX
+      const newW = Math.max(30, (resizeStartWidths[resizeColIndex] ?? 80) + dx)
+      const cells = getCellsInColumn(table, resizeColIndex)
+      cells.forEach((cell) => {
+        cell.style.width = `${newW}px`
+        cell.style.minWidth = `${newW}px`
+      })
+      positionHandles()
+    }
+
+    function onResizeEnd() {
+      document.removeEventListener('pointermove', onResizeMove)
+      document.removeEventListener('pointerup', onResizeEnd)
+      resizeColIndex = -1
+      syncEditorContent()
+      positionHandles()
+    }
+
+    function selectTableAndCell(tableEl: HTMLTableElement, cellEl: HTMLTableCellElement | null) {
+      clearTableSelection()
+      selectedTableRef.current = tableEl
+      selectedCellRef.current = cellEl
+      tableEl.classList.add('table-selected')
+      if (cellEl) cellEl.classList.add('cell-selected')
+      setTableSelected(true)
+      editor!.style.position = 'relative'
+      overlay = document.createElement('div')
+      overlay.className = 'table-resize-overlay'
+      editor!.appendChild(overlay)
+      positionHandles()
+      if (cellEl) {
+        editor!.focus()
+        const sel = document.getSelection()
+        if (sel) {
+          const range = document.createRange()
+          range.selectNodeContents(cellEl)
+          range.collapse(true)
+          sel.removeAllRanges()
+          sel.addRange(range)
+        }
+      }
+    }
+
+    function handleTablePointerDown(e: PointerEvent) {
+      const target = e.target as HTMLElement
+      if (!editor!.contains(target)) return
+      const cell = target.closest('td, th') as HTMLTableCellElement | null
+      const table = target.closest('table') as HTMLTableElement | null
+      if (table && editor!.contains(table)) {
+        e.preventDefault()
+        selectTableAndCell(table, cell ?? table.querySelector('td, th') as HTMLTableCellElement | null)
+      } else if (target !== overlay && !overlay?.contains(target)) {
+        const onHandle = (target as HTMLElement).closest?.('.table-col-resize-handle')
+        if (!onHandle) clearTableSelection()
+      }
+    }
+
+    function handleOutsideTableClick(e: Event) {
+      const target = e.target as Node
+      if (editor!.contains(target)) return
+      if (overlay?.contains(target)) return
+      clearTableSelection()
+    }
+
+    editor.addEventListener('pointerdown', handleTablePointerDown)
+    document.addEventListener('click', handleOutsideTableClick)
+
+    return () => {
+      editor.removeEventListener('pointerdown', handleTablePointerDown)
+      document.removeEventListener('click', handleOutsideTableClick)
+      clearTableSelection()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   /* ── Commands ── */
 
   function runCommand(command: string, value?: string) {
@@ -810,18 +972,65 @@ function NoteEditor({
   }
 
   function handleEditorPaste(event: ReactClipboardEvent<HTMLDivElement>) {
+    const htmlData = event.clipboardData.getData('text/html')
     const text = event.clipboardData.getData('text/plain')
-    if (!text) return
 
-    const allLines = text.split(/\r?\n/)
-    const blocks = findMarkdownTableBlocks(text)
-    if (blocks.length === 0) return
+    // 1) HTML mit <table> (Excel, Websites)
+    if (htmlData && /<table[\s>]/i.test(htmlData)) {
+      const parsed = new DOMParser().parseFromString(htmlData, 'text/html')
+      const firstTable = parsed.querySelector('table')
+      if (firstTable) {
+        const rawTable = firstTable.outerHTML
+        const sanitized = sanitizeHtmlTable(rawTable)
+        if (sanitized) {
+          const tableStyle = 'width:100%;border-collapse:collapse;margin:8px 0'
+          const wrapped = sanitized.replace(/<table\s*[^>]*>/i, `<table style="${tableStyle}">`)
+          event.preventDefault()
+          editorRef.current?.focus()
+          document.execCommand('insertHTML', false, wrapped + '<p><br></p>')
+          syncEditorContent()
+          return
+        }
+      }
+    }
 
-    event.preventDefault()
-    editorRef.current?.focus()
-    const html = buildPasteHtml(allLines, blocks)
-    document.execCommand('insertHTML', false, html || '<p><br></p>')
-    syncEditorContent()
+    // 2) TSV (Excel/Sheets: text/plain mit Tabs + Newlines)
+    if (text) {
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
+      const hasTabs = lines.some((l) => l.includes('\t'))
+      if (lines.length >= 2 && hasTabs) {
+        const rows = lines.map((line) => line.split('\t').map((cell) => escapeHtml(cell.trim())))
+        const colCount = Math.max(...rows.map((r) => r.length), 1)
+        let tsvHtml = '<table style="width:100%;border-collapse:collapse;margin:8px 0"><tbody>'
+        for (const row of rows) {
+          tsvHtml += '<tr>'
+          for (let c = 0; c < colCount; c++) {
+            tsvHtml += `<td style="border:1px solid var(--color-border,#cbd5e1);padding:6px 10px">${row[c] ?? ''}</td>`
+          }
+          tsvHtml += '</tr>'
+        }
+        tsvHtml += '</tbody></table><p><br></p>'
+        event.preventDefault()
+        editorRef.current?.focus()
+        document.execCommand('insertHTML', false, tsvHtml)
+        syncEditorContent()
+        return
+      }
+    }
+
+    // 3) Markdown-Tabellen (bestehende Logik)
+    if (text) {
+      const allLines = text.split(/\r?\n/)
+      const blocks = findMarkdownTableBlocks(text)
+      if (blocks.length > 0) {
+        event.preventDefault()
+        editorRef.current?.focus()
+        const html = buildPasteHtml(allLines, blocks)
+        document.execCommand('insertHTML', false, html || '<p><br></p>')
+        syncEditorContent()
+      }
+    }
+    // 4) Keine Tabelle erkannt: normales Paste (kein preventDefault)
   }
 
   /* ── Heading-Styles: inline font-size (same-line mixing), blockquote: block-level ── */
@@ -946,6 +1155,104 @@ function NoteEditor({
     document.execCommand('insertHTML', false, html)
     syncEditorContent()
     setActivePanel('none')
+  }
+
+  function tableInsertRowAfter() {
+    const table = selectedTableRef.current
+    const cell = selectedCellRef.current
+    if (!table || !cell) return
+    const tr = cell.closest('tr')
+    if (!tr) return
+    const colCount = tr.querySelectorAll('th, td').length
+    const isHeaderRow = tr.querySelector('th') != null
+    const tag = isHeaderRow ? 'th' : 'td'
+    const newRow = document.createElement('tr')
+    for (let i = 0; i < colCount; i++) {
+      const td = document.createElement(tag)
+      td.style.border = '1px solid var(--color-border,#cbd5e1)'
+      td.style.padding = '6px 10px'
+      td.appendChild(document.createTextNode('\u00A0'))
+      newRow.appendChild(td)
+    }
+    tr.nextElementSibling ? tr.insertAdjacentElement('afterend', newRow) : tr.parentElement?.appendChild(newRow)
+    syncEditorContent()
+    selectedCellRef.current = newRow.querySelector('td, th') as HTMLTableCellElement
+    editorRef.current?.focus()
+    const sel = document.getSelection()
+    if (sel && selectedCellRef.current) {
+      const range = document.createRange()
+      range.selectNodeContents(selectedCellRef.current)
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
+  }
+
+  function tableDeleteRow() {
+    const table = selectedTableRef.current
+    const cell = selectedCellRef.current
+    if (!table || !cell) return
+    const tr = cell.closest('tr')
+    if (!tr) return
+    const rows = table.querySelectorAll('tr')
+    if (rows.length <= 1) return
+    tr.remove()
+    syncEditorContent()
+    const nextTr = table.querySelector('tr')
+    selectedCellRef.current = nextTr?.querySelector('td, th') as HTMLTableCellElement ?? null
+    if (!nextTr) selectedTableRef.current = null
+    setTableSelected(!!selectedTableRef.current)
+  }
+
+  function tableInsertColAfter() {
+    const table = selectedTableRef.current
+    const cell = selectedCellRef.current
+    if (!table || !cell) return
+    const tr = cell.closest('tr')
+    if (!tr) return
+    const cells = tr.querySelectorAll('th, td')
+    const colIndex = Array.from(cells).indexOf(cell)
+    if (colIndex < 0) return
+    const tag = cell.tagName.toLowerCase()
+    table.querySelectorAll('tr').forEach((row) => {
+      const newCell = document.createElement(tag)
+      newCell.style.border = '1px solid var(--color-border,#cbd5e1)'
+      newCell.style.padding = '6px 10px'
+      newCell.appendChild(document.createTextNode('\u00A0'))
+      const ref = row.querySelectorAll('th, td')[colIndex]
+      ref ? ref.insertAdjacentElement('afterend', newCell) : row.appendChild(newCell)
+    })
+    syncEditorContent()
+    const nextCell = tr.querySelectorAll('th, td')[colIndex + 1] as HTMLTableCellElement
+    selectedCellRef.current = nextCell ?? (tr.querySelectorAll('th, td')[colIndex] as HTMLTableCellElement)
+    editorRef.current?.focus()
+    const sel = document.getSelection()
+    if (sel && selectedCellRef.current) {
+      const range = document.createRange()
+      range.selectNodeContents(selectedCellRef.current)
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
+  }
+
+  function tableDeleteCol() {
+    const table = selectedTableRef.current
+    const cell = selectedCellRef.current
+    if (!table || !cell) return
+    const tr = cell.closest('tr')
+    if (!tr) return
+    const cells = tr.querySelectorAll('th, td')
+    const colIndex = Array.from(cells).indexOf(cell)
+    if (colIndex < 0) return
+    const colCount = cells.length
+    if (colCount <= 1) return
+    table.querySelectorAll('tr').forEach((row) => {
+      const cellToRemove = row.querySelectorAll('th, td')[colIndex]
+      cellToRemove?.remove()
+    })
+    syncEditorContent()
+    const nextCell = tr.querySelectorAll('th, td')[Math.min(colIndex, tr.querySelectorAll('th, td').length - 1)] as HTMLTableCellElement | undefined
+    selectedCellRef.current = nextCell ?? null
+    if (!selectedCellRef.current) setTableSelected(false)
   }
 
   /* ── Zeichnung (Canvas) ── */
@@ -1519,6 +1826,29 @@ function NoteEditor({
                 </button>
               ))}
             </div>
+          </div>
+        ) : null}
+
+        {/* ── Table edit (when a table is selected) ── */}
+        {tableSelected ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <span className="mr-1 text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Tabelle:</span>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={tableInsertRowAfter} className={`${tbtn} ${tbtnDefault} gap-1 text-xs`} title="Zeile darunter einfügen" aria-label="Zeile +">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M12 5v14M5 12h14" /></svg>
+              Zeile +
+            </button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={tableDeleteRow} className={`${tbtn} ${tbtnDefault} gap-1 text-xs`} title="Zeile löschen" aria-label="Zeile –">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M5 12h14" /></svg>
+              Zeile –
+            </button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={tableInsertColAfter} className={`${tbtn} ${tbtnDefault} gap-1 text-xs`} title="Spalte rechts einfügen" aria-label="Spalte +">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M12 5v14M5 12h14" /></svg>
+              Spalte +
+            </button>
+            <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={tableDeleteCol} className={`${tbtn} ${tbtnDefault} gap-1 text-xs`} title="Spalte löschen" aria-label="Spalte –">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M5 12h14" /></svg>
+              Spalte –
+            </button>
           </div>
         ) : null}
 
