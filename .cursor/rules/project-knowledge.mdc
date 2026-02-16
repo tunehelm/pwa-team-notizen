@@ -12,7 +12,7 @@ alwaysApply: true
 |--------|-----|-------------|
 | id | uuid | Primary Key |
 | title | text | Ordnername |
-| pinned | boolean | Fixiert in Sidebar |
+| pinned | boolean | (veraltet – wird durch `user_pins` ersetzt) |
 | created_at | timestamp | Erstellzeitpunkt |
 | owner_id | uuid | Ersteller (auth.uid) |
 | parent_id | uuid / null | Elternordner (null = Root) |
@@ -28,7 +28,7 @@ alwaysApply: true
 | content | text | HTML-Inhalt (contenteditable) |
 | excerpt | text | Kurzvorschau |
 | updated_label | text | Zeitstempel-Label |
-| pinned | boolean | Fixiert |
+| pinned | boolean | (veraltet – wird durch `user_pins` ersetzt) |
 | owner_id / user_id | uuid | Ersteller |
 
 ### `trash_folders` / `trash_notes`
@@ -66,12 +66,43 @@ Gleiche Struktur + `deleted_at` timestamp. Papierkorb-Logik: Soft-Delete per Ups
 - SQL-Setup: `docs/supabase-messages-setup.sql`
 - Edge Function: `supabase/functions/notify-admin/index.ts`
 
+### `user_pins`
+| Spalte | Typ | Beschreibung |
+|--------|-----|-------------|
+| id | uuid | PK |
+| user_id | uuid | User (auth.uid), FK → auth.users |
+| item_id | text | ID des Ordners oder der Notiz |
+| item_type | text | `'folder'` oder `'note'` |
+| created_at | timestamptz | Zeitstempel |
+
+- **Pro-User Fixierungen**: Jeder User hat seine eigenen Pins
+- UNIQUE(user_id, item_id) — ein User kann ein Element nur einmal pinnen
+- RLS: User sieht/verwaltet nur eigene Pins (SELECT, INSERT, DELETE)
+- SQL-Setup: `docs/supabase-user-pins-setup.sql`
+- Ersetzt die alte globale `pinned`-Spalte in `folders` und `notes`
+
 ## Berechtigungs-System
 
 ### Admin
 - Definiert in `lib/admin.ts` via `ADMIN_EMAILS` (aktuell: `tunehelm@gmail.com`)
 - Kann ALLES: Ordner erstellen/löschen, Schreibschutz setzen, Inhalte bearbeiten
 - Kann readonly-Ordner trotzdem bearbeiten
+
+### Alle Team-Mitglieder (inkl. Nicht-Admins)
+- Können Ordner und Notizen erstellen (Dashboard + FolderPage Create-Buttons für alle sichtbar)
+- Können ihre **eigenen** Ordner/Notizen löschen, verschieben, umbenennen
+- Können Notizen in Team-Ordnern editieren (Inhalt bearbeiten)
+- Können ihre eigenen Pins verwalten (jeder sieht nur seine Fixierungen)
+- Dürfen **NICHT**: Admin-erstellte Ordner/Notizen verschieben, löschen oder umbenennen
+- Dürfen **NICHT**: Ordner anderer Team-Mitglieder umbenennen/löschen
+
+### Berechtigungs-Checks im Code
+- `canCreateHere`: `!isReadonly` — Jeder in nicht-readonly Ordnern (FolderPage)
+- `canManageFolder`: `isOwner || isAdmin` — Umbenennen, Löschen, Zugriffsrechte (FolderPage)
+- `canManageNote(ownerId)`: Per-Notiz Check — nur Ersteller oder Admin (FolderPage, Sidebar)
+- `canDragNote(ownerId)`: Nur eigene Notizen oder Admin (Sidebar)
+- `canDropInFolder(access)`: Nicht in readonly Ordner (Sidebar)
+- `canDelete`: `isOwner || isAdmin` (NotePage — Löschen & Verschieben)
 
 ### Readonly-Ordner (`kind = 'readonly'`)
 - **Ancestor-Chain-Check**: Wenn ein Elternordner readonly ist, sind ALLE Unterordner/Notizen ebenfalls readonly
@@ -93,7 +124,7 @@ Gleiche Struktur + `deleted_at` timestamp. Papierkorb-Logik: Soft-Delete per Ups
 
 | Datei | Verantwortung |
 |-------|---------------|
-| `lib/api.ts` | Alle Supabase CRUD-Operationen |
+| `lib/api.ts` | Alle Supabase CRUD-Operationen, User-Pins API |
 | `lib/admin.ts` | Admin-E-Mail-Check |
 | `state/AppDataContext.tsx` | Globaler State, optimistic Updates, Profil-Upsert bei Login |
 | `state/appDataStore.ts` | TypeScript Interfaces |

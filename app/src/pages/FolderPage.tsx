@@ -38,7 +38,6 @@ export function FolderPage() {
   const folder = findFolderById(id)
   const isAdmin = isAdminEmail(currentUserEmail)
   const isOwner = Boolean(folder && (!folder.ownerId || (currentUserId && folder.ownerId === currentUserId)))
-  const canDelete = isOwner || isAdmin
 
   // Prüfe ob dieser Ordner ODER ein Elternordner readonly ist
   let isReadonly = folder?.access === 'readonly'
@@ -50,7 +49,18 @@ export function FolderPage() {
     }
   }
 
-  const canEdit = isOwner || isAdmin || !isReadonly
+  // Berechtigungen:
+  // - canCreateHere: Jeder User in nicht-readonly Ordnern
+  // - canManageFolder: Nur Ersteller oder Admin (Umbenennen, Löschen, Zugriffsrechte)
+  // - canManageNote(ownerId): Nur Notiz-Ersteller oder Admin (Verschieben, Löschen)
+  const canCreateHere = !isReadonly
+  const canManageFolder = isOwner || isAdmin
+
+  function canManageNote(noteOwnerId: string | undefined) {
+    if (isAdmin) return true
+    if (noteOwnerId && currentUserId && noteOwnerId === currentUserId) return true
+    return false
+  }
   const path = folder ? getFolderPathItems(folder.id) : []
   const subfolders = folder ? getSubfolderItems(folder.id) : []
   const folderNotes = folder ? getFolderNoteItems(folder.id) : []
@@ -109,7 +119,7 @@ export function FolderPage() {
   }
 
   return (
-    <SidebarLayout title={folder?.name || 'Ordner'} showCreate={canEdit}>
+    <SidebarLayout title={folder?.name || 'Ordner'} showCreate={canCreateHere}>
       <div className="mx-auto max-w-3xl px-4 py-6">
         {/* Navigation Bar */}
         <div className="flex items-center justify-between">
@@ -162,7 +172,7 @@ export function FolderPage() {
                       {isReadonly ? 'Schreibschutz aufheben' : 'Schreibschutz aktivieren'}
                     </button>
                   ) : null}
-                  {canEdit ? (
+                  {canManageFolder ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -175,7 +185,7 @@ export function FolderPage() {
                       Umbenennen
                     </button>
                   ) : null}
-                  {canDelete ? (
+                  {canManageFolder ? (
                     <button
                       type="button"
                       onClick={async () => {
@@ -197,7 +207,7 @@ export function FolderPage() {
               ) : null}
             </div>
 
-            {canEdit ? (
+            {canCreateHere ? (
               <div className="flex items-center gap-1.5">
                 {/* Neuer Ordner */}
                 <button
@@ -340,7 +350,7 @@ export function FolderPage() {
                     onDrop={(e: DragEvent) => {
                       e.preventDefault()
                       setDragOverFolderId(null)
-                      if (!canEdit) return
+                      if (isReadonly) return
                       const noteId = e.dataTransfer.getData('text/note-id')
                       if (noteId) {
                         void moveNoteToFolder(noteId, entry.id).then(() => {
@@ -364,15 +374,16 @@ export function FolderPage() {
             <div className="flex flex-col gap-3">
               {folderNotes.map((note) => {
                 const noteColor = getStableColor(note.id)
+                const noteMovable = canManageNote(note.ownerId)
                 return (
                   <div
                     key={note.id}
-                    draggable={canEdit}
-                    onDragStart={canEdit ? (e: DragEvent<HTMLDivElement>) => {
+                    draggable={noteMovable}
+                    onDragStart={noteMovable ? (e: DragEvent<HTMLDivElement>) => {
                       e.dataTransfer.setData('text/note-id', note.id)
                       e.dataTransfer.effectAllowed = 'move'
                     } : undefined}
-                    className={`flex items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-sm ${canEdit ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                    className={`flex items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-sm ${noteMovable ? 'cursor-grab active:cursor-grabbing' : ''}`}
                   >
                     <Link
                       to={`/note/${note.id}`}
@@ -384,7 +395,7 @@ export function FolderPage() {
                         <p className="mt-0.5 line-clamp-1 text-xs text-[var(--color-text-secondary)]">{note.excerpt}</p>
                       </div>
                     </Link>
-                    {canEdit ? (
+                    {noteMovable ? (
                       <button
                         type="button"
                         onClick={() =>

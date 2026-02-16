@@ -8,12 +8,14 @@ import {
   fetchNotes,
   fetchTrashFolders,
   fetchTrashNotes,
+  fetchUserPins,
+  addUserPin as addUserPinApi,
+  removeUserPin as removeUserPinApi,
   moveFolderToParent as moveFolderToParentApi,
   moveNoteToFolder as moveNoteToFolderApi,
   renameFolder as renameFolderApi,
   restoreFolderFromTrash as restoreFolderFromTrashApi,
   restoreNoteFromTrash as restoreNoteFromTrashApi,
-  togglePinFolder as togglePinFolderApi,
   updateFolderAccess as updateFolderAccessApi,
   updateFolderIcon as updateFolderIconApi,
   updateNote as updateNoteApi,
@@ -39,8 +41,6 @@ import {
   getMainFolders,
   getNotesByFolder,
   getNoteById,
-  getPinnedFolders,
-  getPinnedNotes,
   getSubfolders,
   initialFolders,
   initialNotes,
@@ -63,6 +63,7 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
   const [apiError, setApiError] = useState<string | null>(null)
   const [currentUserEmail, setCurrentUserEmail] = useState('')
   const [currentUserName, setCurrentUserName] = useState('')
+  const [userPinIds, setUserPinIds] = useState<Set<string>>(new Set())
 
   // Load current user profile (email + display_name from user_metadata)
   // and upsert into profiles table so other team members can see the name
@@ -143,7 +144,12 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
             } else if (change.type === 'updateTitle') {
               await updateNoteApi(change.noteId, { title: change.payload.title as string })
             } else if (change.type === 'togglePin') {
-              await updateNoteApi(change.noteId, { pinned: change.payload.pinned as boolean })
+              const pinned = change.payload.pinned as boolean
+              if (pinned) {
+                await addUserPinApi(change.noteId, 'note')
+              } else {
+                await removeUserPinApi(change.noteId)
+              }
             }
           } catch (e) {
             console.warn('[AppDataContext] Failed to sync pending change', change, e)
@@ -157,13 +163,18 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
 
     // 4) Fetch fresh data from Supabase
     try {
-      const loadedFolders = await fetchFolders()
-      console.log('[AppDataContext] loadFoldersAndNotes folders', loadedFolders)
-      setFolders(loadedFolders)
+      const [loadedFolders, userPins] = await Promise.all([fetchFolders(), fetchUserPins()])
+      const pinIdSet = new Set(userPins.map((p) => p.item_id))
+      setUserPinIds(pinIdSet)
+
+      // Override pinned based on user_pins
+      const foldersWithPins = loadedFolders.map((f) => ({ ...f, pinned: pinIdSet.has(f.id) }))
+      console.log('[AppDataContext] loadFoldersAndNotes folders', foldersWithPins)
+      setFolders(foldersWithPins)
 
       const notesByFolder = await Promise.all(loadedFolders.map((folder: FolderItem) => fetchNotes(folder.id)))
       console.log('[AppDataContext] loadFoldersAndNotes notesByFolder', notesByFolder)
-      const allNotes = notesByFolder.flat()
+      const allNotes = notesByFolder.flat().map((n) => ({ ...n, pinned: pinIdSet.has(n.id) }))
       setNotes(allNotes)
 
       const [trashFolders, trashNotes] = await Promise.all([fetchTrashFolders(), fetchTrashNotes()])
@@ -175,7 +186,7 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
 
       // 5) Update local cache
       await Promise.all([
-        cacheFolders(loadedFolders),
+        cacheFolders(foldersWithPins),
         cacheNotes(allNotes),
         setLastSync(),
       ])
@@ -300,9 +311,9 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
       findNoteById: (noteId) => getNoteById(notes, noteId),
       getPinnedNoteItems: () => {
         const privateFolderIds = new Set(folders.filter((f) => f.access === 'private').map((f) => f.id))
-        return getPinnedNotes(notes).filter((n) => !privateFolderIds.has(n.folderId))
+        return notes.filter((n) => userPinIds.has(n.id) && !privateFolderIds.has(n.folderId))
       },
-      getPinnedFolderItems: () => getPinnedFolders(folders),
+      getPinnedFolderItems: () => folders.filter((f) => userPinIds.has(f.id) && f.access !== 'private'),
       getMainFolderItems: () => getMainFolders(folders),
       getSubfolderItems: (folderId) => getSubfolders(folders, folderId),
       getFolderNoteItems: (folderId) => getNotesByFolder(notes, folderId),
@@ -374,21 +385,35 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
         }
       },
       toggleFolderPinned: async (folderId) => {
-        const previous = folders
         const target = folders.find((item) => item.id === folderId)
         if (!target) return
 
         const nextPinned = !target.pinned
+        const previousFolders = folders
+        const previousPins = userPinIds
+
+        // Optimistic update
         setFolders((prev) =>
           prev.map((folder) =>
             folder.id === folderId ? { ...folder, pinned: nextPinned } : folder,
           ),
         )
+        setUserPinIds((prev) => {
+          const next = new Set(prev)
+          if (nextPinned) next.add(folderId)
+          else next.delete(folderId)
+          return next
+        })
 
         try {
-          await togglePinFolderApi(folderId)
+          if (nextPinned) {
+            await addUserPinApi(folderId, 'folder')
+          } else {
+            await removeUserPinApi(folderId)
+          }
         } catch (error) {
-          setFolders(previous)
+          setFolders(previousFolders)
+          setUserPinIds(previousPins)
           showApiError('Pin-Status des Ordners konnte nicht gespeichert werden.', error)
         }
       },
@@ -460,40 +485,35 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
         contentSaveTimersRef.current.set(noteId, timeoutId)
       },
       toggleNotePinned: async (noteId) => {
-        const previous = notes
         const target = notes.find((item) => item.id === noteId)
         if (!target) return
 
         const nextPinned = !target.pinned
+        const previousNotes = notes
+        const previousPins = userPinIds
+
+        // Optimistic update
         setNotes((prev) =>
           prev.map((note) =>
-            note.id === noteId
-              ? {
-                  ...note,
-                  pinned: nextPinned,
-                }
-              : note,
+            note.id === noteId ? { ...note, pinned: nextPinned } : note,
           ),
         )
+        setUserPinIds((prev) => {
+          const next = new Set(prev)
+          if (nextPinned) next.add(noteId)
+          else next.delete(noteId)
+          return next
+        })
 
         try {
-          const updated = await updateNoteApi(noteId, { pinned: nextPinned })
-          // Only apply server response if pinned matches what we wanted
-          if (updated.pinned === nextPinned) {
-            setNotes((prev) => prev.map((note) => (note.id === noteId ? updated : note)))
+          if (nextPinned) {
+            await addUserPinApi(noteId, 'note')
           } else {
-            // Server didn't persist the change – keep optimistic state but warn
-            console.warn('[AppDataContext] toggleNotePinned: Server returned different pinned state', {
-              expected: nextPinned,
-              got: updated.pinned,
-            })
-            showApiError(
-              'Pin-Status konnte auf dem Server nicht gespeichert werden. Bitte Supabase RLS-Policies für die Notes-Tabelle prüfen (UPDATE muss für den eingeloggten User erlaubt sein).',
-              new Error('RLS policy may be blocking UPDATE on notes table'),
-            )
+            await removeUserPinApi(noteId)
           }
         } catch (error) {
-          setNotes(previous)
+          setNotes(previousNotes)
+          setUserPinIds(previousPins)
           showApiError('Pin-Status konnte nicht gespeichert werden.', error)
         }
       },

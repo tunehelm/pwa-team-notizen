@@ -75,10 +75,10 @@ export function NotePage() {
           void toggleNotePinned(note.id)
         }}
         onDeleteNote={() => {
-          if (!note || isReadonly) return
+          if (!note || !canDelete) return
           void moveNoteToTrash(note.id).then(() => navigate(backPath)).catch(() => {/* Fehler wird im AppDataContext angezeigt */})
         }}
-        onMoveNote={!isReadonly ? () => setShowMoveModal(true) : undefined}
+        onMoveNote={canDelete ? () => setShowMoveModal(true) : undefined}
         onShareNote={() => setShowShareModal(true)}
       />
       {showShareModal && note ? (

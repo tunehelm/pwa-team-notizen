@@ -135,17 +135,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   // ── Drag & Drop Helpers ──
 
-  /** Kann die Notiz vom User gezogen werden? */
-  function canDragNote(noteOwnerId?: string, folderAccess?: string): boolean {
+  /** Kann die Notiz vom User gezogen werden? (Nur eigene Notizen oder Admin) */
+  function canDragNote(noteOwnerId?: string): boolean {
     if (isAdmin) return true
     if (noteOwnerId && currentUserId && noteOwnerId === currentUserId) return true
-    return folderAccess !== 'readonly'
+    return false
   }
 
-  /** Kann in diesen Ordner gedroppt werden? */
-  function canDropInFolder(folderAccess?: string, folderOwnerId?: string): boolean {
+  /** Kann in diesen Ordner gedroppt werden? (Nicht in readonly) */
+  function canDropInFolder(folderAccess?: string): boolean {
     if (isAdmin) return true
-    if (folderOwnerId && currentUserId && folderOwnerId === currentUserId) return true
     return folderAccess !== 'readonly'
   }
 
@@ -154,21 +153,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     e.dataTransfer.effectAllowed = 'move'
   }
 
-  function handleFolderDragOver(e: DragEvent, folderId: string, folderAccess?: string, folderOwnerId?: string) {
+  function handleFolderDragOver(e: DragEvent, folderId: string, folderAccess?: string) {
     // Nicht reagieren wenn es ein Folder-Reorder ist (nicht Notiz-Drop)
     if (e.dataTransfer.types.includes('text/folder-reorder-id')) return
-    if (!canDropInFolder(folderAccess, folderOwnerId)) return
+    if (!canDropInFolder(folderAccess)) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     setDragOverFolderId(folderId)
   }
 
-  function handleFolderDrop(e: DragEvent, folderId: string, folderAccess?: string, folderOwnerId?: string) {
+  function handleFolderDrop(e: DragEvent, folderId: string, folderAccess?: string) {
     // Nicht reagieren wenn es ein Folder-Reorder ist
     if (e.dataTransfer.types.includes('text/folder-reorder-id')) return
     e.preventDefault()
     setDragOverFolderId(null)
-    if (!canDropInFolder(folderAccess, folderOwnerId)) return
+    if (!canDropInFolder(folderAccess)) return
     const noteId = e.dataTransfer.getData('text/note-id')
     if (noteId) {
       void moveNoteToFolder(noteId, folderId)
@@ -365,9 +364,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     key={folder.id}
                     to={`/folder/${folder.id}`}
                     onClick={onClose}
-                    onDragOver={(e: DragEvent<HTMLAnchorElement>) => handleFolderDragOver(e, folder.id, folder.access, folder.ownerId)}
+                    onDragOver={(e: DragEvent<HTMLAnchorElement>) => handleFolderDragOver(e, folder.id, folder.access)}
                     onDragLeave={() => setDragOverFolderId(null)}
-                    onDrop={(e: DragEvent<HTMLAnchorElement>) => handleFolderDrop(e, folder.id, folder.access, folder.ownerId)}
+                    onDrop={(e: DragEvent<HTMLAnchorElement>) => handleFolderDrop(e, folder.id, folder.access)}
                     className={`sidebar-link flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${dragOverFolderId === folder.id ? 'ring-2 ring-inset ring-blue-400 bg-blue-500/10' : ''}`}
                     style={{ color: 'var(--color-sidebar-text)' }}
                   >
@@ -405,7 +404,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   onDragStart={isAdmin ? (e: DragEvent<HTMLDivElement>) => handleFolderReorderDragStart(e, folder.id) : undefined}
                   onDragOver={(e: DragEvent<HTMLDivElement>) => {
                     handleFolderReorderDragOver(e, folder.id)
-                    handleFolderDragOver(e, folder.id, folder.access, folder.ownerId)
+                    handleFolderDragOver(e, folder.id, folder.access)
                   }}
                   onDragLeave={() => { setDragOverFolderId(null); setFolderDragOverId(null); setFolderDragOverPosition(null) }}
                   onDrop={(e: DragEvent<HTMLDivElement>) => {
@@ -413,7 +412,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     if (hasFolderReorder) {
                       handleFolderReorderDrop(e, folder.id)
                     } else {
-                      handleFolderDrop(e, folder.id, folder.access, folder.ownerId)
+                      handleFolderDrop(e, folder.id, folder.access)
                     }
                   }}
                 >
@@ -478,9 +477,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                           <div key={child.id} className="mb-0.5">
                             <div
                               className={`flex items-center ${dragOverFolderId === child.id ? 'rounded-md ring-2 ring-inset ring-blue-400 bg-blue-500/10' : ''}`}
-                              onDragOver={(e: DragEvent<HTMLDivElement>) => handleFolderDragOver(e, child.id, child.access, child.ownerId)}
+                              onDragOver={(e: DragEvent<HTMLDivElement>) => handleFolderDragOver(e, child.id, child.access)}
                               onDragLeave={() => setDragOverFolderId(null)}
-                              onDrop={(e: DragEvent<HTMLDivElement>) => handleFolderDrop(e, child.id, child.access, child.ownerId)}
+                              onDrop={(e: DragEvent<HTMLDivElement>) => handleFolderDrop(e, child.id, child.access)}
                             >
                               {childHasExpandable ? (
                                 <button
@@ -528,9 +527,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                     <div key={gc.id} className="mb-0.5">
                                       <div
                                         className={`flex items-center ${dragOverFolderId === gc.id ? 'rounded-md ring-2 ring-inset ring-blue-400 bg-blue-500/10' : ''}`}
-                                        onDragOver={(e: DragEvent<HTMLDivElement>) => handleFolderDragOver(e, gc.id, gc.access, gc.ownerId)}
+                                        onDragOver={(e: DragEvent<HTMLDivElement>) => handleFolderDragOver(e, gc.id, gc.access)}
                                         onDragLeave={() => setDragOverFolderId(null)}
-                                        onDrop={(e: DragEvent<HTMLDivElement>) => handleFolderDrop(e, gc.id, gc.access, gc.ownerId)}
+                                        onDrop={(e: DragEvent<HTMLDivElement>) => handleFolderDrop(e, gc.id, gc.access)}
                                       >
                                         {gcHasExpandable ? (
                                           <button
@@ -570,8 +569,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                               key={note.id}
                                               to={`/note/${note.id}`}
                                               onClick={onClose}
-                                              draggable={canDragNote(note.ownerId, gc.access)}
-                                              onDragStart={canDragNote(note.ownerId, gc.access) ? (e: DragEvent<HTMLAnchorElement>) => handleNotesDragStart(e, note.id) : undefined}
+                                              draggable={canDragNote(note.ownerId)}
+                                              onDragStart={canDragNote(note.ownerId) ? (e: DragEvent<HTMLAnchorElement>) => handleNotesDragStart(e, note.id) : undefined}
                                               className="sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] transition-colors"
                                               style={{ color: 'var(--color-sidebar-text)' }}
                                             >
@@ -592,8 +591,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                         key={note.id}
                                         to={`/note/${note.id}`}
                                         onClick={onClose}
-                                        draggable={canDragNote(note.ownerId, child.access)}
-                                        onDragStart={canDragNote(note.ownerId, child.access) ? (e: DragEvent<HTMLAnchorElement>) => handleNotesDragStart(e, note.id) : undefined}
+                                        draggable={canDragNote(note.ownerId)}
+                                        onDragStart={canDragNote(note.ownerId) ? (e: DragEvent<HTMLAnchorElement>) => handleNotesDragStart(e, note.id) : undefined}
                                         className="sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] transition-colors"
                                         style={{ color: 'var(--color-sidebar-text)' }}
                                       >
@@ -616,8 +615,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                               key={note.id}
                               to={`/note/${note.id}`}
                               onClick={onClose}
-                              draggable={canDragNote(note.ownerId, folder.access)}
-                              onDragStart={canDragNote(note.ownerId, folder.access) ? (e: DragEvent<HTMLAnchorElement>) => handleNotesDragStart(e, note.id) : undefined}
+                              draggable={canDragNote(note.ownerId)}
+                              onDragStart={canDragNote(note.ownerId) ? (e: DragEvent<HTMLAnchorElement>) => handleNotesDragStart(e, note.id) : undefined}
                               className="sidebar-link flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors"
                               style={{ color: 'var(--color-sidebar-text)' }}
                             >

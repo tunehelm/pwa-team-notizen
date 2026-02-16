@@ -355,19 +355,6 @@ export async function moveFolderToParent(folderId: string, parentId: string | nu
   if (error) throw error
 }
 
-export async function togglePinFolder(folderId: string): Promise<void> {
-  const { data, error } = await supabase.from('folders').select('pinned').eq('id', folderId).single()
-  if (error) throw error
-
-  const pinned = Boolean((data as { pinned?: unknown }).pinned)
-  const { error: updateError } = await supabase
-    .from('folders')
-    .update({ pinned: !pinned })
-    .eq('id', folderId)
-
-  if (updateError) throw updateError
-}
-
 export async function deleteFolderToTrash(folderId: string): Promise<TrashFolderItem> {
   const { data: folder, error: folderError } = await supabase
     .from('folders')
@@ -817,4 +804,43 @@ export async function emptyTrash(): Promise<void> {
     .delete()
     .gte('id', '00000000-0000-0000-0000-000000000000')
   if (foldersError) throw foldersError
+}
+
+// ── User Pins (pro-User Fixierungen) ──────────────────────
+
+export interface UserPin {
+  item_id: string
+  item_type: 'folder' | 'note'
+}
+
+/** Alle Pins des aktuellen Users laden */
+export async function fetchUserPins(): Promise<UserPin[]> {
+  const { data, error } = await supabase
+    .from('user_pins')
+    .select('item_id, item_type')
+  if (error) {
+    console.warn('[api.fetchUserPins] error:', error.message)
+    return []
+  }
+  return (data ?? []) as UserPin[]
+}
+
+/** Pin für ein Element hinzufügen */
+export async function addUserPin(itemId: string, itemType: 'folder' | 'note'): Promise<void> {
+  const userId = await requireUserId()
+  const { error } = await supabase
+    .from('user_pins')
+    .insert({ user_id: userId, item_id: itemId, item_type: itemType })
+  if (error) throw error
+}
+
+/** Pin für ein Element entfernen */
+export async function removeUserPin(itemId: string): Promise<void> {
+  const userId = await requireUserId()
+  const { error } = await supabase
+    .from('user_pins')
+    .delete()
+    .eq('user_id', userId)
+    .eq('item_id', itemId)
+  if (error) throw error
 }

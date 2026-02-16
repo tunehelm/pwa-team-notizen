@@ -4,7 +4,6 @@ import { SidebarLayout } from '../components/SidebarLayout'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
 import { FolderIcon, getStableColor } from '../components/FolderIcons'
-import { isAdminEmail } from '../lib/admin'
 import { supabase } from '../lib/supabase'
 
 export function DashboardPage() {
@@ -22,7 +21,6 @@ export function DashboardPage() {
     getFolderNoteItems,
   } = useAppData()
   const navigate = useNavigate()
-  const isAdmin = isAdminEmail(currentUserEmail)
 
   const userEmail = currentUserEmail
   const userName = currentUserName
@@ -87,54 +85,52 @@ export function DashboardPage() {
               {userName || userEmail}
             </p>
           </div>
-          {isAdmin ? (
-            <div className="flex items-center gap-1.5">
-              {/* Neuer Ordner */}
-              <button
-                type="button"
-                onClick={async () => {
-                  const created = await createFolder('Neuer Ordner', { access: 'team' })
-                  if (created) navigate(`/folder/${created.id}`)
-                }}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-text-muted)] transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
-                aria-label="Neuer Ordner"
-                title="Neuer Ordner"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                  <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
-                  <line x1="12" y1="11" x2="12" y2="17" />
-                  <line x1="9" y1="14" x2="15" y2="14" />
-                </svg>
-              </button>
-              {/* Neue Notiz */}
-              <button
-                type="button"
-                onClick={async () => {
-                  const first = rootFolders.find((f) => f.access !== 'readonly')
-                  let targetId: string
-                  if (first) {
-                    targetId = first.id
-                  } else {
-                    const created = await createFolder('Allgemein', { access: 'team' })
-                    if (!created) return
-                    targetId = created.id
-                  }
-                  const note = await createNote(targetId, 'Neue Notiz')
-                  if (note) navigate(`/note/${note.id}`)
-                }}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-text-muted)] transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
-                aria-label="Neue Notiz"
-                title="Neue Notiz"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                  <path d="M14 2v6h6" />
-                  <line x1="12" y1="11" x2="12" y2="17" />
-                  <line x1="9" y1="14" x2="15" y2="14" />
-                </svg>
-              </button>
-            </div>
-          ) : null}
+          <div className="flex items-center gap-1.5">
+            {/* Neuer Ordner */}
+            <button
+              type="button"
+              onClick={async () => {
+                const created = await createFolder('Neuer Ordner', { access: 'team' })
+                if (created) navigate(`/folder/${created.id}`)
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-text-muted)] transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
+              aria-label="Neuer Ordner"
+              title="Neuer Ordner"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+                <line x1="12" y1="11" x2="12" y2="17" />
+                <line x1="9" y1="14" x2="15" y2="14" />
+              </svg>
+            </button>
+            {/* Neue Notiz */}
+            <button
+              type="button"
+              onClick={async () => {
+                const first = rootFolders.find((f) => f.access !== 'readonly')
+                let targetId: string
+                if (first) {
+                  targetId = first.id
+                } else {
+                  const created = await createFolder('Allgemein', { access: 'team' })
+                  if (!created) return
+                  targetId = created.id
+                }
+                const note = await createNote(targetId, 'Neue Notiz')
+                if (note) navigate(`/note/${note.id}`)
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-text-muted)] transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
+              aria-label="Neue Notiz"
+              title="Neue Notiz"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                <path d="M14 2v6h6" />
+                <line x1="12" y1="11" x2="12" y2="17" />
+                <line x1="9" y1="14" x2="15" y2="14" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {apiError ? (
