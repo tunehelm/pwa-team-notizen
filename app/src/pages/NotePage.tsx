@@ -18,6 +18,7 @@ import { useAppData } from '../state/useAppData'
 
 import { isAdminEmail } from '../lib/admin'
 import { SELECTABLE_ICONS, FolderIcon } from '../components/FolderIcons'
+import { uploadMedia, dataUrlToBlob } from '../lib/storage'
 
 export function NotePage() {
   const { id = '' } = useParams()
@@ -831,20 +832,34 @@ function NoteEditor({
     if (ctx) ctx.globalCompositeOperation = 'source-over'
   }
 
-  function insertDrawing() {
+  async function insertDrawing() {
     const canvas = canvasRef.current
     if (!canvas) return
     const dataUrl = canvas.toDataURL('image/png')
-    editorRef.current?.focus()
-    // Block-level image (no float — prevents overflow on mobile)
-    document.execCommand(
-      'insertHTML',
-      false,
-      `<div class="img-wrap" contenteditable="false" style="margin:8px 0"><img src="${dataUrl}" alt="Zeichnung" style="max-width:100%;width:300px;border-radius:12px;display:block" /></div><p><br></p>`,
-    )
-    syncEditorContent()
     setIsDrawing(false)
     setActivePanel('none')
+
+    try {
+      const blob = dataUrlToBlob(dataUrl)
+      const url = await uploadMedia(blob, 'drawing.png')
+      editorRef.current?.focus()
+      document.execCommand(
+        'insertHTML',
+        false,
+        `<div class="img-wrap" contenteditable="false" style="margin:8px 0"><img src="${url}" alt="Zeichnung" style="max-width:100%;width:300px;border-radius:12px;display:block" /></div><p><br></p>`,
+      )
+      syncEditorContent()
+    } catch (err) {
+      console.error('[NotePage] Drawing upload failed:', err)
+      // Fallback: Base64 direkt einfügen
+      editorRef.current?.focus()
+      document.execCommand(
+        'insertHTML',
+        false,
+        `<div class="img-wrap" contenteditable="false" style="margin:8px 0"><img src="${dataUrl}" alt="Zeichnung" style="max-width:100%;width:300px;border-radius:12px;display:block" /></div><p><br></p>`,
+      )
+      syncEditorContent()
+    }
   }
 
   /* ── Foto/Datei-Upload ── */
@@ -857,42 +872,46 @@ function NoteEditor({
       const file = input.files?.[0]
       if (!file) return
 
-      if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
-        const reader = new FileReader()
-        reader.onload = () => {
+      void (async () => {
+        try {
+          const url = await uploadMedia(file, file.name)
           editorRef.current?.focus()
-          const tag = file.type.startsWith('video/')
-            ? `<video src="${reader.result as string}" controls style="max-width:100%;border-radius:12px;margin:8px 0"></video>`
-            : `<img src="${reader.result as string}" alt="${file.name}" style="max-width:100%;width:400px;border-radius:12px;margin:8px 0" />`
-          document.execCommand('insertHTML', false, `${tag}<p><br></p>`)
+
+          let html = ''
+          if (file.type.startsWith('image/')) {
+            html = `<div class="img-wrap" contenteditable="false" style="margin:8px 0"><img src="${url}" alt="${file.name}" style="max-width:100%;width:400px;border-radius:12px;display:block" /></div><p><br></p>`
+          } else if (file.type.startsWith('video/')) {
+            html = `<video src="${url}" controls style="max-width:100%;border-radius:12px;margin:8px 0"></video><p><br></p>`
+          } else if (file.type.startsWith('audio/')) {
+            html = `<audio src="${url}" controls style="width:100%;margin:8px 0"></audio><p><br></p>`
+          } else {
+            html = `<a href="${url}" download="${file.name}" style="color:#3b82f6;text-decoration:underline">📎 ${file.name}</a>&nbsp;`
+          }
+
+          document.execCommand('insertHTML', false, html)
           syncEditorContent()
+        } catch (err) {
+          console.error('[NotePage] File upload failed, using Base64 fallback:', err)
+          const reader = new FileReader()
+          reader.onload = () => {
+            editorRef.current?.focus()
+            const dataUrl = reader.result as string
+            let html = ''
+            if (file.type.startsWith('image/')) {
+              html = `<img src="${dataUrl}" alt="${file.name}" style="max-width:100%;width:400px;border-radius:12px;margin:8px 0" /><p><br></p>`
+            } else if (file.type.startsWith('video/')) {
+              html = `<video src="${dataUrl}" controls style="max-width:100%;border-radius:12px;margin:8px 0"></video><p><br></p>`
+            } else if (file.type.startsWith('audio/')) {
+              html = `<audio src="${dataUrl}" controls style="width:100%;margin:8px 0"></audio><p><br></p>`
+            } else {
+              html = `<a href="${dataUrl}" download="${file.name}" style="color:#3b82f6;text-decoration:underline">📎 ${file.name}</a>&nbsp;`
+            }
+            document.execCommand('insertHTML', false, html)
+            syncEditorContent()
+          }
+          reader.readAsDataURL(file)
         }
-        reader.readAsDataURL(file)
-      } else if (file.type.startsWith('audio/')) {
-        const reader = new FileReader()
-        reader.onload = () => {
-          editorRef.current?.focus()
-          document.execCommand(
-            'insertHTML',
-            false,
-            `<audio src="${reader.result as string}" controls style="width:100%;margin:8px 0"></audio><p><br></p>`,
-          )
-          syncEditorContent()
-        }
-        reader.readAsDataURL(file)
-      } else {
-        const reader = new FileReader()
-        reader.onload = () => {
-          editorRef.current?.focus()
-          document.execCommand(
-            'insertHTML',
-            false,
-            `<a href="${reader.result as string}" download="${file.name}" style="color:#3b82f6;text-decoration:underline">📎 ${file.name}</a>&nbsp;`,
-          )
-          syncEditorContent()
-        }
-        reader.readAsDataURL(file)
-      }
+      })()
     }
     input.click()
     setActivePanel('none')
@@ -914,17 +933,32 @@ function NoteEditor({
       recorder.onstop = () => {
         stream.getTracks().forEach((t) => t.stop())
         const blob = new Blob(chunks, { type: 'audio/webm' })
-        const reader = new FileReader()
-        reader.onload = () => {
-          editorRef.current?.focus()
-          document.execCommand(
-            'insertHTML',
-            false,
-            `<audio src="${reader.result as string}" controls style="width:100%;margin:8px 0"></audio><p><br></p>`,
-          )
-          syncEditorContent()
-        }
-        reader.readAsDataURL(blob)
+
+        void (async () => {
+          try {
+            const url = await uploadMedia(blob, 'recording.webm')
+            editorRef.current?.focus()
+            document.execCommand(
+              'insertHTML',
+              false,
+              `<audio src="${url}" controls style="width:100%;margin:8px 0"></audio><p><br></p>`,
+            )
+            syncEditorContent()
+          } catch (err) {
+            console.error('[NotePage] Audio upload failed, using Base64 fallback:', err)
+            const reader = new FileReader()
+            reader.onload = () => {
+              editorRef.current?.focus()
+              document.execCommand(
+                'insertHTML',
+                false,
+                `<audio src="${reader.result as string}" controls style="width:100%;margin:8px 0"></audio><p><br></p>`,
+              )
+              syncEditorContent()
+            }
+            reader.readAsDataURL(blob)
+          }
+        })()
       }
 
       recorder.start()
@@ -1301,7 +1335,7 @@ function NoteEditor({
               Abbrechen
             </button>
             <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Zeichnen</span>
-            <button type="button" onClick={() => { insertDrawing(); setIsEraser(false); drawHistoryRef.current = [] }} className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white active:bg-blue-600">
+            <button type="button" onClick={() => { void insertDrawing(); setIsEraser(false); drawHistoryRef.current = [] }} className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white active:bg-blue-600">
               Einfügen
             </button>
           </div>
