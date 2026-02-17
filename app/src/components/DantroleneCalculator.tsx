@@ -22,9 +22,11 @@ const deFormat = (n: number, decimals: number) =>
 interface DantroleneCalculatorProps {
   config?: DantroleneCalculatorConfig | null
   onRemove?: () => void
+  onDuplicate?: () => void
+  onUpdateConfig?: (next: Record<string, unknown>) => void
 }
 
-export function DantroleneCalculator({ config, onRemove }: DantroleneCalculatorProps) {
+export function DantroleneCalculator({ config, onRemove, onDuplicate }: DantroleneCalculatorProps) {
   const c = { ...DEFAULTS, ...config }
   const [weightInput, setWeightInput] = useState('')
 
@@ -68,17 +70,14 @@ export function DantroleneCalculator({ config, onRemove }: DantroleneCalculatorP
             {metaLine}
           </div>
         </div>
-        {onRemove != null && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="shrink-0 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-red-500/20 hover:text-red-400"
-            style={{ color: 'var(--color-text-muted)' }}
-            title="Block entfernen"
-          >
-            🗑 Entfernen
-          </button>
-        )}
+        <div className="flex shrink-0 gap-1">
+          {onDuplicate != null && (
+            <button type="button" onClick={onDuplicate} className="rounded-lg px-2 py-1 text-xs transition-colors hover:bg-blue-500/20" style={{ color: 'var(--color-text-muted)' }} title="Duplizieren">📋</button>
+          )}
+          {onRemove != null && (
+            <button type="button" onClick={onRemove} className="rounded-lg px-2 py-1 text-xs transition-colors hover:bg-red-500/20 hover:text-red-400" style={{ color: 'var(--color-text-muted)' }} title="Block entfernen">🗑 Entfernen</button>
+          )}
+        </div>
       </div>
       <div className="flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-1">

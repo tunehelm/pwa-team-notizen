@@ -22,7 +22,7 @@ import { isAdminEmail } from '../lib/admin'
 import { SELECTABLE_ICONS, FolderIcon } from '../components/FolderIcons'
 import { uploadMedia, dataUrlToBlob } from '../lib/storage'
 import { sanitizeHtmlTable } from '../lib/sanitizeTable'
-import { type DantroleneCalculatorConfig, DantroleneCalculator } from '../components/DantroleneCalculator'
+import { CALCULATORS, CALCULATOR_TYPES, type CalculatorType } from '../components/calculators/registry'
 
 export function NotePage() {
   const { id = '' } = useParams()
@@ -159,7 +159,7 @@ interface NoteEditorProps {
   onShareNote?: () => void
 }
 
-type ToolbarPanel = 'none' | 'format' | 'insert' | 'link' | 'draw' | 'table' | 'fontcolor' | 'symbols'
+type ToolbarPanel = 'none' | 'format' | 'insert' | 'link' | 'draw' | 'table' | 'fontcolor' | 'symbols' | 'calculator'
 
 /* ── Font color presets ── */
 const FONT_COLORS = [
@@ -247,11 +247,44 @@ function NoteEditor({
     syncEditorContent()
   }
 
-  /** Mounts Smart Blocks ([data-smart-block]) as React components. Fallback: kaputter JSON → Block ignorieren. */
+  /** Dupliziert einen Calculator-Block (gleicher type + config) direkt darunter und mountet neu. */
+  function duplicateSmartBlock(el: HTMLElement) {
+    const editor = editorRef.current
+    if (!editor || !editor.contains(el)) return
+    const type = (el.getAttribute('data-calculator-type') as CalculatorType) || 'dantrolene'
+    const configRaw = el.getAttribute('data-config') ?? '{}'
+    const version = el.getAttribute('data-version') ?? '1'
+    const clone = document.createElement('div')
+    clone.setAttribute('data-smart-block', 'calculator')
+    clone.setAttribute('data-calculator-type', type)
+    clone.setAttribute('data-version', version)
+    clone.setAttribute('data-config', configRaw)
+    clone.setAttribute('contenteditable', 'false')
+    el.insertAdjacentElement('afterend', clone)
+    const br = document.createElement('p')
+    br.innerHTML = '<br>'
+    clone.insertAdjacentElement('afterend', br)
+    syncEditorContent()
+    mountSmartBlocks(editor)
+    editor.focus()
+  }
+
+  /** Aktualisiert die gespeicherte Config eines Blocks und speichert. */
+  function updateSmartBlockConfig(el: HTMLElement, nextConfig: Record<string, unknown>) {
+    const editor = editorRef.current
+    if (!editor || !editor.contains(el)) return
+    el.setAttribute('data-config', JSON.stringify(nextConfig))
+    syncEditorContent()
+  }
+
+  /** Mounts Smart Blocks ([data-smart-block="calculator"]) aus Registry. Fallback: kaputter JSON → Block ignorieren. */
   function mountSmartBlocks(container: HTMLElement) {
     const blocks = container.querySelectorAll<HTMLElement>('[data-smart-block="calculator"]')
     blocks.forEach((el) => {
       el.setAttribute('contenteditable', 'false')
+      const type = (el.getAttribute('data-calculator-type') as CalculatorType) || 'dantrolene'
+      const def = CALCULATORS[type]
+      if (!def) return
       let config: Record<string, unknown> = {}
       try {
         const raw = el.getAttribute('data-config')
@@ -259,11 +292,14 @@ function NoteEditor({
       } catch {
         return
       }
+      const { Component } = def
       const root = (el as unknown as { __smartBlockRoot?: ReturnType<typeof createRoot> }).__smartBlockRoot
       const component = (
-        <DantroleneCalculator
-          config={config as DantroleneCalculatorConfig}
+        <Component
+          config={config}
           onRemove={() => removeSmartBlock(el)}
+          onDuplicate={() => duplicateSmartBlock(el)}
+          onUpdateConfig={(next) => updateSmartBlockConfig(el, next)}
         />
       )
       if (root) {
@@ -1221,15 +1257,12 @@ function NoteEditor({
     setActivePanel('none')
   }
 
-  function insertCalculatorBlock() {
-    const config = JSON.stringify({
-      doseMgPerKg: 2.5,
-      vialMg: 120,
-      finalVialVolumeMl: 22.6,
-      maxDoseMg: 300,
-      label: 'Dantrolen (Agilus) 120 mg',
-    })
-    const html = `<div data-smart-block="calculator" contenteditable="false" data-config="${config.replace(/"/g, '&quot;')}"></div><p><br></p>`
+  function insertCalculatorBlock(type: CalculatorType) {
+    const def = CALCULATORS[type]
+    if (!def) return
+    const config = JSON.stringify(def.defaultConfig)
+    const configAttr = config.replace(/"/g, '&quot;')
+    const html = `<div data-smart-block="calculator" data-calculator-type="${type}" data-version="1" contenteditable="false" data-config="${configAttr}"></div><p><br></p>`
     editorRef.current?.focus()
     document.execCommand('insertHTML', false, html)
     syncEditorContent()
@@ -1584,6 +1617,18 @@ function NoteEditor({
 
   /* ── Download ── */
 
+  function handleExportBackup() {
+    const html = editorRef.current?.innerHTML ?? latestContentRef.current ?? ''
+    const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titleValue || 'Notiz'}</title></head><body>${html}</body></html>`
+    const blob = new Blob([doc], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${titleValue || 'Notiz'}-backup.html`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   function handleDownload() {
     if (!note) return
     const text = editorRef.current?.innerText || note.content?.replace(/<[^>]*>/g, '') || ''
@@ -1746,6 +1791,17 @@ function NoteEditor({
                   </svg>
                   Herunterladen
                 </button>
+                <button
+                  type="button"
+                  onClick={() => { handleExportBackup(); setNoteMenuOpen(false) }}
+                  className="flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm transition-colors hover:bg-[var(--color-bg-app)]"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Notiz-Backup exportieren
+                </button>
                 {canDelete ? (
                   <button
                     type="button"
@@ -1865,7 +1921,7 @@ function NoteEditor({
         {/* ── Insert sub-panel ── */}
         {activePanel === 'insert' ? (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
-            <button type="button" onClick={insertCalculatorBlock} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`} title="Dantrolen-Rechner">
+            <button type="button" onClick={() => setActivePanel('calculator')} className={`${tbtn} ${tbtnDefault} gap-1.5 text-xs`} title="Rechner einfügen">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M8 6h8M8 10h8M8 14h4" /></svg>
               Rechner
             </button>
@@ -1894,6 +1950,29 @@ function NoteEditor({
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
               Symbole
             </button>
+          </div>
+        ) : null}
+
+        {/* ── Calculator selector sub-panel ── */}
+        {activePanel === 'calculator' ? (
+          <div className="mt-1.5 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Rechner einfügen</p>
+              <button type="button" onClick={() => setActivePanel('insert')} className="text-xs" style={{ color: 'var(--color-text-muted)' }}>← Zurück</button>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {CALCULATOR_TYPES.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => insertCalculatorBlock(type)}
+                  className={`${tbtn} ${tbtnDefault} w-full justify-start gap-2 text-xs`}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M8 6h8M8 10h8M8 14h4" /></svg>
+                  {CALCULATORS[type].title}
+                </button>
+              ))}
+            </div>
           </div>
         ) : null}
 
