@@ -26,6 +26,35 @@ serve(async (req) => {
       })
     }
 
+    // Backlog: bevorzugt geplantes Item für week_key, sonst erstes Draft (FIFO)
+    let backlogItem: { id: string; title: string; original_text: string; context_md: string | null; rules_md: string | null } | null = null
+    const { data: planned } = await supabase
+      .from("sales_backlog")
+      .select("id, title, original_text, context_md, rules_md")
+      .eq("status", "planned")
+      .eq("planned_week_key", weekKey)
+      .maybeSingle()
+    if (planned) {
+      backlogItem = planned
+    } else {
+      const { data: draft } = await supabase
+        .from("sales_backlog")
+        .select("id, title, original_text, context_md, rules_md")
+        .eq("status", "draft")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (draft) backlogItem = draft
+    }
+
+    const title = backlogItem?.title ?? `Verkaufssprüche ${weekKey}`
+    const originalText = backlogItem?.original_text ?? "Placeholder: Original-Spruch (aus Backlog oder manuell pflegen)"
+    const contextMd = backlogItem?.context_md ?? "Kontext zur Woche (optional)."
+    const rulesMd = backlogItem?.rules_md ?? "Max 3 Stimmen pro Person, max 2 pro Karte. Tap: 1, 2 oder 3 (Reset)."
+    if (!backlogItem) {
+      console.warn("[sales-week-start] no backlog item for week_key=" + weekKey + ", using placeholder")
+    }
+
     const { data: challenge, error: insertChallengeError } = await supabase
       .from("sales_challenges")
       .insert({
@@ -36,11 +65,10 @@ serve(async (req) => {
         freeze_at: timestamps.freeze_at,
         reveal_at: timestamps.reveal_at,
         ends_at: timestamps.ends_at,
-        title: `Verkaufssprüche ${weekKey}`,
-        /* TODO: Backlog: Wenn sales_backlog existiert, geplanten Eintrag für week_key oder nächsten draft nehmen. */
-        original_text: "Placeholder: Original-Spruch (aus Backlog oder manuell pflegen)",
-        context_md: "Kontext zur Woche (optional).",
-        rules_md: "Max 3 Stimmen pro Person, max 2 pro Karte. Tap: 1, 2 oder 3 (Reset).",
+        title,
+        original_text: originalText,
+        context_md: contextMd,
+        rules_md: rulesMd,
         status: "active",
       })
       .select("id")
@@ -52,6 +80,14 @@ serve(async (req) => {
     }
 
     const challengeId = challenge.id
+
+    if (backlogItem) {
+      const { error: updateBacklogError } = await supabase
+        .from("sales_backlog")
+        .update({ status: "used", used_in_challenge_id: challengeId })
+        .eq("id", backlogItem.id)
+      if (updateBacklogError) console.error("[sales-week-start] update backlog status error", updateBacklogError)
+    }
     const aiEntries = [
       { text: "KI-Inspiration 1: Kurzer knackiger Spruch.", source: "ai" as const },
       { text: "KI-Inspiration 2: Zweiter Vorschlag für diese Woche.", source: "ai" as const },
