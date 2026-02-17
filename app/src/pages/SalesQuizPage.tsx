@@ -70,6 +70,7 @@ export function SalesQuizPage() {
   const [myVotes, setMyVotes] = useState<Vote[]>([]);
   const [winners, setWinners] = useState<Winner | null>(null);
   const [liveTotalVotes, setLiveTotalVotes] = useState<number>(0);
+  const [loadCounter, setLoadCounter] = useState(0);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
 
@@ -162,6 +163,7 @@ export function SalesQuizPage() {
       } else {
         setWinners(null);
       }
+      setLoadCounter((c) => c + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Laden fehlgeschlagen.");
     } finally {
@@ -180,7 +182,10 @@ export function SalesQuizPage() {
   const voteLocked = challenge?.vote_deadline_at ? new Date(challenge.vote_deadline_at) <= now : true;
   const isFrozen = challenge?.freeze_at ? new Date(challenge.freeze_at) <= now : false;
 
-  const shuffledEntries = useMemo(() => shuffle(entries, new Date().getDate()), [entries]);
+  const shuffledEntries = useMemo(
+    () => shuffle([...entries]),
+    [loadCounter, challenge?.id, entries.map((e) => e.id).sort().join(",")]
+  );
 
   const getVoteForEntry = (entryId: string) => myVotes.find((v) => v.entry_id === entryId)?.weight ?? 0;
 
