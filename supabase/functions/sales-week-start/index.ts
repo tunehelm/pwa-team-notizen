@@ -37,6 +37,7 @@ serve(async (req) => {
         reveal_at: timestamps.reveal_at,
         ends_at: timestamps.ends_at,
         title: `Verkaufssprüche ${weekKey}`,
+        /* TODO: Backlog: Wenn sales_backlog existiert, geplanten Eintrag für week_key oder nächsten draft nehmen. */
         original_text: "Placeholder: Original-Spruch (aus Backlog oder manuell pflegen)",
         context_md: "Kontext zur Woche (optional).",
         rules_md: "Max 3 Stimmen pro Person, max 2 pro Karte. Tap: 1, 2 oder 3 (Reset).",
