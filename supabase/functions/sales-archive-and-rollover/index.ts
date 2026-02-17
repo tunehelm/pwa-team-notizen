@@ -55,7 +55,7 @@ serve(async (req) => {
 
     const { data: entries } = await supabase
       .from("sales_entries")
-      .select("id, text, author_initials, source, created_at")
+      .select("id, text, author_initials, source, created_at, winner_notes_md")
       .in("id", entryIds)
 
     const order = [winner.place1_entry_id, winner.place2_entry_id, winner.place3_entry_id].filter(Boolean)
@@ -85,7 +85,7 @@ serve(async (req) => {
         author_initials: e?.author_initials ?? null,
         source: source,
         votes: votesByEntry[entryId] ?? 0,
-        winner_notes_md: null,
+        winner_notes_md: e?.winner_notes_md ?? null,
       }
     })
 
