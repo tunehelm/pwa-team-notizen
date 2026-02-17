@@ -1,6 +1,7 @@
 /**
  * Isofluran ICU Sedierungs-Rechner (PRO V4) – Core Engine
  * Rechenlogik 1:1 aus Spezifikation; Guards/Clamps nur zur Vermeidung von NaN.
+ * Clinical Mode v1: flags, summary, ranges; Explain: formulas, sources, assumptions.
  */
 
 export type IsoInput = {
@@ -21,12 +22,26 @@ export type IsoInput = {
   minuteVolumeLMin: number
 }
 
+export type ClinicalFlag = { level: 'ok' | 'warn' | 'danger'; title: string; detail?: string }
+export type ExplainItem = { label: string; formula: string; values: Record<string, number | string>; result: number | string }
+export type SourceItem = { topic: string; citation: string }
+
 export type IsoResult = {
   macAgeAdjusted: number
   macEffective: number
   fetIso: number
   isoConsumptionMlH: number
   debug: Record<string, number>
+  clinical: {
+    flags: ClinicalFlag[]
+    summary: string
+    ranges: Record<string, 'ok' | 'warn' | 'danger'>
+  }
+  explain: {
+    formulas: ExplainItem[]
+    sources: SourceItem[]
+    assumptions: string[]
+  }
 }
 
 /** Clamps für sichere Berechnung (Warnung im UI, kein hartes Blockieren). */
@@ -37,6 +52,18 @@ const CLAMP = {
   minuteVolumeLMin: { min: 2, max: 30 },
   alcoholFactor: { min: 0.5, max: 1.5 },
 } as const
+
+const EXPLAIN_SOURCES: SourceItem[] = [
+  { topic: 'Age-adjusted MAC', citation: 'Nickalls & Mapleson. Br J Anaesth. 2003.' },
+  { topic: 'Temperature effect', citation: 'Eger EI II. In: Miller\'s Anesthesia. (~5% MAC per °C).' },
+  { topic: 'Opioid MAC reduction', citation: 'Katoh et al. 1999; Manyam et al. 2006.' },
+  { topic: 'Adjunct sedatives', citation: 'Miller\'s Anesthesia; Barash.' },
+]
+
+const EXPLAIN_ASSUMPTIONS = [
+  'Heuristische Verbrauchskonstante "3" (als Annahme markieren).',
+  'Stufungsmodelle (Opioid/Benzo/Prop/Dex) sind modellhaft.',
+]
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
@@ -68,9 +95,10 @@ export function calculateIso(input: IsoInput): IsoResult {
     return 0.9
   }
 
+  const targetMACOverride = input.targetMAC != null && Number.isFinite(input.targetMAC)
   const sedationTarget =
-    input.targetMAC != null && Number.isFinite(input.targetMAC)
-      ? input.targetMAC
+    targetMACOverride
+      ? input.targetMAC!
       : (input.rass !== undefined && input.rass !== null && Number.isFinite(input.rass)
           ? rassToMac(input.rass)
           : 0.5)
@@ -137,6 +165,62 @@ export function calculateIso(input: IsoInput): IsoResult {
   const isoConsumptionMlH =
     (fetIso / 100) * minuteVolumeLMin * 60 * 3
 
+  // —— Clinical Mode: flags, summary, ranges ——
+  const flags: ClinicalFlag[] = []
+  const ranges: Record<string, 'ok' | 'warn' | 'danger'> = { mv: 'ok', temp: 'ok', fet: 'ok', mac: 'ok' }
+
+  if (minuteVolumeLMin > 16) {
+    ranges.mv = 'danger'
+    flags.push({ level: 'danger', title: 'Sehr hohes Minutenvolumen', detail: 'Verbrauch steigt stark' })
+  } else if (minuteVolumeLMin > 12) {
+    ranges.mv = 'warn'
+    flags.push({ level: 'warn', title: 'Hohes Minutenvolumen', detail: 'Verbrauch steigt' })
+  }
+
+  if (temperatureC < 34) {
+    ranges.temp = 'danger'
+    flags.push({ level: 'danger', title: 'Ausgeprägte Hypothermie – MAC deutlich reduziert' })
+  } else if (temperatureC < 36) {
+    ranges.temp = 'warn'
+    flags.push({ level: 'warn', title: 'Hypothermie senkt MAC' })
+  }
+
+  if (age > 75) {
+    flags.push({ level: 'warn', title: 'Alter reduziert MAC deutlich' })
+  }
+
+  if (fetIso < 0.3) {
+    ranges.fet = 'warn'
+    flags.push({ level: 'warn', title: 'Sehr niedrige Fet – Sedierung evtl. zu flach' })
+  } else if (fetIso > 1.2) {
+    ranges.fet = 'warn'
+    flags.push({ level: 'warn', title: 'Hohe Fet – prüfen, ob Ziel sinnvoll ist' })
+  }
+
+  if (targetMACOverride) {
+    flags.push({ level: 'ok', title: 'TargetMAC Override aktiv' })
+  }
+
+  if (opioidFactor <= 0.65 || propFactor <= 0.7) {
+    flags.push({ level: 'ok', title: 'Ko-Sedierung reduziert MAC' })
+  }
+
+  const summary = `Ziel-Fet: ${fetIso.toFixed(2)}% • Verbrauch: ${isoConsumptionMlH.toFixed(1)} ml/h • MV: ${minuteVolumeLMin} L/min`
+
+  // —— Explain: formulas, sources, assumptions ——
+  const formulas: ExplainItem[] = [
+    { label: 'Age MAC', formula: 'MAC_age = MAC40 * (1 - 0.06 * ((age-40)/10))', values: { MAC40, age }, result: macAge },
+    { label: 'Temp factor', formula: 'tempFactor = 1 - 0.05 * (37 - T)', values: { T: temperatureC }, result: tempFactor },
+    { label: 'Sedation target', formula: 'RASS→MAC or targetMAC override', values: { sedationTarget }, result: sedationTarget },
+    { label: 'Opioid', formula: 'µg/kg/min → factor', values: { opioidUgKgMin, opioidFactor }, result: opioidFactor },
+    { label: 'Mida', formula: 'mg/kg/h → factor', values: { midaMgKgH, midaFactor }, result: midaFactor },
+    { label: 'Prop', formula: 'mg/kg/h → factor', values: { propMgKgH, propFactor }, result: propFactor },
+    { label: 'Dex', formula: 'µg/kg/h → factor', values: { dexUgKgH, dexFactor }, result: dexFactor },
+    { label: 'MAC effective', formula: 'MAC_age × opioidF × midaF × propF × dexF × alcoholF × tempF', values: { macAge, opioidFactor, midaFactor, propFactor, dexFactor, alcoholFactor, tempFactor }, result: macEffective },
+    { label: 'FetIso', formula: 'FetIso = MAC_effective * sedationTarget', values: { macEffective, sedationTarget }, result: fetIso },
+    { label: 'Consumption', formula: 'Consumption = (FetIso/100) * MV * 60 * 3', values: { fetIso, MV: minuteVolumeLMin }, result: isoConsumptionMlH },
+  ]
+
   return {
     macAgeAdjusted: macAge,
     macEffective,
@@ -153,5 +237,7 @@ export function calculateIso(input: IsoInput): IsoResult {
       propFactor,
       dexFactor,
     },
+    clinical: { flags, summary, ranges },
+    explain: { formulas, sources: EXPLAIN_SOURCES, assumptions: EXPLAIN_ASSUMPTIONS },
   }
 }

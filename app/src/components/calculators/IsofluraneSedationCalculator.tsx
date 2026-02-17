@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import type { CalculatorBlockProps } from './registry'
-import { FormulaToggle } from './FormulaToggle'
 import { calculateIso, type IsoInput, type IsoResult } from '../../lib/iso/calculateIso'
 
 const deFormat = (n: number, decimals: number) =>
@@ -28,32 +27,12 @@ const DEFAULT_INPUT: IsoInput = {
 
 const RASS_OPTIONS = [0, -1, -2, -3, -4, -5]
 
-const FORMULA_LINES = [
-  'MAC(age) = 1,15 × (1 − 0,06 × ((Alter − 40)/10))',
-  'Temp-Faktor = 1 − 0,05 × (37 − Temp)',
-  'Opioid (µg/kg/min) = (ml/h × µg/ml) / (kg × 60) → Faktor: <0,05→0,85; <0,15→0,65; sonst 0,5',
-  'Mida (mg/kg/h) = (ml/h × mg/ml) / kg → Faktor: <0,03→0,9; <0,06→0,75; sonst 0,7',
-  'Prop (mg/kg/h) = (ml/h × mg/ml) / kg → Faktor: <1→0,85; <2→0,7; sonst 0,5',
-  'Dex (µg/kg/h) = (ml/h × µg/ml) / kg → Faktor: <0,4→0,8; <0,8→0,65; sonst 0,5',
-  'MAC_eff = MAC(age) × OpioidF × MidaF × PropF × DexF × AlkoholF × TempF',
-  'FetIso (Vol%) = MAC_eff × MAC_Ziel (aus RASS oder Override)',
-  'Verbrauch (ml/h, grob) = (FetIso/100) × MV × 60 × 3',
-]
-
-const FORMULA_NOTE = 'Rechenhilfe – klinische Prüfung erforderlich.'
-
-const SOURCES_LINES = [
-  'PRO V4 Rechenlogik: interne Excel/CSV \'Isofluran_ICU_AutoRechner_PRO_V4\' (Sedana Team-intern)',
-  'MAC 40 Jahre Referenzwert (Isofluran): 1,15 (interne Annahme/Referenz in PRO V4)',
-  'Alterskorrektur & Co-Med-Faktoren: PRO V4 Schwellenlogik (intern)',
-  'Verbrauchsformel: Heuristik/Schätzung (intern), klinisch nicht als exakte Verbrauchsmessung zu verstehen',
-]
-
-const SOURCES_DISCLAIMER = 'Nur für internen Gebrauch. Keine Gewähr. Therapieentscheidung obliegt dem behandelnden Team.'
+const MODEL_NOTE = 'Dieses Modell ist eine strukturierte Näherung und keine pharmakodynamische Simulation.'
 
 export type IsoSedationBlockState = {
   version: 1
   label?: string
+  defaultClinicalOn?: boolean
   input: IsoInput
   rassValue: number
   macOverride: number | null
@@ -93,7 +72,9 @@ export function IsofluraneSedationCalculator({ config, onRemove, onDuplicate, on
   const [dexMlStr, setDexMlStr] = useState(String(savedInput.dexMlPerH ?? 0))
   const [dexUgStr, setDexUgStr] = useState(String(savedInput.dexUgPerMl ?? 0))
   const [showDebug, setShowDebug] = useState(false)
-  const [showSources, setShowSources] = useState(false)
+  const defaultClinical = c.defaultClinicalOn !== false
+  const [clinicalMode, setClinicalMode] = useState(defaultClinical)
+  const [showFormulasSources, setShowFormulasSources] = useState(false)
 
   const input: IsoInput = useMemo(() => ({
     weightKg: parseNum(weightStr, DEFAULT_INPUT.weightKg),
@@ -300,28 +281,51 @@ export function IsofluraneSedationCalculator({ config, onRemove, onDuplicate, on
         {result != null && (
           <button type="button" onClick={copyResult} className="rounded-lg border px-2 py-1 text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>Ergebnis kopieren</button>
         )}
+        <button type="button" onClick={() => setClinicalMode((c) => !c)} className={`rounded-lg border px-2 py-1 text-xs ${clinicalMode ? 'border-green-500/50 bg-green-500/10' : ''}`} style={!clinicalMode ? { borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' } : {}}>Clinical Mode {clinicalMode ? 'ON' : 'OFF'}</button>
+        <button type="button" onClick={() => setShowFormulasSources((s) => !s)} className="rounded-lg border px-2 py-1 text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>Formeln & Quellen {showFormulasSources ? '▼' : '▶'}</button>
         <button type="button" onClick={() => setShowDebug((d) => !d)} className="rounded-lg border px-2 py-1 text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>{showDebug ? 'Details ausblenden' : 'Details anzeigen'}</button>
       </div>
 
       {result != null ? (
-        <div className="mt-3 flex flex-wrap gap-3">
-          <div className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--color-border)' }}>
-            <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>MAC alterskorrigiert</div>
-            <div className="text-sm font-medium" style={{ color: 'var(--color-accent)' }}>{deFormat(result.macAgeAdjusted, 3)}</div>
+        <>
+          {clinicalMode && (
+            <div className="mt-3 space-y-1.5">
+              <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{result.clinical.summary}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(['mv', 'temp', 'fet'] as const).map((k) => {
+                  const r = result.clinical.ranges[k]
+                  const label = k === 'mv' ? 'MV' : k === 'temp' ? 'Temp' : 'Fet'
+                  return (
+                    <span key={k} className="rounded px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: r === 'danger' ? 'rgba(239,68,68,0.2)' : r === 'warn' ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.15)', color: r === 'danger' ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>{label}: {r}</span>
+                  )
+                })}
+              </div>
+              {result.clinical.flags.slice(0, 3).map((f, i) => (
+                <p key={i} className="text-xs" style={{ color: f.level === 'danger' ? 'var(--color-accent)' : f.level === 'warn' ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>{f.title}{f.detail ? ` – ${f.detail}` : ''}</p>
+              ))}
+            </div>
+          )}
+          <div className="mt-3 flex flex-wrap gap-3">
+            {clinicalMode && (
+              <div className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--color-border)' }}>
+                <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>MAC alterskorrigiert</div>
+                <div className="text-sm font-medium" style={{ color: 'var(--color-accent)' }}>{deFormat(result.macAgeAdjusted, 3)}</div>
+              </div>
+            )}
+            <div className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>MAC effektiv</div>
+              <div className="text-sm font-medium" style={{ color: 'var(--color-accent)' }}>{deFormat(result.macEffective, 3)}</div>
+            </div>
+            <div className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Fet Isofluran (Vol%)</div>
+              <div className="text-sm font-medium" style={{ color: 'var(--color-accent)' }}>{deFormat(result.fetIso, 3)}</div>
+            </div>
+            <div className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Isofluranverbrauch (ml/h, grob)</div>
+              <div className="text-sm font-medium" style={{ color: 'var(--color-accent)' }}>{deFormat(result.isoConsumptionMlH, 2)}</div>
+            </div>
           </div>
-          <div className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--color-border)' }}>
-            <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>MAC effektiv</div>
-            <div className="text-sm font-medium" style={{ color: 'var(--color-accent)' }}>{deFormat(result.macEffective, 3)}</div>
-          </div>
-          <div className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--color-border)' }}>
-            <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Fet Isofluran (Vol%)</div>
-            <div className="text-sm font-medium" style={{ color: 'var(--color-accent)' }}>{deFormat(result.fetIso, 3)}</div>
-          </div>
-          <div className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--color-border)' }}>
-            <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Isofluranverbrauch (ml/h, grob)</div>
-            <div className="text-sm font-medium" style={{ color: 'var(--color-accent)' }}>{deFormat(result.isoConsumptionMlH, 2)}</div>
-          </div>
-        </div>
+        </>
       ) : (
         <div className="mt-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>—</div>
       )}
@@ -339,24 +343,33 @@ export function IsofluraneSedationCalculator({ config, onRemove, onDuplicate, on
         </div>
       )}
 
-      <FormulaToggle title="Berechnungsformel" lines={FORMULA_LINES} note={FORMULA_NOTE} />
-
-      <div className="mt-2">
-        <button type="button" onClick={() => setShowSources((s) => !s)} className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-[var(--color-border)]" style={{ color: 'var(--color-text-muted)' }}>
-          <span>Quellen & Hinweise</span>
-          <span className="text-[10px]" aria-hidden>{showSources ? '▼' : '▶'}</span>
-        </button>
-        {showSources && (
-          <div className="mt-1.5 rounded-lg border p-3 text-xs" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-secondary)' }}>
-            <ul className="list-inside list-disc space-y-0.5">
-              {SOURCES_LINES.map((line, i) => (
-                <li key={i}>{line}</li>
-              ))}
-            </ul>
-            <p className="mt-2 border-t pt-2" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>{SOURCES_DISCLAIMER}</p>
-          </div>
-        )}
-      </div>
+      {showFormulasSources && result != null && (
+        <div className="mt-3 rounded-lg border p-3 text-xs" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-secondary)' }}>
+          <div className="font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>Formeln</div>
+          <ul className="space-y-1.5">
+            {result.explain.formulas.map((item, i) => (
+              <li key={i}>
+                <span className="font-medium" style={{ color: 'var(--color-text-muted)' }}>{item.label}:</span> {item.formula}
+                <div className="mt-0.5 text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                  {Object.entries(item.values).map(([k, v]) => `${k}=${typeof v === 'number' ? deFormat(v, 3) : v}`).join(' · ')} → {typeof item.result === 'number' ? deFormat(item.result, 3) : item.result}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-2 font-medium" style={{ color: 'var(--color-text-secondary)' }}>Quellen</div>
+          <ul className="list-inside list-disc space-y-0.5 mt-0.5">
+            {result.explain.sources.map((s, i) => (
+              <li key={i}><span style={{ color: 'var(--color-text-muted)' }}>{s.topic}:</span> {s.citation}</li>
+            ))}
+          </ul>
+          <p className="mt-2 border-t pt-2" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>{MODEL_NOTE}</p>
+          <ul className="list-inside list-disc space-y-0.5 mt-1 text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+            {result.explain.assumptions.map((a, i) => (
+              <li key={i}>{a}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
