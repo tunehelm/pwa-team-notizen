@@ -3,8 +3,24 @@ import { DantroleneCalculator } from '../DantroleneCalculator'
 import { CatecholamineCalculator } from './CatecholamineCalculator'
 import { HeparinCalculator } from './HeparinCalculator'
 import { WeightDoseCalculator } from './WeightDoseCalculator'
+import { NoradrenalineCalculator } from './NoradrenalineCalculator'
+import { SedationInfusionCalculator } from './SedationInfusionCalculator'
+import { MapCalculator } from './MapCalculator'
+import { PbwArdsCalculator } from './PbwArdsCalculator'
+import { PfRatioCalculator } from './PfRatioCalculator'
+import { GcsCalculator } from './GcsCalculator'
 
-export type CalculatorType = 'dantrolene' | 'catecholamine' | 'heparin' | 'weight-dose'
+export type CalculatorType =
+  | 'dantrolene'
+  | 'noradrenaline'
+  | 'catecholamine'
+  | 'heparin'
+  | 'sedation-infusion'
+  | 'map-target'
+  | 'pbw-ards'
+  | 'pfratio'
+  | 'weight-dose'
+  | 'gcs'
 
 export interface CalculatorBlockProps {
   config?: Record<string, unknown> | null
@@ -31,6 +47,15 @@ export const CALCULATORS: Record<CalculatorType, CalculatorDef> = {
     },
     Component: DantroleneCalculator as ComponentType<CalculatorBlockProps>,
   },
+  noradrenaline: {
+    title: 'Noradrenalin PRO (µg/kg/min ↔ ml/h)',
+    defaultConfig: {
+      mgTotal: 4,
+      mlTotal: 50,
+      targetMcgPerKgMin: 0.1,
+    },
+    Component: NoradrenalineCalculator,
+  },
   catecholamine: {
     title: 'Katecholamin Perfusor (µg/kg/min ↔ ml/h)',
     defaultConfig: {
@@ -49,6 +74,29 @@ export const CALCULATORS: Record<CalculatorType, CalculatorDef> = {
     },
     Component: HeparinCalculator,
   },
+  'sedation-infusion': {
+    title: 'Sedierungs-Perfusor (Propofol, Midazolam)',
+    defaultConfig: {
+      drug: 'propofol',
+      mgPerMl: 10,
+    },
+    Component: SedationInfusionCalculator,
+  },
+  'map-target': {
+    title: 'MAP-Ziel',
+    defaultConfig: {},
+    Component: MapCalculator,
+  },
+  'pbw-ards': {
+    title: 'IBW / PBW (ARDS)',
+    defaultConfig: { gender: 'male' },
+    Component: PbwArdsCalculator,
+  },
+  pfratio: {
+    title: 'PaO₂/FiO₂ Ratio',
+    defaultConfig: {},
+    Component: PfRatioCalculator,
+  },
   'weight-dose': {
     title: 'mg/kg Standard (Dose/Volumen/Vials)',
     defaultConfig: {
@@ -59,6 +107,22 @@ export const CALCULATORS: Record<CalculatorType, CalculatorDef> = {
     },
     Component: WeightDoseCalculator,
   },
+  gcs: {
+    title: 'GCS Helper',
+    defaultConfig: { e: 4, v: 5, m: 6 },
+    Component: GcsCalculator,
+  },
 }
 
-export const CALCULATOR_TYPES = Object.keys(CALCULATORS) as CalculatorType[]
+export const CALCULATOR_TYPES: CalculatorType[] = [
+  'dantrolene',
+  'noradrenaline',
+  'catecholamine',
+  'heparin',
+  'sedation-infusion',
+  'map-target',
+  'pbw-ards',
+  'pfratio',
+  'weight-dose',
+  'gcs',
+]
