@@ -18,7 +18,7 @@ serve(async (req) => {
     const weekKey = getPreviousWeekKey(now)
     const { data: challenge, error: chErr } = await supabase
       .from("sales_challenges")
-      .select("id, week_key, original_text, context_md")
+      .select("id, week_key, original_text, context_md, category")
       .eq("week_key", weekKey)
       .eq("status", "revealed")
       .maybeSingle()
@@ -70,7 +70,7 @@ serve(async (req) => {
       votesByEntry[v.entry_id] = (votesByEntry[v.entry_id] ?? 0) + (v.weight ?? 0)
     }
 
-    const category = "Verkaufssprüche"
+    const category = challenge.category ?? "Verkaufssprüche"
     const bestofRows = order.map((entryId, idx) => {
       const e = entryMap.get(entryId)
       const place = idx + 1

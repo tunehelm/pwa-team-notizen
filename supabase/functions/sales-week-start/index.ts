@@ -27,10 +27,10 @@ serve(async (req) => {
     }
 
     // Backlog: bevorzugt geplantes Item für week_key, sonst erstes Draft (FIFO)
-    let backlogItem: { id: string; title: string; original_text: string; context_md: string | null; rules_md: string | null } | null = null
+    let backlogItem: { id: string; title: string; original_text: string; context_md: string | null; rules_md: string | null; category: string } | null = null
     const { data: planned } = await supabase
       .from("sales_backlog")
-      .select("id, title, original_text, context_md, rules_md")
+      .select("id, title, original_text, context_md, rules_md, category")
       .eq("status", "planned")
       .eq("planned_week_key", weekKey)
       .maybeSingle()
@@ -39,7 +39,7 @@ serve(async (req) => {
     } else {
       const { data: draft } = await supabase
         .from("sales_backlog")
-        .select("id, title, original_text, context_md, rules_md")
+        .select("id, title, original_text, context_md, rules_md, category")
         .eq("status", "draft")
         .order("created_at", { ascending: true })
         .limit(1)
@@ -48,6 +48,7 @@ serve(async (req) => {
     }
 
     const title = backlogItem?.title ?? `Verkaufssprüche ${weekKey}`
+    const challengeCategory = backlogItem?.category ?? null
     const originalText = backlogItem?.original_text ?? "Placeholder: Original-Spruch (aus Backlog oder manuell pflegen)"
     const contextMd = backlogItem?.context_md ?? "Kontext zur Woche (optional)."
     const rulesMd = backlogItem?.rules_md ?? "Max 3 Stimmen pro Person, max 2 pro Karte. Tap: 1, 2 oder 3 (Reset)."
@@ -69,6 +70,7 @@ serve(async (req) => {
         original_text: originalText,
         context_md: contextMd,
         rules_md: rulesMd,
+        category: challengeCategory,
         status: "active",
       })
       .select("id")
