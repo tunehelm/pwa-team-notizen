@@ -685,6 +685,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             Team
           </Link>
           <Link
+            to="/sales-quiz"
+            onClick={onClose}
+            className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
+              location.pathname === '/sales-quiz'
+                ? 'bg-blue-500/20 text-blue-400 font-medium'
+                : ''
+            }`}
+            style={location.pathname === '/sales-quiz' ? undefined : { color: 'var(--color-sidebar-text-muted)' }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" />
+            </svg>
+            Montags-Quiz
+          </Link>
+          <Link
             to="/trash"
             onClick={onClose}
             className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
