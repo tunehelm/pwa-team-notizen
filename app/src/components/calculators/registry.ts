@@ -9,6 +9,7 @@ import { MapCalculator } from './MapCalculator'
 import { PbwArdsCalculator } from './PbwArdsCalculator'
 import { PfRatioCalculator } from './PfRatioCalculator'
 import { GcsCalculator } from './GcsCalculator'
+import { BeCorrectionCalculator } from './BeCorrectionCalculator'
 
 export type CalculatorType =
   | 'dantrolene'
@@ -18,6 +19,7 @@ export type CalculatorType =
   | 'sedation-infusion'
   | 'map-target'
   | 'pbw-ards'
+  | 'be-correction'
   | 'pfratio'
   | 'weight-dose'
   | 'gcs'
@@ -92,6 +94,11 @@ export const CALCULATORS: Record<CalculatorType, CalculatorDef> = {
     defaultConfig: { gender: 'male' },
     Component: PbwArdsCalculator,
   },
+  'be-correction': {
+    title: 'BE-Korrektur (TRIS/NaHCO₃)',
+    defaultConfig: { label: 'BE-Korrektur (TRIS / NaHCO₃)' },
+    Component: BeCorrectionCalculator,
+  },
   pfratio: {
     title: 'PaO₂/FiO₂ Ratio',
     defaultConfig: {},
@@ -122,6 +129,7 @@ export const CALCULATOR_TYPES: CalculatorType[] = [
   'sedation-infusion',
   'map-target',
   'pbw-ards',
+  'be-correction',
   'pfratio',
   'weight-dose',
   'gcs',
