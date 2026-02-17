@@ -67,6 +67,7 @@ export function SalesQuizPage() {
   const [myEntry, setMyEntry] = useState<Entry | null>(null);
   const [myVotes, setMyVotes] = useState<Vote[]>([]);
   const [winners, setWinners] = useState<Winner | null>(null);
+  const [liveTotalVotes, setLiveTotalVotes] = useState<number>(0);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
 
@@ -95,6 +96,7 @@ export function SalesQuizPage() {
         setMyEntry(null);
         setMyVotes([]);
         setWinners(null);
+        setLiveTotalVotes(0);
         setLoading(false);
         return;
       }
@@ -110,6 +112,11 @@ export function SalesQuizPage() {
       if (entriesErr) throw entriesErr;
       const published = (entriesData ?? []) as Entry[];
       setEntries(published);
+
+      const { data: liveTotal } = await supabase.rpc("get_sales_challenge_total_votes", {
+        p_challenge_id: chData.id,
+      });
+      setLiveTotalVotes(typeof liveTotal === "number" ? liveTotal : 0);
 
       if (uid) {
         const { data: myEntryData } = await supabase
@@ -152,7 +159,7 @@ export function SalesQuizPage() {
     void loadData();
   }, [loadData]);
 
-  const totalVotes = winners?.total_votes ?? 0;
+  const totalVotes = winners?.total_votes ?? liveTotalVotes ?? 0;
   const myVotesUsed = myVotes.reduce((s, v) => s + v.weight, 0);
   const isRevealed = challenge?.status === "revealed" || (challenge?.reveal_at && new Date(challenge.reveal_at) <= new Date());
   const editLocked = challenge?.edit_deadline_at ? new Date(challenge.edit_deadline_at) < new Date() : true;
@@ -408,7 +415,6 @@ export function SalesQuizPage() {
 }
 
 function RevealPodium({
-  challengeId,
   winners,
   entries,
 }: {
