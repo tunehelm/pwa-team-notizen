@@ -427,9 +427,14 @@ export function SalesQuizPage() {
           )}
         </section>
 
-        {/* Published entries (Liste) oder Reveal Podium */}
+        {/* Published entries (Liste) oder Reveal Podium (nur Top 3 + Original) */}
         {isRevealed && winners ? (
-          <RevealPodium challengeId={challenge.id} winners={winners} entries={entries} />
+          <RevealPodium
+            challengeId={challenge.id}
+            winners={winners}
+            entries={entries}
+            originalText={challenge.original_text}
+          />
         ) : (
           <section>
             <h2 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Varianten</h2>
@@ -483,10 +488,12 @@ export function SalesQuizPage() {
 function RevealPodium({
   winners,
   entries,
+  originalText,
 }: {
   challengeId: string;
   winners: Winner;
   entries: Entry[];
+  originalText: string | null;
 }) {
   const top3 = [winners.place1_entry_id, winners.place2_entry_id, winners.place3_entry_id]
     .filter(Boolean)
@@ -496,32 +503,44 @@ function RevealPodium({
   if (top3.length === 0) {
     return (
       <section>
-        <h2 className="mb-3 text-sm font-semibold">Ergebnis</h2>
+        <h2 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Ergebnis</h2>
         <p className="text-sm text-[var(--color-text-muted)]">Keine Plätze vergeben.</p>
+        {originalText && (
+          <div className="mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3">
+            <p className="text-xs font-medium text-[var(--color-text-muted)]">Originalspruch</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--color-text-secondary)]">{originalText}</p>
+          </div>
+        )}
       </section>
     );
   }
 
   return (
-    <section>
-      <h2 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">🏆 Podium</h2>
+    <section className="overflow-auto">
+      <h2 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">🏆 Podium (Top 3)</h2>
       <div className="space-y-3">
         {top3.map((entry, i) => (
           <div
             key={entry.id}
-            className={`rounded-2xl border-2 p-4 ${
+            className={`min-w-0 rounded-2xl border-2 p-4 ${
               i === 0 ? "border-amber-400 dark:border-amber-600" : i === 1 ? "border-slate-300 dark:border-slate-600" : "border-amber-700 dark:border-amber-900"
             }`}
           >
             <p className="text-xs font-medium text-[var(--color-text-muted)]">Platz {i + 1}</p>
             <p className="mt-1 whitespace-pre-wrap text-[var(--color-text-primary)]">{entry.text}</p>
-            {entry.author_initials && (
-              <p className="mt-1 text-xs text-[var(--color-text-muted)]">{entry.author_initials}</p>
-            )}
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              {entry.source === "ai" ? "KI" : entry.author_initials || "—"}
+            </p>
           </div>
         ))}
       </div>
       <p className="mt-2 text-xs text-[var(--color-text-muted)]">Gesamt: {winners.total_votes} Stimmen</p>
+      {originalText && (
+        <div className="mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3">
+          <p className="text-xs font-medium text-[var(--color-text-muted)]">Originalspruch</p>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--color-text-secondary)]">{originalText}</p>
+        </div>
+      )}
     </section>
   );
 }
