@@ -141,6 +141,13 @@ UI Komponenten:
 - Pages: Dashboard, Folder, Note
 - Editor: Toolbar oben, Content darunter
 
+## Smart Calculator System
+
+- **Registry-basierter Ansatz:** Alle Rechner-Typen sind in `app/src/components/calculators/registry.ts` definiert (`CalculatorType`, `CALCULATORS`, `CALCULATOR_TYPES`). Neue Rechner = neuer Typ + Eintrag + Komponente.
+- **Entkoppelte Calculator-Komponenten:** Jede Komponente erhält `config`, `onRemove`, `onDuplicate`, `onUpdateConfig`; keine direkte Abhängigkeit vom Editor. Siehe `docs/SMART_BLOCKS.md` für data-smart-block, data-config, Persistenz.
+- **Wiederverwendbarkeit:** Formeln und Logik (z. B. Isofluran PRO V4) liegen in `app/src/lib/iso/`; UI nur in den Calculator-Komponenten.
+- **Minimal-Render-Strategie im Editor:** Smart-Blocks werden nach dem Laden des Notiz-HTML per `mountSmartBlocks(container)` gemountet; jeder Block ist ein React-Root. Bei Config-Änderung wird nur `data-config` am DOM-Element aktualisiert und `syncEditorContent()` aufgerufen – kein vollständiger Re-Mount der ganzen Notiz.
+
 ## Offline / Persistenz
 Minimum (jetzt):
 - UI soll auch offline nutzbar sein (PWA cached shell).
