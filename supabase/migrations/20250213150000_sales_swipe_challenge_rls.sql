@@ -38,6 +38,7 @@ ALTER TABLE public.sales_bestof ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_admin_emails ENABLE ROW LEVEL SECURITY;
 
 -- sales_admin_emails: nur Admins lesen (für RLS-Check brauchen wir keinen Lesezugriff von außen)
+DROP POLICY IF EXISTS "sales_admin_emails_admin_only" ON public.sales_admin_emails;
 CREATE POLICY "sales_admin_emails_admin_only"
   ON public.sales_admin_emails FOR SELECT TO authenticated
   USING (public.is_sales_admin());
