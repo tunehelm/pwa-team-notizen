@@ -699,6 +699,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </svg>
             Montags-Quiz
           </Link>
+          {isAdmin && (
+            <Link
+              to="/admin/sales-backlog"
+              onClick={onClose}
+              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
+                location.pathname === '/admin/sales-backlog'
+                  ? 'bg-blue-500/20 text-blue-400 font-medium'
+                  : ''
+              }`}
+              style={location.pathname === '/admin/sales-backlog' ? undefined : { color: 'var(--color-sidebar-text-muted)' }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="2" />
+              </svg>
+              Quiz-Backlog
+            </Link>
+          )}
           <Link
             to="/trash"
             onClick={onClose}

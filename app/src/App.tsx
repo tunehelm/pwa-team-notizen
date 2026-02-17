@@ -8,6 +8,7 @@ import { PrivatePage } from "./pages/PrivatePage";
 import { SearchPage } from "./pages/SearchPage";
 import { TeamHubPage } from "./pages/TeamHubPage";
 import { SalesQuizPage } from "./pages/SalesQuizPage";
+import { SalesBacklogPage } from "./pages/SalesBacklogPage";
 import { TrashPage } from "./pages/TrashPage";
 import { AppDataProvider } from "./state/AppDataContext";
 import { useRequirePasswordSetup } from "./hooks/useRequirePasswordSetup";
@@ -119,6 +120,7 @@ function App() {
           <Route path="/private" element={<PrivatePage />} />
           <Route path="/team" element={<TeamHubPage />} />
           <Route path="/sales-quiz" element={<SalesQuizPage />} />
+          <Route path="/admin/sales-backlog" element={<SalesBacklogPage />} />
           <Route path="/folder/:id" element={<FolderPage />} />
           <Route path="/note/:id" element={<NotePage />} />
           <Route path="/trash" element={<TrashPage />} />
