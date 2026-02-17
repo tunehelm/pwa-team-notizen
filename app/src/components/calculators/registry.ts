@@ -10,9 +10,11 @@ import { PfRatioCalculator } from './PfRatioCalculator'
 import { GcsCalculator } from './GcsCalculator'
 import { BeCorrectionCalculator } from './BeCorrectionCalculator'
 import { MannitolCalculator } from './MannitolCalculator'
+import { IsofluraneSedationCalculator } from './IsofluraneSedationCalculator'
 
 export type CalculatorType =
   | 'dantrolene'
+  | 'isoflurane-sedation'
   | 'mannitol-osmofundin'
   | 'noradrenaline-perfusor'
   | 'heparin'
@@ -48,6 +50,32 @@ export const CALCULATORS: Record<CalculatorType, CalculatorDef> = {
       label: 'Dantrolen (Agilus) 120 mg',
     },
     Component: DantroleneCalculator as ComponentType<CalculatorBlockProps>,
+  },
+  'isoflurane-sedation': {
+    title: 'Isofluran ICU Rechner (PRO V4)',
+    defaultConfig: {
+      version: 1,
+      label: 'Isofluran ICU Rechner (PRO V4)',
+      input: {
+        weightKg: 80,
+        age: 60,
+        temperatureC: 37,
+        rass: -3,
+        opioidMlPerH: 0,
+        opioidUgPerMl: 0,
+        midaMlPerH: 0,
+        midaMgPerMl: 0,
+        propMlPerH: 0,
+        propMgPerMl: 0,
+        dexMlPerH: 0,
+        dexUgPerMl: 0,
+        alcoholFactor: 1,
+        minuteVolumeLMin: 8,
+      },
+      rassValue: -3,
+      macOverride: null,
+    },
+    Component: IsofluraneSedationCalculator,
   },
   'mannitol-osmofundin': {
     title: 'Mannitol / Osmofundin 15 %',
@@ -125,6 +153,7 @@ export const CALCULATORS: Record<CalculatorType, CalculatorDef> = {
 
 export const CALCULATOR_TYPES: CalculatorType[] = [
   'dantrolene',
+  'isoflurane-sedation',
   'mannitol-osmofundin',
   'noradrenaline-perfusor',
   'heparin',
