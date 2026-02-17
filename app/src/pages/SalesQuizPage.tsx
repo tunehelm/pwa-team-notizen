@@ -16,6 +16,7 @@ type Challenge = {
   vote_deadline_at: string;
   freeze_at: string;
   reveal_at: string;
+  ends_at: string;
 };
 
 type Entry = {
@@ -30,6 +31,8 @@ type Entry = {
   draft_text: string | null;
   my_card_color: string | null;
   locked_at: string | null;
+  winner_notes_md: string | null;
+  winner_notes_updated_at?: string | null;
 };
 
 type Vote = { entry_id: string; weight: number };
@@ -79,7 +82,7 @@ export function SalesQuizPage() {
 
       const { data: chData, error: chErr } = await supabase
         .from("sales_challenges")
-        .select("id, week_key, title, original_text, context_md, rules_md, status, edit_deadline_at, vote_deadline_at, freeze_at, reveal_at")
+        .select("id, week_key, title, original_text, context_md, rules_md, status, edit_deadline_at, vote_deadline_at, freeze_at, reveal_at, ends_at")
         .eq("week_key", weekKey)
         .in("status", ["active", "frozen", "revealed"])
         .maybeSingle();
@@ -100,7 +103,7 @@ export function SalesQuizPage() {
 
       const { data: entriesData, error: entriesErr } = await supabase
         .from("sales_entries")
-        .select("id, challenge_id, author_user_id, author_initials, source, is_published, published_at, text, draft_text, my_card_color, locked_at")
+        .select("id, challenge_id, author_user_id, author_initials, source, is_published, published_at, text, draft_text, my_card_color, locked_at, winner_notes_md, winner_notes_updated_at")
         .eq("challenge_id", chData.id)
         .eq("is_published", true);
 
@@ -416,6 +419,9 @@ export function SalesQuizPage() {
             winners={winners}
             entries={entries}
             originalText={challenge.original_text}
+            currentUserId={userId}
+            endsAt={challenge.ends_at}
+            onRefresh={loadData}
           />
         ) : (
           <section>
@@ -445,16 +451,24 @@ function RevealPodium({
   winners,
   entries,
   originalText,
+  currentUserId,
+  endsAt,
+  onRefresh,
 }: {
   challengeId: string;
   winners: Winner;
   entries: Entry[];
   originalText: string | null;
+  currentUserId: string | null;
+  endsAt: string;
+  onRefresh: () => void;
 }) {
   const top3 = [winners.place1_entry_id, winners.place2_entry_id, winners.place3_entry_id]
     .filter(Boolean)
     .map((id) => entries.find((e) => e.id === id))
     .filter(Boolean) as Entry[];
+
+  const canEditWinnerNotes = endsAt ? new Date(endsAt) > new Date() : false;
 
   if (top3.length === 0) {
     return (
@@ -471,24 +485,18 @@ function RevealPodium({
     );
   }
 
-  // TODO: Winner Notes Markdown anzeigen, wenn sales_winners um ein notes-Feld ergänzt wird
   return (
     <section className="overflow-auto">
       <h2 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">🏆 Podium (Top 3)</h2>
       <div className="space-y-3">
         {top3.map((entry, i) => (
-          <div
+          <RevealPodiumCard
             key={entry.id}
-            className={`min-w-0 rounded-2xl border-2 p-4 ${
-              i === 0 ? "border-amber-400 dark:border-amber-600" : i === 1 ? "border-slate-300 dark:border-slate-600" : "border-amber-700 dark:border-amber-900"
-            }`}
-          >
-            <p className="text-xs font-medium text-[var(--color-text-muted)]">Platz {i + 1}</p>
-            <p className="mt-1 whitespace-pre-wrap text-[var(--color-text-primary)]">{entry.text}</p>
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              {entry.source === "ai" ? "KI" : entry.author_initials || "—"}
-            </p>
-          </div>
+            entry={entry}
+            place={i + 1}
+            canEdit={canEditWinnerNotes && currentUserId === entry.author_user_id}
+            onSaved={onRefresh}
+          />
         ))}
       </div>
       <p className="mt-2 text-xs text-[var(--color-text-muted)]">Gesamt: {winners.total_votes} Stimmen</p>
@@ -499,5 +507,97 @@ function RevealPodium({
         </div>
       )}
     </section>
+  );
+}
+
+function RevealPodiumCard({
+  entry,
+  place,
+  canEdit,
+  onSaved,
+}: {
+  entry: Entry;
+  place: number;
+  canEdit: boolean;
+  onSaved: () => void;
+}) {
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [draftNotes, setDraftNotes] = useState(entry.winner_notes_md ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setDraftNotes(entry.winner_notes_md ?? "");
+  }, [entry.winner_notes_md]);
+
+  const borderClass =
+    place === 1 ? "border-amber-400 dark:border-amber-600" : place === 2 ? "border-slate-300 dark:border-slate-600" : "border-amber-700 dark:border-amber-900";
+
+  const saveNotes = useCallback(async () => {
+    setSaving(true);
+    setSaved(false);
+    const { error } = await supabase
+      .from("sales_entries")
+      .update({
+        winner_notes_md: draftNotes.trim() || null,
+        winner_notes_updated_at: new Date().toISOString(),
+      })
+      .eq("id", entry.id);
+    setSaving(false);
+    if (!error) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      onSaved();
+    }
+  }, [entry.id, draftNotes, onSaved]);
+
+  return (
+    <div className={`min-w-0 rounded-2xl border-2 p-4 ${borderClass}`}>
+      <p className="text-xs font-medium text-[var(--color-text-muted)]">Platz {place}</p>
+      <p className="mt-1 whitespace-pre-wrap text-[var(--color-text-primary)]">{entry.text}</p>
+      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+        {entry.source === "ai" ? "KI" : entry.author_initials || "—"}
+      </p>
+      {entry.winner_notes_md && (
+        <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-page)] p-2 text-sm text-[var(--color-text-secondary)]">
+          <p className="text-xs font-medium text-[var(--color-text-muted)]">Notiz</p>
+          <div className="prose prose-sm dark:prose-invert mt-1" dangerouslySetInnerHTML={{ __html: entry.winner_notes_md.replace(/\n/g, "<br />") }} />
+        </div>
+      )}
+      {canEdit && (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setNotesOpen((o) => !o)}
+            className="text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+          >
+            {notesOpen ? "▼" : "▶"} Deine Notiz (optional)
+          </button>
+          {notesOpen && (
+            <div className="mt-2 space-y-2">
+              <textarea
+                value={draftNotes}
+                onChange={(e) => setDraftNotes(e.target.value)}
+                placeholder="Kurzer Kommentar (wird im Best-of archiviert)"
+                rows={2}
+                className="w-full resize-none rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-page)] px-2 py-1.5 text-sm"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void saveNotes()}
+                  disabled={saving}
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] px-2 py-1 text-xs font-medium disabled:opacity-50"
+                >
+                  {saving ? "…" : "Speichern"}
+                </button>
+                {saved && <span className="text-xs text-emerald-600 dark:text-emerald-400">Gespeichert</span>}
+              </div>
+              <p className="text-xs text-[var(--color-text-muted)]">Wird im Best-of archiviert.</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
