@@ -504,6 +504,7 @@ function RevealPodium({
     );
   }
 
+  // TODO: Winner Notes Markdown anzeigen, wenn sales_winners um ein notes-Feld ergänzt wird
   return (
     <section className="overflow-auto">
       <h2 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">🏆 Podium (Top 3)</h2>
