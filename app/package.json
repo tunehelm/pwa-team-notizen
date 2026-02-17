@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "docs:drift": "node scripts/checkDocsDrift.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
