@@ -170,6 +170,7 @@ export function SalesQuizPage() {
   const voteLocked = challenge?.vote_deadline_at ? new Date(challenge.vote_deadline_at) <= now : true;
   const isFrozen = challenge?.freeze_at ? new Date(challenge.freeze_at) <= now : false;
 
+  // Shuffle pro Page-Load (loadCounter), stabil solange Liste gleich bleibt (challenge + entry ids)
   const shuffledEntries = useMemo(
     () => shuffle([...entries]),
     [loadCounter, challenge?.id, entries.map((e) => e.id).sort().join(",")]
