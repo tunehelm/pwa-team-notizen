@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import { SidebarLayout } from "../components/SidebarLayout";
 import { supabase } from "../lib/supabase";
 import { getWeekKey } from "../lib/salesChallengeUtils";
@@ -76,18 +75,6 @@ export function SalesQuizPage() {
 
   const weekKey = useMemo(() => getWeekKey(new Date()), []);
   const [userId, setUserId] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
-
-  const now = useMemo(() => {
-    if (import.meta.env.DEV) {
-      const debugTime = searchParams.get("debugTime");
-      if (debugTime) {
-        const t = new Date(debugTime);
-        if (!Number.isNaN(t.getTime())) return t;
-      }
-    }
-    return new Date();
-  }, [searchParams]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -177,6 +164,7 @@ export function SalesQuizPage() {
 
   const totalVotes = winners?.total_votes ?? liveTotalVotes ?? 0;
   const myVotesUsed = myVotes.reduce((s, v) => s + v.weight, 0);
+  const now = new Date();
   const isRevealed = challenge?.status === "revealed" || (challenge?.reveal_at && new Date(challenge.reveal_at) <= now);
   const editLocked = challenge?.edit_deadline_at ? new Date(challenge.edit_deadline_at) <= now : true;
   const voteLocked = challenge?.vote_deadline_at ? new Date(challenge.vote_deadline_at) <= now : true;
