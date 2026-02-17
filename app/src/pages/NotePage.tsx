@@ -232,6 +232,21 @@ function NoteEditor({
     setEditorMounted(!!node)
   }, [])
 
+  /** Entfernt einen Smart-Block aus dem Editor und speichert. Optional: folgendes leeres <p><br></p> mit entfernen. */
+  function removeSmartBlock(el: HTMLElement) {
+    const editor = editorRef.current
+    if (!editor || !editor.contains(el)) return
+    const next = el.nextElementSibling
+    if (next?.tagName === 'P') {
+      const text = next.textContent?.replace(/\s/g, '') ?? ''
+      const brOnly = next.innerHTML === '<br>' || next.innerHTML === '<br/>' || (text === '' && next.querySelector('br'))
+      if (brOnly) next.remove()
+    }
+    el.remove()
+    editor.focus()
+    syncEditorContent()
+  }
+
   /** Mounts Smart Blocks ([data-smart-block]) as React components. Fallback: kaputter JSON → Block ignorieren. */
   function mountSmartBlocks(container: HTMLElement) {
     const blocks = container.querySelectorAll<HTMLElement>('[data-smart-block="calculator"]')
@@ -245,7 +260,12 @@ function NoteEditor({
         return
       }
       const root = (el as unknown as { __smartBlockRoot?: ReturnType<typeof createRoot> }).__smartBlockRoot
-      const component = <DantroleneCalculator config={config as DantroleneCalculatorConfig} />
+      const component = (
+        <DantroleneCalculator
+          config={config as DantroleneCalculatorConfig}
+          onRemove={() => removeSmartBlock(el)}
+        />
+      )
       if (root) {
         root.render(component)
       } else {

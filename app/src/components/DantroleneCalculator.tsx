@@ -21,9 +21,10 @@ const deFormat = (n: number, decimals: number) =>
 
 interface DantroleneCalculatorProps {
   config?: DantroleneCalculatorConfig | null
+  onRemove?: () => void
 }
 
-export function DantroleneCalculator({ config }: DantroleneCalculatorProps) {
+export function DantroleneCalculator({ config, onRemove }: DantroleneCalculatorProps) {
   const c = { ...DEFAULTS, ...config }
   const [weightInput, setWeightInput] = useState('')
 
@@ -58,13 +59,26 @@ export function DantroleneCalculator({ config }: DantroleneCalculatorProps) {
         color: 'var(--color-text-primary)',
       }}
     >
-      <div className="mb-3">
-        <div className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-          {title}
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div>
+          <div className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+            {title}
+          </div>
+          <div className="mt-0.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            {metaLine}
+          </div>
         </div>
-        <div className="mt-0.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          {metaLine}
-        </div>
+        {onRemove != null && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="shrink-0 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-red-500/20 hover:text-red-400"
+            style={{ color: 'var(--color-text-muted)' }}
+            title="Block entfernen"
+          >
+            🗑 Entfernen
+          </button>
+        )}
       </div>
       <div className="flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-1">
