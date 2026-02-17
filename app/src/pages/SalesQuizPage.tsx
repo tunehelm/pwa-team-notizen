@@ -454,7 +454,7 @@ export function SalesQuizPage() {
                             <button
                               type="button"
                               onClick={() => setVote(entry.id, vote === 0 ? 1 : vote === 1 ? 2 : 0)}
-                              className="rounded-lg bg-blue-500 px-2 py-1 text-xs font-medium text-white"
+                              className="rounded-lg bg-blue-500 px-2 py-1 text-xs font-medium text-white transition-transform duration-150 active:scale-95"
                             >
                               {vote === 0 ? "0 → 1" : vote === 1 ? "1 → 2" : "2 → 0"}
                             </button>
