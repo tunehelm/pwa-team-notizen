@@ -14,25 +14,50 @@ serve(async (req) => {
     }
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-    const weekKey = getWeekKey(new Date())
-    const { data: challenge, error: updateError } = await supabase
+    const now = new Date()
+    const weekKey = getWeekKey(now)
+    const { data: challenge, error: fetchError } = await supabase
       .from("sales_challenges")
-      .update({ status: "frozen" })
+      .select("id, freeze_at, status")
       .eq("week_key", weekKey)
-      .in("status", ["active"])
-      .select("id")
+      .in("status", ["active", "frozen", "revealed"])
       .maybeSingle()
 
-    if (updateError) {
-      console.error("[sales-freeze] update error", updateError)
-      return new Response(JSON.stringify({ error: updateError.message }), { status: 500 })
+    if (fetchError) {
+      console.error("[sales-freeze] fetch error", fetchError)
+      return new Response(JSON.stringify({ error: fetchError.message }), { status: 500 })
     }
 
     if (!challenge) {
       return new Response(
-        JSON.stringify({ ok: true, message: "No active challenge to freeze", week_key: weekKey }),
+        JSON.stringify({ ok: true, message: "No challenge for this week", week_key: weekKey }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       )
+    }
+
+    if (challenge.status !== "active") {
+      return new Response(
+        JSON.stringify({ ok: true, message: "Challenge already frozen or revealed", week_key: weekKey }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    }
+
+    const freezeAt = challenge.freeze_at ? new Date(challenge.freeze_at) : null
+    if (freezeAt && now < freezeAt) {
+      return new Response(
+        JSON.stringify({ ok: true, message: "Freeze not yet (freeze_at in future)", week_key: weekKey }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    }
+
+    const { error: updateError } = await supabase
+      .from("sales_challenges")
+      .update({ status: "frozen" })
+      .eq("id", challenge.id)
+
+    if (updateError) {
+      console.error("[sales-freeze] update error", updateError)
+      return new Response(JSON.stringify({ error: updateError.message }), { status: 500 })
     }
 
     return new Response(
