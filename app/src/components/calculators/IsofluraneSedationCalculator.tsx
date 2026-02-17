@@ -1,6 +1,12 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import type { CalculatorBlockProps } from './registry'
 import { calculateIso, type IsoInput, type IsoResult } from '../../lib/iso/calculateIso'
+
+export type AlcoholMode = 'none' | 'chronic' | 'acute'
+
+const ALCOHOL_MODE_FACTOR: Record<AlcoholMode, number> = { none: 1.0, chronic: 1.2, acute: 0.8 }
+
+const ALCOHOL_TOOLTIP = 'Alkohol kann den MAC-Bedarf beeinflussen. Diese Auswahl ist eine grobe klinische Orientierung und ersetzt keine ärztliche Beurteilung. Bei Unsicherheit bitte auf \'Kein Alkohol-Effekt\' belassen.'
 
 const deFormat = (n: number, decimals: number) =>
   n.toLocaleString('de-DE', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
@@ -33,6 +39,7 @@ export type IsoSedationBlockState = {
   version: 1
   label?: string
   defaultClinicalOn?: boolean
+  alcoholMode?: AlcoholMode
   input: IsoInput
   rassValue: number
   macOverride: number | null
@@ -49,6 +56,72 @@ const inputStyle = {
   color: 'var(--color-text-primary)',
 } as const
 
+const ALCOHOL_OPTIONS: { value: AlcoholMode; label: string }[] = [
+  { value: 'none', label: 'Kein Alkohol-Effekt (Standard)' },
+  { value: 'chronic', label: 'Chronisch alkoholkrank (Bedarf eher ↑)' },
+  { value: 'acute', label: 'Akute Intoxikation (Bedarf eher ↓)' },
+]
+
+function AlcoholInfoTooltip() {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [open])
+  return (
+    <div className="relative inline-flex align-middle" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-xs font-medium transition-colors hover:bg-[var(--color-border)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+        style={{ color: 'var(--color-text-muted)' }}
+        aria-label="Info Alkohol"
+        aria-expanded={open}
+      >
+        i
+      </button>
+      {open && (
+        <div
+          className="absolute left-full top-1/2 z-50 ml-1.5 max-w-xs -translate-y-1/2 rounded-xl border p-2.5 text-xs shadow-lg"
+          style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-secondary)' }}
+          role="tooltip"
+        >
+          {ALCOHOL_TOOLTIP}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AlcoholSelector({ value, onChange }: { value: AlcoholMode; onChange: (m: AlcoholMode) => void }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-1">
+        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Alkohol (Einfluss auf Sedierungsbedarf)</span>
+        <AlcoholInfoTooltip />
+      </div>
+      <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap">
+        {ALCOHOL_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={`rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${value === opt.value ? 'border-blue-500 bg-blue-500/20' : ''}`}
+            style={value === opt.value ? {} : { borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function IsofluraneSedationCalculator({ config, onRemove, onDuplicate, onUpdateConfig }: CalculatorBlockProps) {
   const c = (config ?? {}) as Partial<IsoSedationBlockState>
   const savedInput = (c.input ?? {}) as Partial<IsoInput>
@@ -56,11 +129,22 @@ export function IsofluraneSedationCalculator({ config, onRemove, onDuplicate, on
   const savedMacOverride = c.macOverride != null && Number.isFinite(c.macOverride) ? c.macOverride : null
   const label = (c.label as string) ?? DEFAULT_LABEL
 
+  function migrateAlcoholMode(): AlcoholMode {
+    const mode = c.alcoholMode as AlcoholMode | undefined
+    if (mode === 'none' || mode === 'chronic' || mode === 'acute') return mode
+    const factor = savedInput.alcoholFactor
+    if (typeof factor === 'number') {
+      if (factor <= 0.9) return 'acute'
+      if (factor >= 1.1) return 'chronic'
+    }
+    return 'none'
+  }
+
   const [weightStr, setWeightStr] = useState(String(savedInput.weightKg ?? DEFAULT_INPUT.weightKg))
   const [ageStr, setAgeStr] = useState(String(savedInput.age ?? DEFAULT_INPUT.age))
   const [tempStr, setTempStr] = useState(String(savedInput.temperatureC ?? DEFAULT_INPUT.temperatureC))
   const [mvStr, setMvStr] = useState(String(savedInput.minuteVolumeLMin ?? DEFAULT_INPUT.minuteVolumeLMin))
-  const [alcoholStr, setAlcoholStr] = useState(String(savedInput.alcoholFactor ?? DEFAULT_INPUT.alcoholFactor))
+  const [alcoholMode, setAlcoholMode] = useState<AlcoholMode>(migrateAlcoholMode())
   const [rassValue, setRassValue] = useState(savedRass)
   const [macOverrideStr, setMacOverrideStr] = useState(savedMacOverride != null ? String(savedMacOverride) : '')
   const [opioidMlStr, setOpioidMlStr] = useState(String(savedInput.opioidMlPerH ?? 0))
@@ -90,9 +174,10 @@ export function IsofluraneSedationCalculator({ config, onRemove, onDuplicate, on
     propMgPerMl: parseNum(propMgStr, 0),
     dexMlPerH: parseNum(dexMlStr, 0),
     dexUgPerMl: parseNum(dexUgStr, 0),
-    alcoholFactor: parseNum(alcoholStr, 1),
+    alcoholFactor: ALCOHOL_MODE_FACTOR[alcoholMode],
+    alcoholMode,
     minuteVolumeLMin: parseNum(mvStr, DEFAULT_INPUT.minuteVolumeLMin),
-  }), [weightStr, ageStr, tempStr, rassValue, macOverrideStr, opioidMlStr, opioidUgStr, midaMlStr, midaMgStr, propMlStr, propMgStr, dexMlStr, dexUgStr, alcoholStr, mvStr])
+  }), [weightStr, ageStr, tempStr, rassValue, macOverrideStr, opioidMlStr, opioidUgStr, midaMlStr, midaMgStr, propMlStr, propMgStr, dexMlStr, dexUgStr, alcoholMode, mvStr])
 
   const result: IsoResult | null = useMemo(() => {
     if (input.weightKg <= 0 || input.minuteVolumeLMin <= 0) return null
@@ -117,21 +202,22 @@ export function IsofluraneSedationCalculator({ config, onRemove, onDuplicate, on
         propMgPerMl: parseNum(propMgStr, 0),
         dexMlPerH: parseNum(dexMlStr, 0),
         dexUgPerMl: parseNum(dexUgStr, 0),
-        alcoholFactor: parseNum(alcoholStr, 1),
+        alcoholFactor: ALCOHOL_MODE_FACTOR[alcoholMode],
         minuteVolumeLMin: parseNum(mvStr, DEFAULT_INPUT.minuteVolumeLMin),
       },
+      alcoholMode,
       rassValue,
       macOverride: macOverrideStr.trim() !== '' ? parseNum(macOverrideStr, 0.5) : null,
     }
     onUpdateConfig?.(payload)
-  }, [onUpdateConfig, label, weightStr, ageStr, tempStr, mvStr, alcoholStr, rassValue, macOverrideStr, opioidMlStr, opioidUgStr, midaMlStr, midaMgStr, propMlStr, propMgStr, dexMlStr, dexUgStr])
+  }, [onUpdateConfig, label, weightStr, ageStr, tempStr, mvStr, alcoholMode, rassValue, macOverrideStr, opioidMlStr, opioidUgStr, midaMlStr, midaMgStr, propMlStr, propMgStr, dexMlStr, dexUgStr])
 
   const handleReset = useCallback(() => {
     setWeightStr(String(DEFAULT_INPUT.weightKg))
     setAgeStr(String(DEFAULT_INPUT.age))
     setTempStr(String(DEFAULT_INPUT.temperatureC))
     setMvStr(String(DEFAULT_INPUT.minuteVolumeLMin))
-    setAlcoholStr(String(DEFAULT_INPUT.alcoholFactor))
+    setAlcoholMode('none')
     setRassValue(-3)
     setMacOverrideStr('')
     setOpioidMlStr('0')
@@ -160,7 +246,6 @@ export function IsofluraneSedationCalculator({ config, onRemove, onDuplicate, on
   const warnAge = input.age < 16 || input.age > 100
   const warnTemp = input.temperatureC < 32 || input.temperatureC > 41
   const warnMv = input.minuteVolumeLMin > 0 && (input.minuteVolumeLMin < 2 || input.minuteVolumeLMin > 30)
-  const warnAlcohol = input.alcoholFactor < 0.5 || input.alcoholFactor > 1.5
 
   return (
     <div
@@ -214,13 +299,7 @@ export function IsofluraneSedationCalculator({ config, onRemove, onDuplicate, on
               ))}
             </div>
           </label>
-          <label className="flex flex-col gap-0.5">
-            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Alkohol-Faktor</span>
-            <div className="flex items-center gap-1">
-              <input type="text" inputMode="decimal" value={alcoholStr} onChange={(e) => setAlcoholStr(e.target.value)} className="h-9 w-14 rounded-lg border px-2 text-sm focus:border-blue-500 focus:outline-none" style={inputStyle} />
-              <button type="button" onClick={() => setAlcoholStr('1')} className="rounded border px-1.5 py-0.5 text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>1,0</button>
-            </div>
-          </label>
+          <AlcoholSelector value={alcoholMode} onChange={setAlcoholMode} />
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
@@ -270,9 +349,9 @@ export function IsofluraneSedationCalculator({ config, onRemove, onDuplicate, on
         </div>
       </div>
 
-      {(warnWeight || warnAge || warnTemp || warnMv || warnAlcohol) && (
+      {(warnWeight || warnAge || warnTemp || warnMv) && (
         <p className="mt-1.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          Hinweis: Werte außerhalb typischer Bereiche (kg 20–250, Alter 16–100, Temp 32–41 °C, MV 2–30 L/min, Alkohol 0,5–1,5).
+          Hinweis: Werte außerhalb typischer Bereiche (kg 20–250, Alter 16–100, Temp 32–41 °C, MV 2–30 L/min).
         </p>
       )}
 

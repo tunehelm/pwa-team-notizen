@@ -19,6 +19,7 @@ export type IsoInput = {
   dexMlPerH: number
   dexUgPerMl: number
   alcoholFactor: number
+  alcoholMode?: 'none' | 'chronic' | 'acute'
   minuteVolumeLMin: number
 }
 
@@ -201,6 +202,13 @@ export function calculateIso(input: IsoInput): IsoResult {
     flags.push({ level: 'ok', title: 'TargetMAC Override aktiv' })
   }
 
+  const alcoholMode = input.alcoholMode ?? 'none'
+  if (alcoholMode === 'chronic') {
+    flags.push({ level: 'ok', title: 'Chronischer Alkohol: Sedierungsbedarf kann erhöht sein' })
+  } else if (alcoholMode === 'acute') {
+    flags.push({ level: 'warn', title: 'Akute Intoxikation: Sedierungsbedarf kann reduziert sein' })
+  }
+
   if (opioidFactor <= 0.65 || propFactor <= 0.7) {
     flags.push({ level: 'ok', title: 'Ko-Sedierung reduziert MAC' })
   }
@@ -208,6 +216,7 @@ export function calculateIso(input: IsoInput): IsoResult {
   const summary = `Ziel-Fet: ${fetIso.toFixed(2)}% • Verbrauch: ${isoConsumptionMlH.toFixed(1)} ml/h • MV: ${minuteVolumeLMin} L/min`
 
   // —— Explain: formulas, sources, assumptions ——
+  const alcoholExplainResult: number | string = alcoholMode !== 'none' ? `${alcoholFactor} (Modus: ${alcoholMode})` : alcoholFactor
   const formulas: ExplainItem[] = [
     { label: 'Age MAC', formula: 'MAC_age = MAC40 * (1 - 0.06 * ((age-40)/10))', values: { MAC40, age }, result: macAge },
     { label: 'Temp factor', formula: 'tempFactor = 1 - 0.05 * (37 - T)', values: { T: temperatureC }, result: tempFactor },
@@ -216,6 +225,7 @@ export function calculateIso(input: IsoInput): IsoResult {
     { label: 'Mida', formula: 'mg/kg/h → factor', values: { midaMgKgH, midaFactor }, result: midaFactor },
     { label: 'Prop', formula: 'mg/kg/h → factor', values: { propMgKgH, propFactor }, result: propFactor },
     { label: 'Dex', formula: 'µg/kg/h → factor', values: { dexUgKgH, dexFactor }, result: dexFactor },
+    { label: 'Alkohol-Faktor', formula: 'alcoholFactor (Modus)', values: { factor: alcoholFactor, modus: alcoholMode }, result: alcoholExplainResult },
     { label: 'MAC effective', formula: 'MAC_age × opioidF × midaF × propF × dexF × alcoholF × tempF', values: { macAge, opioidFactor, midaFactor, propFactor, dexFactor, alcoholFactor, tempFactor }, result: macEffective },
     { label: 'FetIso', formula: 'FetIso = MAC_effective * sedationTarget', values: { macEffective, sedationTarget }, result: fetIso },
     { label: 'Consumption', formula: 'Consumption = (FetIso/100) * MV * 60 * 3', values: { fetIso, MV: minuteVolumeLMin }, result: isoConsumptionMlH },

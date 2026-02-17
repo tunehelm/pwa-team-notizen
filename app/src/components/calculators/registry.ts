@@ -72,6 +72,7 @@ export const CALCULATORS: Record<CalculatorType, CalculatorDef> = {
         alcoholFactor: 1,
         minuteVolumeLMin: 8,
       },
+      alcoholMode: 'none',
       rassValue: -3,
       macOverride: null,
     },
