@@ -9,9 +9,11 @@ import { PbwArdsCalculator } from './PbwArdsCalculator'
 import { PfRatioCalculator } from './PfRatioCalculator'
 import { GcsCalculator } from './GcsCalculator'
 import { BeCorrectionCalculator } from './BeCorrectionCalculator'
+import { MannitolCalculator } from './MannitolCalculator'
 
 export type CalculatorType =
   | 'dantrolene'
+  | 'mannitol-osmofundin'
   | 'noradrenaline-perfusor'
   | 'heparin'
   | 'sedation-infusion'
@@ -46,6 +48,15 @@ export const CALCULATORS: Record<CalculatorType, CalculatorDef> = {
       label: 'Dantrolen (Agilus) 120 mg',
     },
     Component: DantroleneCalculator as ComponentType<CalculatorBlockProps>,
+  },
+  'mannitol-osmofundin': {
+    title: 'Mannitol / Osmofundin 15 %',
+    defaultConfig: {
+      label: 'Mannitol / Osmofundin 15 %',
+      doseGPerKg: 0.5,
+      concentrationGPerMl: 0.15,
+    },
+    Component: MannitolCalculator,
   },
   'noradrenaline-perfusor': {
     title: 'Noradrenalin Perfusor',
@@ -114,6 +125,7 @@ export const CALCULATORS: Record<CalculatorType, CalculatorDef> = {
 
 export const CALCULATOR_TYPES: CalculatorType[] = [
   'dantrolene',
+  'mannitol-osmofundin',
   'noradrenaline-perfusor',
   'heparin',
   'sedation-infusion',
