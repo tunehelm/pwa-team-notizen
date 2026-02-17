@@ -13,56 +13,76 @@
 
 **Reihenfolge Montag 11:00:** Zuerst **Archive** (Vorwoche), danach **Week Start** (neue Woche).
 
-## Cron-Ausdrücke
+## Vercel Cron (aktiv)
 
-Supabase hat kein eingebautes Cron für Edge Functions. Optionen:
+Die App nutzt **Vercel Cron** über geschützte API-Routen (`app/api/cron/*`). Die Routen rufen die Supabase Edge Functions mit Service-Role auf; Secrets bleiben serverseitig (nur ENV).
 
-### Option A: Vercel Cron
+### ENV-Variablen (Vercel Dashboard → Project → Settings → Environment Variables)
 
-Zeiten in **UTC** (Berlin Winter UTC+1, Sommer UTC+2). Beispiel Winter:
+| Variable | Beschreibung |
+|----------|--------------|
+| `SUPABASE_URL` | Supabase Projekt-URL (z. B. `https://<project-ref>.supabase.co`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service-Role-Key aus Supabase (API → service_role) |
+| `CRON_SECRET` | Geheimes Token; Cron-Requests müssen Header `x-cron-secret: <CRON_SECRET>` senden. |
+| `CRON_ENABLED` | `true` = Cron ausführen; anders (oder nicht gesetzt) = sofort 200 "Cron disabled", kein Aufruf an Supabase. |
 
-```json
-{
-  "crons": [
-    { "path": "/api/cron/sales-archive", "schedule": "0 10 * * 1" },
-    { "path": "/api/cron/sales-week-start", "schedule": "0 10 * * 1" },
-    { "path": "/api/cron/sales-freeze", "schedule": "0 14 * * 5" },
-    { "path": "/api/cron/sales-reveal", "schedule": "0 15 * * 5" }
-  ]
-}
+### Cron deaktivieren
+
+- In Vercel: `CRON_ENABLED` auf etwas anderes setzen als `true` (z. B. `false` oder Variable entfernen). Dann liefern alle Cron-Endpoints sofort 200 mit `{ "cron": "disabled" }` zurück, ohne Supabase zu callen.
+
+### Schedules (vercel.json, UTC)
+
+- **sales-archive:** täglich 09:05 UTC (`5 9 * * *`) – entspricht ~10:05 CET / 11:05 CEST.
+- **sales-week-start:** täglich 09:10 UTC (`10 9 * * *`) – 5 min nach Archive (Reihenfolge Montag: erst Archive, dann Week-Start).
+- **sales-freeze:** alle 10 Minuten (`*/10 * * * *`).
+- **sales-reveal:** alle 10 Minuten (`*/10 * * * *`).
+
+Die Supabase-Functions prüfen intern `now >= freeze_at` / `now >= reveal_at` und sind idempotent. Dadurch ist **DST (Winter-/Sommerzeit) unkritisch**: Die Cron-Jobs laufen regelmäßig, die Logik entscheidet, ob gerade Aktion nötig ist.
+
+### Cron manuell testen (POST mit Secret)
+
+```bash
+# Basis-URL deiner App (Vercel Preview oder Production)
+BASE="https://<deine-app>.vercel.app"
+
+curl -X POST "${BASE}/api/cron/sales-archive" \
+  -H "x-cron-secret: <CRON_SECRET>"
+
+curl -X POST "${BASE}/api/cron/sales-week-start" \
+  -H "x-cron-secret: <CRON_SECRET>"
 ```
 
-Die API-Routen müssen die Supabase Edge Function per `fetch` mit Service-Role/Secret aufrufen.
+Ohne gültiges `x-cron-secret` oder mit `CRON_ENABLED !== 'true'`: 401 bzw. 200 "Cron disabled".
 
-### Option B: Externer Cron (z. B. cron-job.org)
+---
 
-- Montag 11:00 Berlin: `sales-archive-and-rollover`, dann `sales-week-start`
-- Freitag 15:00: `sales-freeze`
-- Freitag 16:00: `sales-reveal`
+## Weitere Optionen (ohne Vercel Cron)
 
-URLs: `https://<project-ref>.supabase.co/functions/v1/<function-name>`
+### Externer Cron (z. B. cron-job.org)
 
-### Option C: Supabase Scheduled Triggers (pg_cron)
+- Montag 11:00 Berlin: zuerst Archive, dann Week-Start.
+- Freitag 15:00: Freeze; Freitag 16:00: Reveal.
+- URLs: `https://<deine-app>.vercel.app/api/cron/sales-archive` etc., mit Header `x-cron-secret`.
+
+### Supabase Scheduled Triggers (pg_cron)
 
 Falls ihr pg_cron nutzt: HTTP-Requests an Edge Functions erfordern z. B. die Extension `pg_net` oder einen externen Aufruf.
 
 ## Manuell triggern
 
-Aus dem Projektroot (oder mit curl):
+**Empfohlen (über Vercel API):** Siehe Abschnitt „Cron manuell testen“ oben (POST an `/api/cron/...` mit `x-cron-secret`).
+
+**Direkt Supabase (falls ohne Vercel):**
 
 ```bash
-# Projekt-Ref aus Supabase Dashboard → Project Settings → General
 PROJECT_REF="<dein-project-ref>"
 BASE="https://${PROJECT_REF}.supabase.co/functions/v1"
-
-# Mit Anon Key (falls Function öffentlich) oder Service Role Key
-curl -X POST "${BASE}/sales-week-start" -H "Authorization: Bearer <KEY>"
-curl -X POST "${BASE}/sales-freeze"    -H "Authorization: Bearer <KEY>"
-curl -X POST "${BASE}/sales-reveal"   -H "Authorization: Bearer <KEY>"
+# Mit Service Role Key
 curl -X POST "${BASE}/sales-archive-and-rollover" -H "Authorization: Bearer <KEY>"
+curl -X POST "${BASE}/sales-week-start" -H "Authorization: Bearer <KEY>"
 ```
 
-**Woche manuell anstoßen:** Zuerst `sales-archive-and-rollover` (archiviert Vorwoche), dann `sales-week-start` (legt aktuelle Woche an, falls noch nicht da).
+**Reihenfolge Montag:** Zuerst Archive (Vorwoche), dann Week-Start (neue Woche).
 
 ## Idempotenz
 
