@@ -14,16 +14,32 @@ serve(async (req) => {
     }
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-    const weekKey = getWeekKey(new Date())
+    const now = new Date()
+    const weekKey = getWeekKey(now)
     const { data: challenge, error: challengeError } = await supabase
       .from("sales_challenges")
-      .select("id")
+      .select("id, status, reveal_at")
       .eq("week_key", weekKey)
       .maybeSingle()
 
     if (challengeError || !challenge) {
       return new Response(
-        JSON.stringify({ ok: false, message: "Challenge not found", week_key: weekKey }),
+        JSON.stringify({ ok: true, message: "Challenge not found", week_key: weekKey }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    }
+
+    if (challenge.status === "revealed") {
+      return new Response(
+        JSON.stringify({ ok: true, message: "Already revealed", week_key: weekKey }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    }
+
+    const revealAt = challenge.reveal_at ? new Date(challenge.reveal_at) : null
+    if (revealAt && now < revealAt) {
+      return new Response(
+        JSON.stringify({ ok: true, message: "Reveal not yet (reveal_at in future)", week_key: weekKey }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       )
     }
