@@ -38,41 +38,25 @@ Die Functions importieren aus `_shared/sales-challenge-utils.ts`. Beim Deploy wi
 
 ## Cron (Europe/Berlin)
 
-Supabase bietet kein eingebautes Cron für Edge Functions. Optionen:
+Supabase bietet kein eingebautes Cron für Edge Functions. Die App ist eine **Vite SPA** (keine Next.js), daher existieren keine Vercel API Routes – Cron läuft über einen **externen Dienst**.
 
-### Option A: Vercel Cron (empfohlen, wenn App auf Vercel läuft)
+### Empfohlen: cron-job.org (oder GitHub Actions)
 
-In `vercel.json` (oder im Vercel Dashboard unter Cron Jobs):
+- **URLs:** `https://<project-ref>.supabase.co/functions/v1/<function-name>` (sales-week-start, sales-freeze, sales-reveal, sales-archive-and-rollover).
+- **Methode:** POST.
+- **Header:** `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>`.
 
-- Zeitangaben in **UTC**. Europe/Berlin: Winter UTC+1, Sommer UTC+2.
-  - Montag 11:00 Berlin = Montag 10:00 UTC (Winter) bzw. 09:00 UTC (Sommer).
-  - Freitag 15:00 Berlin = Freitag 14:00 UTC (Winter) bzw. 13:00 UTC (Sommer).
-  - Freitag 16:00 Berlin = Freitag 15:00 UTC (Winter) bzw. 14:00 UTC (Sommer).
+Zeitpläne (cron-job.org, Zeitzone Europe/Berlin):
 
-Beispiel (Winterzeit, UTC+1):
+- **Montag 11:00:** sales-archive-and-rollover, danach (z. B. 11:05) sales-week-start.
+- **Freitag 15:00:** sales-freeze.
+- **Freitag 16:00:** sales-reveal.
 
-```json
-{
-  "crons": [
-    { "path": "/api/cron/sales-archive", "schedule": "0 10 * * 1" },
-    { "path": "/api/cron/sales-week-start", "schedule": "0 10 * * 1" },
-    { "path": "/api/cron/sales-freeze", "schedule": "0 14 * * 5" },
-    { "path": "/api/cron/sales-reveal", "schedule": "0 15 * * 5" }
-  ]
-}
-```
+Ausführliche curl-Beispiele und Tabellen: **docs/SALES_QUIZ_AUTOMATION.md**.
 
-Die Pfade `/api/cron/...` müssen in der App als Serverless Functions existieren, die die Supabase Edge Function per `fetch` aufrufen (mit Authorization Header oder Secret).
+### Vercel Cron (nicht nutzbar mit Vite)
 
-### Option B: Externer Cron (z. B. cron-job.org)
-
-- Jobs anlegen, die die Function-URLs per GET/POST aufrufen.
-- URLs: `https://<project-ref>.supabase.co/functions/v1/sales-week-start` (analog für freeze, reveal, sales-archive-and-rollover).
-- Optional: Authorization Header mit einem geheimen Token setzen und in der Edge Function prüfen.
-
-### Option C: Supabase pg_cron (nur DB)
-
-Mit `pg_cron` kann man keine HTTP-Requests an Edge Functions senden, ohne eine zusätzliche Extension (z. B. http). Daher eher Option A oder B.
+Vercel Cron kann nur **interne** Pfade (z. B. `/api/cron/...`) aufrufen. Bei einer Vite-App gibt es keine API-Routen → 404. Die ehemaligen `app/api/cron/*` wurden entfernt; siehe **docs/deprecated-cron-api.md**.
 
 ## Manueller Test
 
