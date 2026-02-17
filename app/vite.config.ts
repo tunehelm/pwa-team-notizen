@@ -12,6 +12,9 @@ export default defineConfig(({ mode }) => ({
   build: {
     minify: 'esbuild', // esbuild statt terser – vermeidet PWA-Plugin-Konflikt
   },
+  test: {
+    environment: 'node',
+  },
   plugins: [
     react(),
     tailwindcss(),
