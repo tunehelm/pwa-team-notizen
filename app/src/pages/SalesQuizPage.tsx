@@ -184,13 +184,36 @@ export function SalesQuizPage() {
 
   const getVoteForEntry = (entryId: string) => myVotes.find((v) => v.entry_id === entryId)?.weight ?? 0;
 
+  const [voteError, setVoteError] = useState<string | null>(null);
+
   const setVote = useCallback(
     async (entryId: string, nextWeight: number) => {
       if (!challenge || !userId || voteLocked) return;
+      setVoteError(null);
       const current = myVotes.find((v) => v.entry_id === entryId)?.weight ?? 0;
       const newTotal = myVotesUsed - current + nextWeight;
-      if (newTotal > 3) return;
+      if (newTotal > 3) {
+        setVoteError("Du hast keine Stimmen mehr frei.");
+        return;
+      }
       if (nextWeight > 2) return;
+
+      if (nextWeight === 0) {
+        const { error: delErr } = await supabase
+          .from("sales_votes")
+          .delete()
+          .eq("challenge_id", challenge.id)
+          .eq("entry_id", entryId)
+          .eq("voter_user_id", userId);
+        if (delErr) {
+          setVoteError("Stimme konnte nicht zurückgenommen werden.");
+          return;
+        }
+        setMyVotes((prev) => prev.filter((v) => v.entry_id !== entryId));
+        const { data: total } = await supabase.rpc("get_sales_challenge_total_votes", { p_challenge_id: challenge.id });
+        setLiveTotalVotes(typeof total === "number" ? total : 0);
+        return;
+      }
 
       const { error: upsertErr } = await supabase.from("sales_votes").upsert(
         {
@@ -201,12 +224,17 @@ export function SalesQuizPage() {
         },
         { onConflict: "challenge_id,entry_id,voter_user_id" }
       );
-      if (upsertErr) return;
+      if (upsertErr) {
+        const msg = upsertErr.message?.toLowerCase() ?? "";
+        setVoteError(msg.includes("limit") || msg.includes("constraint") ? "Du hast keine Stimmen mehr frei." : "Stimme konnte nicht gespeichert werden.");
+        return;
+      }
       setMyVotes((prev) => {
         const rest = prev.filter((v) => v.entry_id !== entryId);
-        if (nextWeight === 0) return rest;
         return [...rest, { entry_id: entryId, weight: nextWeight }];
       });
+      const { data: total } = await supabase.rpc("get_sales_challenge_total_votes", { p_challenge_id: challenge.id });
+      setLiveTotalVotes(typeof total === "number" ? total : 0);
     },
     [challenge, userId, voteLocked, myVotesUsed, myVotes]
   );
@@ -400,6 +428,9 @@ export function SalesQuizPage() {
         ) : (
           <section>
             <h2 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Varianten</h2>
+            {voteError && (
+              <p className="mb-3 text-sm text-amber-600 dark:text-amber-400">{voteError}</p>
+            )}
             {voteLocked && (
               <p className="mb-3 text-xs text-[var(--color-text-muted)]">
                 Voting geschlossen (Deadline: {challenge.vote_deadline_at ? new Date(challenge.vote_deadline_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "—"})
