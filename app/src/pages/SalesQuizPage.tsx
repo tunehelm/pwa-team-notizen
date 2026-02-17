@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { SwipeDeck } from "../components/sales/SwipeDeck";
 import { SidebarLayout } from "../components/SidebarLayout";
 import { supabase } from "../lib/supabase";
 import { getWeekKey } from "../lib/salesChallengeUtils";
@@ -39,14 +40,6 @@ type Winner = {
   place3_entry_id: string | null;
   total_votes: number;
 };
-
-const CARD_COLORS = [
-  "bg-slate-100 dark:bg-slate-800",
-  "bg-amber-50 dark:bg-amber-900/20",
-  "bg-sky-50 dark:bg-sky-900/20",
-  "bg-emerald-50 dark:bg-emerald-900/20",
-  "bg-violet-50 dark:bg-violet-900/20",
-];
 
 function shuffle<T>(arr: T[], seed?: number): T[] {
   const out = [...arr];
@@ -435,38 +428,12 @@ export function SalesQuizPage() {
                 Voting geschlossen (Deadline: {challenge.vote_deadline_at ? new Date(challenge.vote_deadline_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "—"})
               </p>
             )}
-            {shuffledEntries.length === 0 ? (
-              <p className="text-sm text-[var(--color-text-muted)]">Noch keine veröffentlichten Varianten.</p>
-            ) : (
-              <ul className="space-y-3">
-                {shuffledEntries.map((entry, idx) => {
-                  const vote = getVoteForEntry(entry.id);
-                  const colorClass = CARD_COLORS[idx % CARD_COLORS.length];
-                  return (
-                    <li
-                      key={entry.id}
-                      className={`rounded-2xl border border-[var(--color-border)] p-4 ${colorClass}`}
-                    >
-                      <p className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{entry.text}</p>
-                      <div className="mt-3 flex items-center gap-2">
-                        <span className="text-xs text-[var(--color-text-muted)]">Deine Stimmen hier: {vote}</span>
-                        {!voteLocked && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => setVote(entry.id, vote === 0 ? 1 : vote === 1 ? 2 : 0)}
-                              className="rounded-lg bg-blue-500 px-2 py-1 text-xs font-medium text-white transition-transform duration-150 active:scale-95"
-                            >
-                              {vote === 0 ? "0 → 1" : vote === 1 ? "1 → 2" : "2 → 0"}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+            <SwipeDeck
+              entries={shuffledEntries.map((e) => ({ id: e.id, text: e.text }))}
+              getMyWeight={(entryId) => getVoteForEntry(entryId) as 0 | 1 | 2}
+              onCycleVote={(entryId) => setVote(entryId, getVoteForEntry(entryId) === 0 ? 1 : getVoteForEntry(entryId) === 1 ? 2 : 0)}
+              voteLocked={voteLocked}
+            />
           </section>
         )}
       </div>
