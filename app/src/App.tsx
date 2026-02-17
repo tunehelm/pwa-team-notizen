@@ -1,84 +1,35 @@
 import { useEffect, useState } from "react";
-import type { Session } from "@supabase/supabase-js";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { DashboardPage } from "./pages/DashboardPage";
 import { FolderPage } from "./pages/FolderPage";
 import { NotePage } from "./pages/NotePage";
+import { PasswordSetupPage } from "./pages/PasswordSetupPage";
 import { PrivatePage } from "./pages/PrivatePage";
 import { SearchPage } from "./pages/SearchPage";
 import { TeamHubPage } from "./pages/TeamHubPage";
 import { TrashPage } from "./pages/TrashPage";
 import { AppDataProvider } from "./state/AppDataContext";
+import { useRequirePasswordSetup } from "./hooks/useRequirePasswordSetup";
 import { supabase } from "./lib/supabase";
 
-/** Prüft ob ein eingeloggter User noch kein Passwort gesetzt hat (Invite-User) */
-function needsPasswordSetup(session: Session | null): boolean {
-  if (!session?.user) return false;
-  // Wenn der User bereits ein Passwort gesetzt hat, steht das in den Metadaten
-  if (session.user.user_metadata?.password_set) return false;
-  // Invite-User haben oft kein confirmed_at oder es ist sehr nah am created_at
-  // Sicherste Prüfung: Hat der User das password_set Flag NICHT?
-  // Wir setzen dieses Flag beim ersten Passwort-Setzen
-  const createdAt = new Date(session.user.created_at).getTime();
-  const lastSignIn = session.user.last_sign_in_at ? new Date(session.user.last_sign_in_at).getTime() : createdAt;
-  // Wenn der User sich zum ersten Mal einloggt (weniger als 2 Min seit Erstellung)
-  // und noch kein password_set Flag hat → Passwort setzen
-  const isFirstLogin = Math.abs(lastSignIn - createdAt) < 120_000;
-  return isFirstLogin && !session.user.user_metadata?.password_set;
-}
-
 function App() {
-  const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState<Session | null>(null);
+  const { loading, session, needsPasswordSetup } = useRequirePasswordSetup();
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
-  const [isInviteMode, setIsInviteMode] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
-
-    // Prüfe ob ein Invite- oder Recovery-Token im URL-Hash liegt
     const hash = window.location.hash;
-    const isInviteHash = hash.includes('type=invite') || hash.includes('type=signup') || hash.includes('type=magiclink');
-    const isRecoveryHash = hash.includes('type=recovery');
+    const isRecoveryHash = hash.includes("type=recovery");
+    if (session && isRecoveryHash) setIsRecoveryMode(true);
+  }, [session]);
 
-    const init = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (!isMounted) return;
-
-      if (error) console.error(error);
-      const sess = data.session ?? null;
-      setSession(sess);
-
-      // Invite-User: Passwort setzen erzwingen
-      if (sess && (isInviteHash || needsPasswordSetup(sess))) {
-        setIsInviteMode(true);
-      }
-      if (isRecoveryHash && sess) {
-        setIsRecoveryMode(true);
-      }
-
-      setLoading(false);
-    };
-
-    void init();
-
-    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
-      setSession(newSession ?? null);
-      if (event === "PASSWORD_RECOVERY") {
-        setIsRecoveryMode(true);
-      }
-      // Invite-Event abfangen
-      if (event === "SIGNED_IN" && newSession && (isInviteHash || needsPasswordSetup(newSession))) {
-        setIsInviteMode(true);
-      }
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setIsRecoveryMode(true);
     });
-
-    return () => {
-      isMounted = false;
-      sub.subscription.unsubscribe();
-    };
+    return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Required render priority: loading → no session → recovery → password setup → main app
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-app)]">
@@ -92,21 +43,19 @@ function App() {
 
   if (!session) return <LoginPage />;
 
+  if (!session.user) return <LoginPage />;
+
   if (isRecoveryMode) {
     return <SetNewPasswordPage onDone={() => setIsRecoveryMode(false)} />;
   }
 
-  if (isInviteMode) {
+  if (needsPasswordSetup) {
     return (
-      <SetNewPasswordPage
+      <PasswordSetupPage
         title="Willkommen bei SM-TeamNotes!"
-        subtitle="Bitte setze ein Passwort für deinen Account."
+        subtitle="Bitte setze ein sicheres Passwort für deinen Account (mindestens 8 Zeichen)."
         buttonLabel="Passwort setzen & starten"
-        onDone={() => {
-          setIsInviteMode(false);
-          // Hash aus URL entfernen
-          window.history.replaceState(null, '', window.location.pathname);
-        }}
+        onDone={() => window.history.replaceState(null, "", window.location.pathname)}
       />
     );
   }
@@ -289,8 +238,8 @@ function SetNewPasswordPage({ onDone, title, subtitle, buttonLabel }: {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const handleSetPassword = async () => {
-    if (newPassword.length < 6) {
-      setMessage({ type: "error", text: "Das Passwort muss mindestens 6 Zeichen haben." });
+    if (newPassword.length < 8) {
+      setMessage({ type: "error", text: "Das Passwort muss mindestens 8 Zeichen haben." });
       return;
     }
     try {
@@ -319,7 +268,7 @@ function SetNewPasswordPage({ onDone, title, subtitle, buttonLabel }: {
       <div className="w-full max-w-sm">
         <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{title || "Neues Passwort setzen"}</h1>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          {subtitle || "Mindestens 6 Zeichen."}
+          {subtitle || "Mindestens 8 Zeichen."}
         </p>
 
         {message ? (
@@ -347,9 +296,9 @@ function SetNewPasswordPage({ onDone, title, subtitle, buttonLabel }: {
           <button
             type="button"
             onClick={() => void handleSetPassword()}
-            disabled={submitting || newPassword.length < 6}
+            disabled={submitting || newPassword.length < 8}
             className={`w-full rounded-xl px-4 py-3 text-sm font-semibold text-white transition-colors ${
-              submitting || newPassword.length < 6 ? "bg-slate-400" : "bg-blue-500 hover:bg-blue-600"
+              submitting || newPassword.length < 8 ? "bg-slate-400" : "bg-blue-500 hover:bg-blue-600"
             }`}
           >
             {submitting ? "Bitte warten…" : (buttonLabel || "Passwort speichern")}

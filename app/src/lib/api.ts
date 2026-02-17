@@ -48,6 +48,7 @@ const FOLDER_COLUMNS_FALLBACK = 'id,title,pinned,created_at,owner_id,parent_id,k
 const NOTE_COLUMNS = 'id,folder_id,title,content,excerpt,updated_label,pinned,created_at,updated_at,owner_id,user_id'
 const TRASH_FOLDER_COLUMNS = 'id,title,pinned,created_at,owner_id,parent_id,kind,icon,deleted_at'
 const TRASH_FOLDER_COLUMNS_FALLBACK = 'id,title,pinned,created_at,owner_id,deleted_at'
+const TRASH_FOLDER_COLUMNS_MINIMAL = 'id,deleted_at'
 const TRASH_NOTE_COLUMNS = 'id,folder_id,title,content,excerpt,updated_label,pinned,created_at,updated_at,owner_id,user_id,deleted_at'
 
 function stripHtml(value: string) {
@@ -133,6 +134,13 @@ function isMissingColumnError(error: unknown) {
   )
 }
 
+/** 400 Bad Request from PostgREST (e.g. missing column or invalid query) – try fallback select */
+function isBadRequestError(error: unknown) {
+  if (!error || typeof error !== 'object') return false
+  const status = 'status' in error ? Number((error as { status?: unknown }).status) : undefined
+  return status === 400 || isMissingColumnError(error)
+}
+
 async function selectTrashFolderById(folderId: string): Promise<TrashFolderRow> {
   const full = await supabase
     .from('trash_folders')
@@ -171,18 +179,19 @@ async function selectTrashFolderById(folderId: string): Promise<TrashFolderRow> 
 }
 
 async function selectAllTrashFolders(): Promise<TrashFolderRow[]> {
+  console.debug('[Trash] fetch start (folders)')
   const full = await supabase
     .from('trash_folders')
     .select(TRASH_FOLDER_COLUMNS)
     .order('deleted_at', { ascending: false })
 
-  console.log('[api.selectAllTrashFolders] full response', { data: full.data, error: full.error })
+  console.debug('[Trash] response', { data: full.data, error: full.error })
 
   if (!full.error) {
     return (full.data ?? []) as TrashFolderRow[]
   }
 
-  if (!isMissingColumnError(full.error)) {
+  if (!isBadRequestError(full.error)) {
     throw full.error
   }
 
@@ -191,17 +200,43 @@ async function selectAllTrashFolders(): Promise<TrashFolderRow[]> {
     .select(TRASH_FOLDER_COLUMNS_FALLBACK)
     .order('deleted_at', { ascending: false })
 
-  console.log('[api.selectAllTrashFolders] fallback response', {
-    data: fallback.data,
-    error: fallback.error,
-  })
+  console.debug('[Trash] fallback response', { data: fallback.data, error: fallback.error })
 
-  if (fallback.error) throw fallback.error
-  return ((fallback.data ?? []) as Array<Omit<TrashFolderRow, 'parent_id' | 'kind'>>).map((row) => ({
-    ...row,
-    parent_id: null,
-    kind: 'team',
-  }))
+  if (!fallback.error) {
+    return ((fallback.data ?? []) as Array<Omit<TrashFolderRow, 'parent_id' | 'kind'>>).map((row) => ({
+      ...row,
+      parent_id: null,
+      kind: 'team',
+    }))
+  }
+
+  if (!isBadRequestError(fallback.error)) {
+    throw fallback.error
+  }
+
+  const minimal = await supabase
+    .from('trash_folders')
+    .select(TRASH_FOLDER_COLUMNS_MINIMAL)
+    .order('deleted_at', { ascending: false })
+
+  console.debug('[Trash] minimal response', { data: minimal.data, error: minimal.error })
+
+  if (!minimal.error) {
+    const rows = (minimal.data ?? []) as Array<{ id: string; deleted_at: string }>
+    return rows.map((row) => ({
+      id: row.id,
+      title: '',
+      pinned: false,
+      created_at: '',
+      owner_id: '',
+      parent_id: null,
+      kind: 'team' as const,
+      deleted_at: row.deleted_at,
+    }))
+  }
+
+  console.error('[Trash] failed', full.error ?? fallback.error ?? minimal.error)
+  return []
 }
 
 async function upsertTrashFolder(sourceFolder: FolderRow, deletedAt: string) {
@@ -752,18 +787,34 @@ export async function restoreNoteFromTrash(noteId: string): Promise<NoteItem> {
 }
 
 export async function fetchTrashFolders(): Promise<TrashFolderItem[]> {
-  const rows = await selectAllTrashFolders()
-  return rows.map(mapTrashFolderRow)
+  try {
+    const rows = await selectAllTrashFolders()
+    return rows.map(mapTrashFolderRow)
+  } catch (err) {
+    console.error('[Trash] failed', err)
+    return []
+  }
 }
 
 export async function fetchTrashNotes(): Promise<TrashNoteItem[]> {
-  const { data, error } = await supabase
-    .from('trash_notes')
-    .select(TRASH_NOTE_COLUMNS)
-    .order('deleted_at', { ascending: false })
+  console.debug('[Trash] fetch start (notes)')
+  try {
+    const { data, error } = await supabase
+      .from('trash_notes')
+      .select(TRASH_NOTE_COLUMNS)
+      .order('deleted_at', { ascending: false })
 
-  if (error) throw error
-  return ((data ?? []) as TrashNoteRow[]).map(mapTrashNoteRow)
+    console.debug('[Trash] response (notes)', { data, error })
+
+    if (error) {
+      console.error('[Trash] failed', error)
+      return []
+    }
+    return ((data ?? []) as TrashNoteRow[]).map(mapTrashNoteRow)
+  } catch (err) {
+    console.error('[Trash] failed', err)
+    return []
+  }
 }
 
 /** Permanently delete a folder from trash */

@@ -177,8 +177,14 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
       const allNotes = notesByFolder.flat().map((n) => ({ ...n, pinned: pinIdSet.has(n.id) }))
       setNotes(allNotes)
 
-      const [trashFolders, trashNotes] = await Promise.all([fetchTrashFolders(), fetchTrashNotes()])
-      console.log('[AppDataContext] loadFoldersAndNotes trash', { trashFolders, trashNotes })
+      let trashFolders: TrashFolderItem[] = []
+      let trashNotes: TrashNoteItem[] = []
+      try {
+        ;[trashFolders, trashNotes] = await Promise.all([fetchTrashFolders(), fetchTrashNotes()])
+        console.debug('[Trash] loadFoldersAndNotes', { folders: trashFolders.length, notes: trashNotes.length })
+      } catch (trashError) {
+        console.error('[Trash] failed', trashError)
+      }
       setTrash({
         folders: trashFolders,
         notes: trashNotes,
