@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const SWIPE_THRESHOLD_PX = 60;
 
@@ -32,6 +32,17 @@ export function SwipeDeck({ entries, getMyWeight, onCycleVote, voteLocked }: Pro
   const clampedIndex = n === 0 ? 0 : Math.max(0, Math.min(index, n - 1));
   const entry = n > 0 ? entries[clampedIndex] : null;
   const vote = entry ? getMyWeight(entry.id) : 0;
+
+  const [justChanged, setJustChanged] = useState(false);
+  const prevIndexRef = useRef(clampedIndex);
+  useEffect(() => {
+    if (prevIndexRef.current !== clampedIndex) {
+      prevIndexRef.current = clampedIndex;
+      setJustChanged(true);
+      const id = requestAnimationFrame(() => setJustChanged(false));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [clampedIndex]);
 
   const goPrev = useCallback(() => {
     if (n <= 1) return;
@@ -96,7 +107,9 @@ export function SwipeDeck({ entries, getMyWeight, onCycleVote, voteLocked }: Pro
         role="region"
         aria-label={`Karte ${clampedIndex + 1} von ${n}`}
       >
-        <div className={`rounded-xl p-4 ${colorClass}`}>
+        <div
+          className={`rounded-xl p-4 transition-opacity duration-200 ${colorClass} ${justChanged ? "opacity-0" : "opacity-100"}`}
+        >
           <p className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{entry!.text}</p>
           <div className="mt-3 flex items-center gap-2">
             <span className="text-xs text-[var(--color-text-muted)]">Deine Stimmen hier: {vote}</span>
