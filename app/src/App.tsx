@@ -12,12 +12,26 @@ import { AppDataProvider } from "./state/AppDataContext";
 import { useRequirePasswordSetup } from "./hooks/useRequirePasswordSetup";
 import { supabase } from "./lib/supabase";
 
+const DEBUG_AUTH = import.meta.env.VITE_DEBUG_AUTH === "true";
+
 function App() {
-  const { loading, session, needsPasswordSetup } = useRequirePasswordSetup();
+  const { loading, session, needsPasswordSetup, authError, clearAuthError } = useRequirePasswordSetup();
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
 
   useEffect(() => {
     const hash = window.location.hash;
+    if (DEBUG_AUTH && hash) {
+      const type = hash.includes("type=recovery")
+        ? "recovery"
+        : hash.includes("type=invite")
+          ? "invite"
+          : hash.includes("type=magiclink")
+            ? "magiclink"
+            : hash.includes("type=signup")
+              ? "signup"
+              : "other";
+      console.debug("[Auth:hash]", { hash: hash.slice(0, 80), type });
+    }
     const isRecoveryHash = hash.includes("type=recovery");
     if (session && isRecoveryHash) setIsRecoveryMode(true);
   }, [session]);
@@ -29,7 +43,42 @@ function App() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Required render priority: loading → no session → recovery → password setup → main app
+  const handleSignOutAndClear = async () => {
+    await supabase.auth.signOut();
+    clearAuthError();
+  };
+
+  // Required render priority: authError → loading → no session → recovery → password setup → main app
+  if (authError) {
+    const message =
+      authError === "timeout"
+        ? "Anmeldung dauert zu lange. Bitte Netzwerk prüfen oder abmelden und erneut versuchen."
+        : authError === "session_invalid"
+          ? "Sitzung ungültig. Bitte erneut anmelden."
+          : "Fehler beim Laden der Anmeldung. Bitte Seite neu laden oder abmelden.";
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--color-bg-app)] px-6">
+        <p className="text-center text-sm text-[var(--color-text-secondary)]">{message}</p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+          >
+            Seite neu laden
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleSignOutAndClear()}
+            className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+          >
+            Abmelden
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-app)]">
