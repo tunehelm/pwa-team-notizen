@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { SidebarLayout } from '../components/SidebarLayout'
 import { UserAvatar } from '../components/UserAvatar'
 import { useAppData } from '../state/useAppData'
@@ -35,6 +35,8 @@ export function TeamHubPage() {
   // Admin-Nachrichteneingang
   const [messages, setMessages] = useState<Message[]>([])
   const [showMessages, setShowMessages] = useState(false)
+  const [messagesLoading, setMessagesLoading] = useState(false)
+  const [messagesError, setMessagesError] = useState<string | null>(null)
 
   // Lade alle Profile aus der profiles-Tabelle und ergänze Owner-IDs
   useEffect(() => {
@@ -79,21 +81,28 @@ export function TeamHubPage() {
     void loadMembers()
   }, [currentUserId, currentUserEmail, currentUserName, folders, notes])
 
-  // Admin: Nachrichten laden
-  useEffect(() => {
+  // Admin: Nachrichten laden (und nach Mark-as-read neu laden)
+  const loadMessages = useCallback(async () => {
     if (!isAdmin) return
-    void supabase
+    setMessagesLoading(true)
+    setMessagesError(null)
+    const { data, error } = await supabase
       .from('messages')
       .select('*')
       .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          console.warn('[TeamHub] Nachrichten laden fehlgeschlagen:', error.message)
-          return
-        }
-        if (data) setMessages(data as Message[])
-      })
+    setMessagesLoading(false)
+    if (error) {
+      console.warn('[TeamHub] Nachrichten laden fehlgeschlagen:', error.message)
+      setMessagesError('Nachrichten konnten nicht geladen werden. Bitte Seite neu laden.')
+      setMessages([])
+      return
+    }
+    setMessages((data ?? []) as Message[])
   }, [isAdmin])
+
+  useEffect(() => {
+    void loadMessages()
+  }, [loadMessages])
 
   const unreadCount = messages.filter((m) => !m.read).length
 
@@ -122,10 +131,26 @@ export function TeamHubPage() {
     }
   }
 
-  // Admin: Nachricht als gelesen markieren
+  // Admin: Nachricht als gelesen markieren (inkl. Refetch für Badge)
   async function markAsRead(msgId: string) {
-    await supabase.from('messages').update({ read: true }).eq('id', msgId)
+    const { error } = await supabase.from('messages').update({ read: true }).eq('id', msgId)
+    if (error) {
+      console.warn('[TeamHub] Als gelesen markieren fehlgeschlagen:', error.message)
+      return
+    }
     setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, read: true } : m)))
+  }
+
+  // Admin: Alle als gelesen markieren
+  async function markAllAsRead() {
+    const unreadIds = messages.filter((m) => !m.read).map((m) => m.id)
+    if (unreadIds.length === 0) return
+    const { error } = await supabase.from('messages').update({ read: true }).in('id', unreadIds)
+    if (error) {
+      console.warn('[TeamHub] Alle als gelesen fehlgeschlagen:', error.message)
+      return
+    }
+    setMessages((prev) => prev.map((m) => ({ ...m, read: true })))
   }
 
   // Zeitformat
@@ -296,52 +321,84 @@ export function TeamHubPage() {
 
               {showMessages ? (
                 <div className="border-t border-[var(--color-border)]">
-                  {messages.length === 0 ? (
+                  {messagesError ? (
+                    <div className="px-4 py-6 text-center text-sm text-red-500">
+                      {messagesError}
+                    </div>
+                  ) : messagesLoading ? (
+                    <div className="px-4 py-6 text-center text-sm text-[var(--color-text-muted)]">
+                      Nachrichten werden geladen…
+                    </div>
+                  ) : messages.length === 0 ? (
                     <div className="px-4 py-6 text-center text-sm text-[var(--color-text-muted)]">
                       Noch keine Nachrichten eingegangen.
                     </div>
                   ) : (
-                    messages.map((msg, i) => (
-                      <div
-                        key={msg.id}
-                        className={`px-4 py-3 ${i > 0 ? 'border-t border-[var(--color-border)]' : ''} ${!msg.read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <UserAvatar email={msg.sender_email ?? undefined} name={msg.sender_name ?? undefined} size="sm" />
-                              <div>
-                                <p className="text-xs font-medium text-[var(--color-text-primary)]">
-                                  {msg.sender_name || msg.sender_email || 'Unbekannt'}
-                                </p>
-                                <p className="text-[10px] text-[var(--color-text-muted)]">{formatTime(msg.created_at)}</p>
-                              </div>
-                            </div>
-                            <p className="mt-1.5 whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">
-                              {msg.content}
-                            </p>
-                          </div>
-                          {!msg.read ? (
-                            <button
-                              type="button"
-                              onClick={() => void markAsRead(msg.id)}
-                              title="Als gelesen markieren"
-                              className="mt-1 shrink-0 rounded-lg p-1.5 text-blue-500 transition-colors hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                            >
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            </button>
-                          ) : (
-                            <span className="mt-1 shrink-0 p-1.5 text-emerald-400">
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            </span>
-                          )}
+                    <>
+                      {unreadCount > 0 ? (
+                        <div className="flex justify-end border-b border-[var(--color-border)] px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => void markAllAsRead()}
+                            className="text-xs font-medium text-blue-500 hover:underline"
+                          >
+                            Alle als gelesen markieren
+                          </button>
                         </div>
-                      </div>
-                    ))
+                      ) : null}
+                      {messages.map((msg, i) => (
+                        <div
+                          key={msg.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            if (!msg.read) void markAsRead(msg.id)
+                          }}
+                          onKeyDown={(e) => {
+                            if ((e.key === 'Enter' || e.key === ' ') && !msg.read) void markAsRead(msg.id)
+                          }}
+                          className={`cursor-pointer px-4 py-3 ${i > 0 ? 'border-t border-[var(--color-border)]' : ''} ${!msg.read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <UserAvatar email={msg.sender_email ?? undefined} name={msg.sender_name ?? undefined} size="sm" />
+                                <div>
+                                  <p className="text-xs font-medium text-[var(--color-text-primary)]">
+                                    {msg.sender_name || msg.sender_email || 'Unbekannt'}
+                                  </p>
+                                  <p className="text-[10px] text-[var(--color-text-muted)]">{formatTime(msg.created_at)}</p>
+                                </div>
+                              </div>
+                              <p className="mt-1.5 whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">
+                                {msg.content}
+                              </p>
+                            </div>
+                            {!msg.read ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void markAsRead(msg.id)
+                                }}
+                                title="Als gelesen markieren"
+                                className="mt-1 shrink-0 rounded-lg p-1.5 text-blue-500 transition-colors hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              </button>
+                            ) : (
+                              <span className="mt-1 shrink-0 p-1.5 text-emerald-400" aria-hidden>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </div>
               ) : null}
