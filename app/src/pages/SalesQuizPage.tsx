@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { SidebarLayout } from "../components/SidebarLayout";
 import { supabase } from "../lib/supabase";
 import { getWeekKey } from "../lib/salesChallengeUtils";
@@ -13,6 +14,7 @@ type Challenge = {
   status: string;
   edit_deadline_at: string;
   vote_deadline_at: string;
+  freeze_at: string;
   reveal_at: string;
 };
 
@@ -73,6 +75,18 @@ export function SalesQuizPage() {
 
   const weekKey = useMemo(() => getWeekKey(new Date()), []);
   const [userId, setUserId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+
+  const now = useMemo(() => {
+    if (import.meta.env.DEV) {
+      const debugTime = searchParams.get("debugTime");
+      if (debugTime) {
+        const t = new Date(debugTime);
+        if (!Number.isNaN(t.getTime())) return t;
+      }
+    }
+    return new Date();
+  }, [searchParams]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -84,7 +98,7 @@ export function SalesQuizPage() {
 
       const { data: chData, error: chErr } = await supabase
         .from("sales_challenges")
-        .select("id, week_key, title, original_text, context_md, rules_md, status, edit_deadline_at, vote_deadline_at, reveal_at")
+        .select("id, week_key, title, original_text, context_md, rules_md, status, edit_deadline_at, vote_deadline_at, freeze_at, reveal_at")
         .eq("week_key", weekKey)
         .in("status", ["active", "frozen", "revealed"])
         .maybeSingle();
@@ -161,9 +175,10 @@ export function SalesQuizPage() {
 
   const totalVotes = winners?.total_votes ?? liveTotalVotes ?? 0;
   const myVotesUsed = myVotes.reduce((s, v) => s + v.weight, 0);
-  const isRevealed = challenge?.status === "revealed" || (challenge?.reveal_at && new Date(challenge.reveal_at) <= new Date());
-  const editLocked = challenge?.edit_deadline_at ? new Date(challenge.edit_deadline_at) < new Date() : true;
-  const voteLocked = challenge?.vote_deadline_at ? new Date(challenge.vote_deadline_at) < new Date() : true;
+  const isRevealed = challenge?.status === "revealed" || (challenge?.reveal_at && new Date(challenge.reveal_at) <= now);
+  const editLocked = challenge?.edit_deadline_at ? new Date(challenge.edit_deadline_at) <= now : true;
+  const voteLocked = challenge?.vote_deadline_at ? new Date(challenge.vote_deadline_at) <= now : true;
+  const isFrozen = challenge?.freeze_at ? new Date(challenge.freeze_at) <= now : false;
 
   const shuffledEntries = useMemo(() => shuffle(entries, new Date().getDate()), [entries]);
 
@@ -281,6 +296,13 @@ export function SalesQuizPage() {
   return (
     <SidebarLayout title="Montags-Quiz">
       <div className="mx-auto max-w-2xl px-4 py-6">
+        {/* Banner: Auswertung läuft */}
+        {isFrozen && !isRevealed && (
+          <div className="mb-4 rounded-xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+            Auswertung läuft – Ergebnis um {challenge.reveal_at ? new Date(challenge.reveal_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "16:00"}.
+          </div>
+        )}
+
         {/* Header Ticker */}
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
           <span className="text-[var(--color-text-secondary)]">🔥 Diese Woche: {totalVotes} Stimmen</span>
@@ -333,9 +355,14 @@ export function SalesQuizPage() {
         <section className="mb-6 rounded-2xl border-2 border-blue-200 dark:border-blue-800 bg-[var(--color-bg-card)] p-4">
           <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Meine Karte</h2>
           {editLocked ? (
-            <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-              {myEntry?.is_published ? myEntry.text : "Bearbeitung beendet."}
-            </p>
+            <>
+              <p className="mt-2 text-sm text-[var(--color-text-primary)]">
+                {myEntry?.is_published ? myEntry.text : "Bearbeitung beendet."}
+              </p>
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                Bearbeitung gesperrt (Deadline: {challenge.edit_deadline_at ? new Date(challenge.edit_deadline_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "—"})
+              </p>
+            </>
           ) : (
             <>
               <textarea
@@ -373,6 +400,11 @@ export function SalesQuizPage() {
         ) : (
           <section>
             <h2 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Varianten</h2>
+            {voteLocked && (
+              <p className="mb-3 text-xs text-[var(--color-text-muted)]">
+                Voting geschlossen (Deadline: {challenge.vote_deadline_at ? new Date(challenge.vote_deadline_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "—"})
+              </p>
+            )}
             {shuffledEntries.length === 0 ? (
               <p className="text-sm text-[var(--color-text-muted)]">Noch keine veröffentlichten Varianten.</p>
             ) : (
@@ -386,22 +418,20 @@ export function SalesQuizPage() {
                       className={`rounded-2xl border border-[var(--color-border)] p-4 ${colorClass}`}
                     >
                       <p className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{entry.text}</p>
-                      {entry.source === "ai" && (
-                        <p className="mt-1 text-xs text-[var(--color-text-muted)]">Inspiration</p>
-                      )}
-                      {!voteLocked && (
-                        <div className="mt-3 flex items-center gap-2">
-                          <span className="text-xs text-[var(--color-text-muted)]">Deine Stimmen hier:</span>
-                          <button
-                            type="button"
-                            onClick={() => setVote(entry.id, vote === 0 ? 1 : vote === 1 ? 2 : 0)}
-                            className="rounded-lg bg-blue-500 px-2 py-1 text-xs font-medium text-white"
-                          >
-                            {vote === 0 ? "0 → 1" : vote === 1 ? "1 → 2" : "2 → 0"}
-                          </button>
-                          <span className="text-xs font-medium">{vote}</span>
-                        </div>
-                      )}
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className="text-xs text-[var(--color-text-muted)]">Deine Stimmen hier: {vote}</span>
+                        {!voteLocked && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setVote(entry.id, vote === 0 ? 1 : vote === 1 ? 2 : 0)}
+                              className="rounded-lg bg-blue-500 px-2 py-1 text-xs font-medium text-white"
+                            >
+                              {vote === 0 ? "0 → 1" : vote === 1 ? "1 → 2" : "2 → 0"}
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </li>
                   );
                 })}
