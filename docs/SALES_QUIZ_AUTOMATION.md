@@ -2,6 +2,12 @@
 
 Übersicht der Edge Functions, Cron-Zeiten und manueller Auslösung.
 
+## Hinweis: Vite SPA, keine Vercel API Routes
+
+Die App ist eine **Vite/React SPA** (keine Next.js). Vercel API Routes (`/api/cron/*`) existieren nur bei Next.js; bei Vite liefern solche Pfade in Production **404**. Cron wird daher über einen **externen Dienst** (z. B. cron-job.org) erledigt, der die **Supabase Edge Functions direkt** aufruft – mit Service-Role-Key, ohne Umweg über die App.
+
+---
+
 ## Jobs (Zeiten Europe/Berlin)
 
 | Job | Zeit (Berlin) | Function | Aktion |
@@ -13,95 +19,82 @@
 
 **Reihenfolge Montag 11:00:** Zuerst **Archive** (Vorwoche), danach **Week Start** (neue Woche).
 
-## Vercel Cron (aktiv)
+---
 
-Die App nutzt **Vercel Cron** über geschützte API-Routen (`app/api/cron/*`). Die Routen rufen die Supabase Edge Functions mit Service-Role auf; Secrets bleiben serverseitig (nur ENV).
+## Cron: Externer Dienst (cron-job.org, empfohlen)
 
-### ENV-Variablen (Vercel Dashboard → Project → Settings → Environment Variables)
+Da Vercel Cron nur **interne** Pfade (z. B. `/api/cron/...`) triggern kann und bei einer Vite-SPA keine API-Routen existieren, rufen wir die **Supabase Edge Functions direkt** auf:
 
-| Variable | Beschreibung |
-|----------|--------------|
-| `SUPABASE_URL` | Supabase Projekt-URL (z. B. `https://<project-ref>.supabase.co`) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service-Role-Key aus Supabase (API → service_role) |
-| `CRON_SECRET` | Geheimes Token; Cron-Requests müssen Header `x-cron-secret: <CRON_SECRET>` senden. |
-| `CRON_ENABLED` | `true` = Cron ausführen; anders (oder nicht gesetzt) = sofort 200 "Cron disabled", kein Aufruf an Supabase. |
+- **URL:** `https://<project-ref>.supabase.co/functions/v1/<function-name>`
+- **Methode:** POST
+- **Header:** `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>`
 
-### Cron deaktivieren
+Den Service-Role-Key als geheimes Feld in cron-job.org (oder GitHub Actions Secret) hinterlegen; er wird **nicht** in der App benötigt.
 
-- In Vercel: `CRON_ENABLED` auf etwas anderes setzen als `true` (z. B. `false` oder Variable entfernen). Dann liefern alle Cron-Endpoints sofort 200 mit `{ "cron": "disabled" }` zurück, ohne Supabase zu callen.
+### Zeitpläne (cron-job.org, Europe/Berlin)
 
-### Schedules (vercel.json, UTC)
+| Function | Empfohlene Zeit (Berlin) | Cron (cron-job.org: „Jeden Montag 11:00“ etc.) |
+|----------|--------------------------|--------------------------------------------------|
+| **sales-archive-and-rollover** | Montag 11:00 | z. B. Montag 11:00 |
+| **sales-week-start** | Montag 11:05 | 5 Min nach Archive |
+| **sales-freeze** | Freitag 15:00 | Freitag 15:00 |
+| **sales-reveal** | Freitag 16:00 | Freitag 16:00 |
 
-- **sales-archive:** täglich 09:05 UTC (`5 9 * * *`) – entspricht ~10:05 CET / 11:05 CEST.
-- **sales-week-start:** täglich 09:10 UTC (`10 9 * * *`) – 5 min nach Archive (Reihenfolge Montag: erst Archive, dann Week-Start).
-- **sales-freeze:** alle 10 Minuten (`*/10 * * * *`).
-- **sales-reveal:** alle 10 Minuten (`*/10 * * * *`).
+Die Supabase-Functions prüfen intern `now >= freeze_at` / `now >= reveal_at` und sind idempotent. **DST (Winter-/Sommerzeit)** wird von cron-job.org berücksichtigt, wenn du die Zeitzone „Europe/Berlin“ wählst.
 
-Die Supabase-Functions prüfen intern `now >= freeze_at` / `now >= reveal_at` und sind idempotent. Dadurch ist **DST (Winter-/Sommerzeit) unkritisch**: Die Cron-Jobs laufen regelmäßig, die Logik entscheidet, ob gerade Aktion nötig ist.
+### curl-Beispiele (zum Testen und für cron-job.org)
 
-### Cron manuell testen (POST mit Secret)
+Ersetze `<PROJECT_REF>` und `<SUPABASE_SERVICE_ROLE_KEY>` durch deine Werte (Supabase Dashboard → Project Settings → API).
 
 ```bash
-# Basis-URL deiner App (Vercel Preview oder Production)
-BASE="https://<deine-app>.vercel.app"
+PROJECT_REF="dein-project-ref"
+BASE="https://${PROJECT_REF}.supabase.co/functions/v1"
+KEY="<SUPABASE_SERVICE_ROLE_KEY>"
 
-curl -X POST "${BASE}/api/cron/sales-archive" \
-  -H "x-cron-secret: <CRON_SECRET>"
+# Montag: zuerst Archive, dann Week-Start
+curl -X POST "${BASE}/sales-archive-and-rollover" -H "Authorization: Bearer ${KEY}"
+curl -X POST "${BASE}/sales-week-start"           -H "Authorization: Bearer ${KEY}"
 
-curl -X POST "${BASE}/api/cron/sales-week-start" \
-  -H "x-cron-secret: <CRON_SECRET>"
+# Freitag
+curl -X POST "${BASE}/sales-freeze"                -H "Authorization: Bearer ${KEY}"
+curl -X POST "${BASE}/sales-reveal"                 -H "Authorization: Bearer ${KEY}"
 ```
 
-Ohne gültiges `x-cron-secret` oder mit `CRON_ENABLED !== 'true'`: 401 bzw. 200 "Cron disabled".
+In **cron-job.org**: Job anlegen → URL = `https://<PROJECT_REF>.supabase.co/functions/v1/sales-week-start` (bzw. freeze, reveal, sales-archive-and-rollover), Methode POST, optional „Request Headers“: `Authorization: Bearer <KEY>` (oder als „Authentification“ nutzen, falls angeboten).
 
 ---
 
-## Weitere Optionen (ohne Vercel Cron)
+## Vercel / vercel.json
 
-### Externer Cron (z. B. cron-job.org)
+- **Repo-Root:** `vercel.json` kann z. B. Build/Output der SPA steuern; **keine** Cron-Einträge, die auf `/api/cron/*` zeigen (diese Routen existieren nicht).
+- **App ist Vite:** Keine Serverless Functions unter `app/api/`. Cron ausschließlich extern (cron-job.org o. ä.).
 
-- Montag 11:00 Berlin: zuerst Archive, dann Week-Start.
-- Freitag 15:00: Freeze; Freitag 16:00: Reveal.
-- URLs: `https://<deine-app>.vercel.app/api/cron/sales-archive` etc., mit Header `x-cron-secret`.
-
-### Supabase Scheduled Triggers (pg_cron)
-
-Falls ihr pg_cron nutzt: HTTP-Requests an Edge Functions erfordern z. B. die Extension `pg_net` oder einen externen Aufruf.
-
-## Manuell triggern
-
-**Empfohlen (über Vercel API):** Siehe Abschnitt „Cron manuell testen“ oben (POST an `/api/cron/...` mit `x-cron-secret`).
-
-**Direkt Supabase (falls ohne Vercel):**
-
-```bash
-PROJECT_REF="<dein-project-ref>"
-BASE="https://${PROJECT_REF}.supabase.co/functions/v1"
-# Mit Service Role Key
-curl -X POST "${BASE}/sales-archive-and-rollover" -H "Authorization: Bearer <KEY>"
-curl -X POST "${BASE}/sales-week-start" -H "Authorization: Bearer <KEY>"
-```
-
-**Reihenfolge Montag:** Zuerst Archive (Vorwoche), dann Week-Start (neue Woche).
+---
 
 ## Idempotenz
 
 | Function | Verhalten bei erneutem Aufruf |
 |----------|-------------------------------|
 | **sales-week-start** | Wenn Challenge für `week_key` existiert → 200, "Challenge already exists", keine Duplikate. |
-| **sales-freeze** | Nur Update wenn status = `active` und `now >= freeze_at`. Bereits frozen/revealed → 200, "already frozen or revealed". |
-| **sales-reveal** | Nur Berechnung wenn status ≠ `revealed` und `now >= reveal_at`. Bereits revealed → 200, "Already revealed". |
+| **sales-freeze** | Nur Update wenn status = `active` und `now >= freeze_at`. Bereits frozen/revealed → 200. |
+| **sales-reveal** | Nur Berechnung wenn status ≠ `revealed` und `now >= reveal_at`. Bereits revealed → 200. |
 | **sales-archive-and-rollover** | Sucht Vorwoche mit status `revealed`. Keine gefunden → 200, "No revealed challenge to archive". |
 
-## Secrets
+---
 
-- `SUPABASE_SERVICE_ROLE_KEY` in Supabase (Dashboard → Project Settings → API → service_role) als Secret setzen, damit die Functions mit Service Role laufen.
+## Secrets (Supabase)
+
+Die Edge Functions laufen mit Service Role. Den Key in Supabase als Secret setzen (falls von den Functions genutzt):
 
 ```bash
 supabase secrets set SUPABASE_SERVICE_ROLE_KEY=<dein-service-role-key>
 ```
 
-## Deploy
+Für **cron-job.org** wird der gleiche Key nur im externen Dienst gespeichert (nicht in der Vite-App).
+
+---
+
+## Deploy (Edge Functions)
 
 ```bash
 supabase functions deploy sales-week-start
@@ -110,4 +103,4 @@ supabase functions deploy sales-reveal
 supabase functions deploy sales-archive-and-rollover
 ```
 
-Siehe auch: `docs/sales-swipe-cron.md` (Details zu Secrets und Vercel).
+Siehe auch: `docs/sales-swipe-cron.md` (Übersicht Edge Functions & Optionen).
