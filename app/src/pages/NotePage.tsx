@@ -277,14 +277,36 @@ function NoteEditor({
     syncEditorContent()
   }
 
+  /** Migriert alte NA/Catecholamin-Blöcke zu noradrenaline-perfusor und setzt data-* für Persistenz. */
+  function migrateCalculatorConfig(
+    rawType: string | null,
+    config: Record<string, unknown>,
+    el: HTMLElement,
+  ): { type: CalculatorType; config: Record<string, unknown> } {
+    if (rawType === 'noradrenaline' || rawType === 'catecholamine') {
+      const mgTotal = Number(config.mgTotal ?? config.mgInSyringe ?? 5)
+      const mlTotal = Number(config.mlTotal ?? 50)
+      const migrated = {
+        label: 'Noradrenalin Perfusor',
+        mgTotal: Number.isFinite(mgTotal) && mgTotal > 0 ? mgTotal : 5,
+        mlTotal: Number.isFinite(mlTotal) && mlTotal > 0 ? mlTotal : 50,
+        defaultRateMlH: 5,
+        defaultWeightKg: 70,
+      }
+      el.setAttribute('data-calculator-type', 'noradrenaline-perfusor')
+      el.setAttribute('data-config', JSON.stringify(migrated))
+      return { type: 'noradrenaline-perfusor', config: migrated }
+    }
+    const type = (rawType as CalculatorType) || 'dantrolene'
+    return { type, config }
+  }
+
   /** Mounts Smart Blocks ([data-smart-block="calculator"]) aus Registry. Fallback: kaputter JSON → Block ignorieren. */
   function mountSmartBlocks(container: HTMLElement) {
     const blocks = container.querySelectorAll<HTMLElement>('[data-smart-block="calculator"]')
     blocks.forEach((el) => {
       el.setAttribute('contenteditable', 'false')
-      const type = (el.getAttribute('data-calculator-type') as CalculatorType) || 'dantrolene'
-      const def = CALCULATORS[type]
-      if (!def) return
+      const rawType = el.getAttribute('data-calculator-type')
       let config: Record<string, unknown> = {}
       try {
         const raw = el.getAttribute('data-config')
@@ -292,11 +314,14 @@ function NoteEditor({
       } catch {
         return
       }
+      const { type, config: resolvedConfig } = migrateCalculatorConfig(rawType, config, el)
+      const def = CALCULATORS[type]
+      if (!def) return
       const { Component } = def
       const root = (el as unknown as { __smartBlockRoot?: ReturnType<typeof createRoot> }).__smartBlockRoot
       const component = (
         <Component
-          config={config}
+          config={resolvedConfig}
           onRemove={() => removeSmartBlock(el)}
           onDuplicate={() => duplicateSmartBlock(el)}
           onUpdateConfig={(next) => updateSmartBlockConfig(el, next)}

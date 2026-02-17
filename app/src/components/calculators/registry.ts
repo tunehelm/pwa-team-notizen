@@ -1,9 +1,8 @@
 import type { ComponentType } from 'react'
 import { DantroleneCalculator } from '../DantroleneCalculator'
-import { CatecholamineCalculator } from './CatecholamineCalculator'
 import { HeparinCalculator } from './HeparinCalculator'
 import { WeightDoseCalculator } from './WeightDoseCalculator'
-import { NoradrenalineCalculator } from './NoradrenalineCalculator'
+import { NoradrenalinePerfusorCalculator } from './NoradrenalinePerfusorCalculator'
 import { SedationInfusionCalculator } from './SedationInfusionCalculator'
 import { MapCalculator } from './MapCalculator'
 import { PbwArdsCalculator } from './PbwArdsCalculator'
@@ -13,8 +12,7 @@ import { BeCorrectionCalculator } from './BeCorrectionCalculator'
 
 export type CalculatorType =
   | 'dantrolene'
-  | 'noradrenaline'
-  | 'catecholamine'
+  | 'noradrenaline-perfusor'
   | 'heparin'
   | 'sedation-infusion'
   | 'map-target'
@@ -49,23 +47,16 @@ export const CALCULATORS: Record<CalculatorType, CalculatorDef> = {
     },
     Component: DantroleneCalculator as ComponentType<CalculatorBlockProps>,
   },
-  noradrenaline: {
-    title: 'Noradrenalin PRO (µg/kg/min ↔ ml/h)',
+  'noradrenaline-perfusor': {
+    title: 'Noradrenalin Perfusor',
     defaultConfig: {
-      mgTotal: 4,
+      label: 'Noradrenalin Perfusor',
+      mgTotal: 5,
       mlTotal: 50,
-      targetMcgPerKgMin: 0.1,
+      defaultRateMlH: 5,
+      defaultWeightKg: 70,
     },
-    Component: NoradrenalineCalculator,
-  },
-  catecholamine: {
-    title: 'Katecholamin Perfusor (µg/kg/min ↔ ml/h)',
-    defaultConfig: {
-      mgInSyringe: 4,
-      mlTotal: 50,
-      targetMcgPerKgMin: 0.1,
-    },
-    Component: CatecholamineCalculator,
+    Component: NoradrenalinePerfusorCalculator,
   },
   heparin: {
     title: 'Heparin Perfusor (IE/kg/h ↔ ml/h)',
@@ -123,8 +114,7 @@ export const CALCULATORS: Record<CalculatorType, CalculatorDef> = {
 
 export const CALCULATOR_TYPES: CalculatorType[] = [
   'dantrolene',
-  'noradrenaline',
-  'catecholamine',
+  'noradrenaline-perfusor',
   'heparin',
   'sedation-infusion',
   'map-target',
