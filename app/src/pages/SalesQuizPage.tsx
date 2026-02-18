@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { SwipeDeck } from "../components/sales/SwipeDeck";
 import { SidebarLayout } from "../components/SidebarLayout";
@@ -82,9 +82,12 @@ export function SalesQuizPage() {
     const fromQuery = parseWeekFromSearch(location.search);
     return fromQuery ?? getWeekKey(new Date());
   }, [location.search]);
+  const weekKeyRef = useRef(weekKey);
+  weekKeyRef.current = weekKey;
   const [userId, setUserId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
+    const myWeekKey = weekKey;
     setLoading(true);
     setError(null);
     try {
@@ -95,11 +98,12 @@ export function SalesQuizPage() {
       const { data: chData, error: chErr } = await supabase
         .from("sales_challenges")
         .select("id, week_key, title, original_text, context_md, rules_md, status, edit_deadline_at, vote_deadline_at, freeze_at, reveal_at, ends_at")
-        .eq("week_key", weekKey)
+        .eq("week_key", myWeekKey)
         .in("status", ["active", "frozen", "revealed"])
         .maybeSingle();
 
       if (chErr) throw chErr;
+      if (weekKeyRef.current !== myWeekKey) return;
       if (!chData) {
         setChallenge(null);
         setEntries([]);
@@ -120,12 +124,14 @@ export function SalesQuizPage() {
         .eq("is_published", true);
 
       if (entriesErr) throw entriesErr;
+      if (weekKeyRef.current !== myWeekKey) return;
       const published = (entriesData ?? []) as Entry[];
       setEntries(published);
 
       const { data: liveTotal } = await supabase.rpc("get_sales_challenge_total_votes", {
         p_challenge_id: chData.id,
       });
+      if (weekKeyRef.current !== myWeekKey) return;
       setLiveTotalVotes(typeof liveTotal === "number" ? liveTotal : 0);
 
       if (uid) {
@@ -147,6 +153,7 @@ export function SalesQuizPage() {
         setMyEntry(null);
         setMyVotes([]);
       }
+      if (weekKeyRef.current !== myWeekKey) return;
 
       if (chData.status === "revealed" || new Date(chData.reveal_at) <= new Date()) {
         const { data: winData } = await supabase
@@ -160,9 +167,10 @@ export function SalesQuizPage() {
       }
       setLoadCounter((c) => c + 1);
     } catch (e) {
+      if (weekKeyRef.current !== myWeekKey) return;
       setError(e instanceof Error ? e.message : "Laden fehlgeschlagen.");
     } finally {
-      setLoading(false);
+      if (weekKeyRef.current === myWeekKey) setLoading(false);
     }
   }, [weekKey]);
 
@@ -317,7 +325,8 @@ export function SalesQuizPage() {
     return (
       <SidebarLayout title="Montags-Quiz">
         <div className="mx-auto max-w-2xl px-4 py-6">
-          <p className="text-[var(--color-text-secondary)]">Diese Woche gibt es keine aktive Challenge ({weekKey}).</p>
+          <p className="text-[var(--color-text-secondary)]">Keine Challenge für {weekKey}.</p>
+          <p className="mt-2 text-xs text-[var(--color-text-muted)]">Hinweis: Seed/Week-start.</p>
         </div>
       </SidebarLayout>
     );
@@ -334,7 +343,8 @@ export function SalesQuizPage() {
         )}
 
         {/* Week-Anzeige + Header Ticker */}
-        <p className="mb-2 text-xs text-[var(--color-text-muted)]">Week: {weekKey}</p>
+        <p className="mb-1 text-xs text-[var(--color-text-muted)]">Week: {weekKey}</p>
+        <p className="mb-2 text-[10px] text-[var(--color-text-muted)]">Challenge ID: {challenge.id}</p>
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
           <span className="text-[var(--color-text-secondary)]">🔥 Diese Woche: {totalVotes} Stimmen</span>
           <span className="text-[var(--color-text-secondary)]">🎯 Deine Stimmen: {myVotesUsed} von 3</span>
