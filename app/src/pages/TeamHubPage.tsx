@@ -51,9 +51,16 @@ export function TeamHubPage() {
   const [registeredUsersLoading, setRegisteredUsersLoading] = useState(false)
   const [registeredUsersError, setRegisteredUsersError] = useState<string | null>(null)
 
-  // Lade alle Profile aus der profiles-Tabelle und ergänze Owner-IDs
+  // Admin: Team-Workspace Mitglieder-Dropdown (ein-/ausklappen)
+  const [showWorkspaceMembers, setShowWorkspaceMembers] = useState(false)
+  const [membersLoading, setMembersLoading] = useState(true)
+  const [membersError, setMembersError] = useState<string | null>(null)
+
+  // Lade alle Profile aus der profiles-Tabelle und ergänze Owner-IDs (distinct owner_id aus Ordner/Notizen)
   useEffect(() => {
     async function loadMembers() {
+      setMembersLoading(true)
+      setMembersError(null)
       const ownerIds = new Set<string>()
       for (const f of folders) {
         if (f.ownerId) ownerIds.add(f.ownerId)
@@ -66,7 +73,8 @@ export function TeamHubPage() {
       const profileMap = new Map<string, { email: string; name: string }>()
       const { data: profiles, error } = await supabase.from('profiles').select('id, email, display_name')
       if (error) {
-        console.warn('[TeamHub] Profile konnten nicht geladen werden:', error.message)
+        console.error('[TeamHub] Profile konnten nicht geladen werden:', error.message)
+        setMembersError('Konnte Mitglieder nicht laden.')
       }
       if (profiles) {
         for (const p of profiles) {
@@ -89,6 +97,7 @@ export function TeamHubPage() {
       })
 
       setMembers(memberList)
+      setMembersLoading(false)
     }
 
     void loadMembers()
@@ -554,8 +563,54 @@ export function TeamHubPage() {
               <div className="bg-[var(--color-bg-card)] px-3 py-4 text-center">
                 <p className="text-xl font-bold text-[var(--color-text-primary)]">{members.length}</p>
                 <p className="text-[10px] text-[var(--color-text-muted)]">Mitglieder</p>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setShowWorkspaceMembers((v) => !v)}
+                    className="mt-1.5 text-[10px] font-medium text-blue-500 hover:underline"
+                  >
+                    {showWorkspaceMembers ? 'Ausblenden' : 'Anzeigen'}
+                  </button>
+                )}
               </div>
             </div>
+
+            {/* Admin-only: ausklappbare Personenliste (Wer steckt hinter "Mitglieder") */}
+            {isAdmin && showWorkspaceMembers ? (
+              <div className="border-t border-[var(--color-border)]">
+                {membersError ? (
+                  <div className="px-4 py-3 text-center text-sm text-red-500">
+                    {membersError}
+                  </div>
+                ) : membersLoading ? (
+                  <div className="px-4 py-3 text-center text-sm text-[var(--color-text-muted)]">
+                    Wird geladen…
+                  </div>
+                ) : members.length === 0 ? (
+                  <div className="px-4 py-3 text-center text-sm text-[var(--color-text-muted)]">
+                    Keine Mitglieder gefunden.
+                  </div>
+                ) : (
+                  <ul className="max-h-48 overflow-y-auto px-4 py-2" role="list">
+                    {members.map((m) => {
+                      const displayName = m.name?.trim() || m.email || 'Unbekannt'
+                      const sub = m.name?.trim() && m.email ? m.email : (!m.name && !m.email && m.id) ? `…${m.id.slice(-8)}` : null
+                      return (
+                        <li
+                          key={m.id}
+                          className="flex flex-col gap-0.5 border-b border-[var(--color-border)] py-2 last:border-b-0"
+                        >
+                          <span className="text-sm font-medium text-[var(--color-text-primary)]">{displayName}</span>
+                          {sub ? (
+                            <span className="text-xs text-[var(--color-text-muted)]">{sub}</span>
+                          ) : null}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+            ) : null}
           </div>
         </section>
       </div>
