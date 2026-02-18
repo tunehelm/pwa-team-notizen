@@ -13,3 +13,9 @@ verify_jwt = false
 
 [functions.sales-archive-and-rollover]
 verify_jwt = false
+
+[functions.sales-seed-testweek]
+verify_jwt = false
+
+[functions.sales-reset-testweek]
+verify_jwt = false

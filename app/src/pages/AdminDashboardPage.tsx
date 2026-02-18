@@ -38,7 +38,7 @@ function formatAt(iso: string): string {
 }
 
 export function AdminDashboardPage() {
-  const { currentUserEmail, profileLoaded } = useAppData();
+  const { currentUserEmail, currentUserId, profileLoaded } = useAppData();
   const isAdmin = profileLoaded && isAdminEmail(currentUserEmail);
   const [challenge, setChallenge] = useState<{
     week_key?: string;
@@ -118,23 +118,10 @@ export function AdminDashboardPage() {
     setResetting(true);
     setResetError(null);
     try {
-      const { data: challenges } = await supabase
-        .from("sales_challenges")
-        .select("id")
-        .eq("week_key", TEST_WEEK_KEY);
-      const ids = (challenges ?? []).map((c: { id: string }) => c.id);
-
-      if (ids.length > 0) {
-        await supabase.from("sales_votes").delete().in("challenge_id", ids);
-        await supabase.from("sales_winners").delete().in("challenge_id", ids);
-        await supabase.from("sales_entries").delete().in("challenge_id", ids);
-      }
-      await supabase.from("sales_bestof").delete().eq("challenge_week_key", TEST_WEEK_KEY);
-      await supabase.from("sales_backlog").delete().eq("planned_week_key", TEST_WEEK_KEY);
-      if (ids.length > 0) {
-        await supabase.from("sales_backlog").delete().in("used_in_challenge_id", ids);
-        await supabase.from("sales_challenges").delete().in("id", ids);
-      }
+      const { data, error } = await supabase.functions.invoke("sales-reset-testweek", { method: "POST" });
+      if (error) throw new Error(error.message ?? "Reset fehlgeschlagen.");
+      const res = data as { error?: string; ok?: boolean } | null;
+      if (res?.error) throw new Error(res.error);
       setTick((t) => t + 1);
     } catch (e) {
       setResetError(e instanceof Error ? e.message : "Reset fehlgeschlagen.");
@@ -143,28 +130,21 @@ export function AdminDashboardPage() {
     }
   };
 
-  const createTestWeek = async () => {
+  const seedTestWeek = async () => {
     setCreateTestWeekLoading(true);
     setCreateTestWeekError(null);
     try {
-      const { data: existing } = await supabase
-        .from("sales_backlog")
-        .select("id")
-        .eq("planned_week_key", TEST_WEEK_KEY)
-        .eq("status", "planned")
-        .maybeSingle();
-      if (existing) {
-        setCreateTestWeekError("Testwoche ist bereits geplant.");
+      const { data, error } = await supabase.functions.invoke("sales-seed-testweek", {
+        method: "POST",
+        body: { voter_user_id: currentUserId ?? undefined },
+      });
+      if (error) throw new Error(error.message ?? "Seed fehlgeschlagen.");
+      const res = data as { error?: string; ok?: boolean; message?: string } | null;
+      if (res?.error) throw new Error(res.error);
+      if (res?.message === "Challenge already exists") {
+        setCreateTestWeekError("Testwoche existiert bereits.");
         return;
       }
-      const { error } = await supabase.from("sales_backlog").insert({
-        status: "planned",
-        category: "Allgemein",
-        title: `Testwoche ${TEST_WEEK_KEY}`,
-        original_text: "Test",
-        planned_week_key: TEST_WEEK_KEY,
-      });
-      if (error) throw error;
       setTick((t) => t + 1);
     } catch (e) {
       setCreateTestWeekError(e instanceof Error ? e.message : "Anlegen fehlgeschlagen.");
@@ -295,7 +275,7 @@ export function AdminDashboardPage() {
                   onClick={() => setShowTestTools(!showTestTools)}
                   className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm font-semibold text-[var(--color-text-primary)] hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  <span>Quiz-Testdaten</span>
+                  <span>Testdaten</span>
                   <svg
                     viewBox="0 0 24 24"
                     fill="none"
@@ -326,7 +306,7 @@ export function AdminDashboardPage() {
                       <button
                         type="button"
                         disabled={createTestWeekLoading}
-                        onClick={() => void createTestWeek()}
+                        onClick={() => void seedTestWeek()}
                         className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-page)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
                       >
                         {createTestWeekLoading ? "Anlegen…" : "Testwoche anlegen"}
