@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { DashboardPage } from "./pages/DashboardPage";
 import { FolderPage } from "./pages/FolderPage";
 import { NotePage } from "./pages/NotePage";
@@ -118,9 +118,25 @@ function App() {
     );
   }
 
-  if (!session) return <LoginPage />;
+  if (!session) {
+    try {
+      const path = window.location.pathname + window.location.search;
+      if (path !== "/login") sessionStorage.setItem("auth:returnTo", path);
+    } catch {
+      // ignore
+    }
+    return <LoginPage />;
+  }
 
-  if (!session.user) return <LoginPage />;
+  if (!session.user) {
+    try {
+      const path = window.location.pathname + window.location.search;
+      if (path !== "/login") sessionStorage.setItem("auth:returnTo", path);
+    } catch {
+      // ignore
+    }
+    return <LoginPage />;
+  }
 
   if (isRecoveryMode) {
     return <SetNewPasswordPage onDone={() => setIsRecoveryMode(false)} />;
@@ -140,6 +156,7 @@ function App() {
   return (
     <AppDataProvider userId={session.user.id}>
       <BrowserRouter>
+        <RedirectToReturn />
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/search" element={<SearchPage />} />
@@ -157,6 +174,23 @@ function App() {
       </BrowserRouter>
     </AppDataProvider>
   );
+}
+
+/** Nach Login: gespeicherte returnTo-URL aus sessionStorage lesen und dorthin navigieren. */
+function RedirectToReturn() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    try {
+      const returnTo = sessionStorage.getItem("auth:returnTo");
+      if (returnTo) {
+        sessionStorage.removeItem("auth:returnTo");
+        navigate(returnTo, { replace: true });
+      }
+    } catch {
+      // ignore
+    }
+  }, [navigate]);
+  return null;
 }
 
 /* ─── Login ──────────────────────────────────────────────── */
