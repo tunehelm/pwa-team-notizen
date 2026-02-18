@@ -24,3 +24,10 @@ export function getWeekKey(date: Date): string {
   const w = getISOWeek(date);
   return `${y}-W${String(w).padStart(2, "0")}`;
 }
+
+/** Week key of the week after the given date (e.g. for "next week"). */
+export function getNextWeekKey(date: Date): string {
+  const d = new Date(date);
+  d.setUTCDate(d.getUTCDate() + 7);
+  return getWeekKey(d);
+}
