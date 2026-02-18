@@ -3,14 +3,26 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+}
+
 const TEST_WEEK_KEY = "2099-W01"
 
-serve(async () => {
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders })
+  }
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
     if (!serviceRoleKey) {
-      return new Response(JSON.stringify({ error: "SUPABASE_SERVICE_ROLE_KEY not set" }), { status: 500 })
+      return new Response(JSON.stringify({ error: "SUPABASE_SERVICE_ROLE_KEY not set" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
     }
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
@@ -23,7 +35,7 @@ serve(async () => {
     if (chErr || !challenge) {
       return new Response(
         JSON.stringify({ ok: true, message: "nothing to delete", week_key: TEST_WEEK_KEY }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
     }
     const ids = [challenge.id]
@@ -38,10 +50,13 @@ serve(async () => {
 
     return new Response(
       JSON.stringify({ ok: true, message: "reset done", week_key: TEST_WEEK_KEY }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     )
   } catch (err) {
     console.error("[sales-reset-testweek] error", err)
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500 })
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    })
   }
 })

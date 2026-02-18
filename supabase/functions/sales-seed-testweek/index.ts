@@ -3,14 +3,26 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+}
+
 const TEST_WEEK_KEY = "2099-W01"
 
 serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders })
+  }
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
     if (!serviceRoleKey) {
-      return new Response(JSON.stringify({ error: "SUPABASE_SERVICE_ROLE_KEY not set" }), { status: 500 })
+      return new Response(JSON.stringify({ error: "SUPABASE_SERVICE_ROLE_KEY not set" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
     }
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
@@ -26,7 +38,7 @@ serve(async (req) => {
     if (existing) {
       return new Response(
         JSON.stringify({ ok: true, message: "Challenge already exists", week_key: TEST_WEEK_KEY }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
     }
 
@@ -59,7 +71,10 @@ serve(async (req) => {
       .single()
 
     if (insertChErr || !challenge) {
-      return new Response(JSON.stringify({ error: insertChErr?.message ?? "insert challenge failed" }), { status: 500 })
+      return new Response(JSON.stringify({ error: insertChErr?.message ?? "insert challenge failed" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
     }
     const challengeId = challenge.id
 
@@ -119,10 +134,13 @@ serve(async (req) => {
         entries: 5,
         votes: voterUserId ? 5 : 0,
       }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     )
   } catch (err) {
     console.error("[sales-seed-testweek] error", err)
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500 })
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    })
   }
 })
