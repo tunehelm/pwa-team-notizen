@@ -207,62 +207,66 @@ export function SalesQuizPage() {
     [loadCounter, challenge?.id, entries.map((e) => e.id).sort().join(",")]
   );
 
+  /** Adapter: Eintrag → Anzahl Stimmen (0..2 pro Karte, Summe ≤ 3). */
   const getVoteForEntry = (entryId: string) => myVotes.find((v) => v.entry_id === entryId)?.weight ?? 0;
 
   const [voteError, setVoteError] = useState<string | null>(null);
 
-  const setVote = useCallback(
-    async (entryId: string, nextWeight: number) => {
+  /** Delta +1 oder -1; optimistisches Update, bei Fehler Rollback. */
+  const setVoteDelta = useCallback(
+    async (entryId: string, delta: 1 | -1) => {
       if (!challenge || !userId || voteDisabled) return;
       setVoteError(null);
       const current = myVotes.find((v) => v.entry_id === entryId)?.weight ?? 0;
-      const newTotal = myVotesUsed - current + nextWeight;
+      const newWeight = Math.max(0, Math.min(2, current + delta));
+      const newTotal = myVotesUsed - current + newWeight;
       if (newTotal > 3) {
         setVoteError("Du hast keine Stimmen mehr frei.");
         return;
       }
-      if (nextWeight > 2) return;
-
-      if (nextWeight === 0) {
-        const { error: delErr } = await supabase
-          .from("sales_votes")
-          .delete()
-          .eq("challenge_id", challenge.id)
-          .eq("entry_id", entryId)
-          .eq("voter_user_id", userId);
-        if (delErr) {
-          setVoteError("Stimme konnte nicht zurückgenommen werden.");
-          return;
-        }
-        setMyVotes((prev) => prev.filter((v) => v.entry_id !== entryId));
-        const { data: total } = await supabase.rpc("get_sales_challenge_total_votes", { p_challenge_id: challenge.id });
-        setLiveTotalVotes(typeof total === "number" ? total : 0);
-        return;
-      }
-
-      const { error: upsertErr } = await supabase.from("sales_votes").upsert(
-        {
-          challenge_id: challenge.id,
-          entry_id: entryId,
-          voter_user_id: userId,
-          weight: nextWeight,
-        },
-        { onConflict: "challenge_id,entry_id,voter_user_id" }
-      );
-      if (upsertErr) {
-        const msg = upsertErr.message?.toLowerCase() ?? "";
-        setVoteError(msg.includes("limit") || msg.includes("constraint") ? "Du hast keine Stimmen mehr frei." : "Stimme konnte nicht gespeichert werden.");
-        return;
+      const prevVotes = myVotes;
+      if (import.meta.env.DEV) {
+        console.debug("[SalesQuiz] vote", { variantId: entryId, delta, current, newWeight, newTotal });
       }
       setMyVotes((prev) => {
         const rest = prev.filter((v) => v.entry_id !== entryId);
-        return [...rest, { entry_id: entryId, weight: nextWeight }];
+        if (newWeight === 0) return rest;
+        return [...rest, { entry_id: entryId, weight: newWeight }];
       });
-      const { data: total } = await supabase.rpc("get_sales_challenge_total_votes", { p_challenge_id: challenge.id });
-      setLiveTotalVotes(typeof total === "number" ? total : 0);
+
+      try {
+        if (newWeight === 0) {
+          const { error: delErr } = await supabase
+            .from("sales_votes")
+            .delete()
+            .eq("challenge_id", challenge.id)
+            .eq("entry_id", entryId)
+            .eq("voter_user_id", userId);
+          if (delErr) throw delErr;
+        } else {
+          const { error: upsertErr } = await supabase.from("sales_votes").upsert(
+            {
+              challenge_id: challenge.id,
+              entry_id: entryId,
+              voter_user_id: userId,
+              weight: newWeight,
+            },
+            { onConflict: "challenge_id,entry_id,voter_user_id" }
+          );
+          if (upsertErr) throw upsertErr;
+        }
+        const { data: total } = await supabase.rpc("get_sales_challenge_total_votes", { p_challenge_id: challenge.id });
+        setLiveTotalVotes(typeof total === "number" ? total : 0);
+      } catch (err) {
+        setMyVotes(prevVotes);
+        const msg = err instanceof Error ? err.message : String(err);
+        setVoteError(msg.toLowerCase().includes("limit") || msg.toLowerCase().includes("constraint") ? "Du hast keine Stimmen mehr frei." : "Stimme konnte nicht gespeichert werden.");
+      }
     },
     [challenge, userId, voteDisabled, myVotesUsed, myVotes]
   );
+
+  const voteFreezeReason = isFrozen ? "Voting ist eingefroren." : voteLocked ? "Voting geschlossen (Deadline)." : null;
 
   const saveDraft = useCallback(
     async (draftText: string, colorKey?: string) => {
@@ -475,14 +479,12 @@ export function SalesQuizPage() {
             )}
             <SwipeDeck
               entries={shuffledEntries.map((e) => ({ id: e.id, text: e.text }))}
-              getMyWeight={(entryId) => getVoteForEntry(entryId) as 0 | 1 | 2}
+              getMyWeight={(entryId) => getVoteForEntry(entryId)}
               remainingVotes={Math.max(0, 3 - myVotesUsed)}
-              onCycleVote={(entryId) => {
-                const cur = getVoteForEntry(entryId);
-                if (cur >= 1) void setVote(entryId, 0);
-                else if (myVotesUsed < 3) void setVote(entryId, 1);
-              }}
+              onVotePlus={(entryId) => void setVoteDelta(entryId, 1)}
+              onVoteMinus={(entryId) => void setVoteDelta(entryId, -1)}
               voteLocked={voteDisabled}
+              voteFreezeReason={voteFreezeReason}
             />
           </section>
         )}

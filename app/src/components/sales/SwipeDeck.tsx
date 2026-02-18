@@ -15,15 +15,19 @@ const CARD_COLORS = [
   "bg-violet-50 dark:bg-violet-900/20",
 ];
 
+const MAX_VOTES = 3;
+
 type Props = {
   entries: SwipeDeckEntry[];
-  getMyWeight: (entryId: string) => 0 | 1 | 2;
+  getMyWeight: (entryId: string) => number;
   remainingVotes: number;
-  onCycleVote: (entryId: string) => void;
+  onVotePlus: (entryId: string) => void;
+  onVoteMinus: (entryId: string) => void;
   voteLocked: boolean;
+  voteFreezeReason: string | null;
 };
 
-export function SwipeDeck({ entries, getMyWeight, remainingVotes, onCycleVote, voteLocked }: Props) {
+export function SwipeDeck({ entries, getMyWeight, remainingVotes, onVotePlus, onVoteMinus, voteLocked, voteFreezeReason }: Props) {
   const [index, setIndex] = useState(0);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
@@ -112,20 +116,44 @@ export function SwipeDeck({ entries, getMyWeight, remainingVotes, onCycleVote, v
           className={`rounded-xl p-4 transition-opacity duration-200 ${colorClass} ${justChanged ? "opacity-0" : "opacity-100"}`}
         >
           <p className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{entry!.text}</p>
-          <div className="mt-3 flex items-center gap-2">
-            <span className="text-xs text-[var(--color-text-muted)]">Deine Stimmen hier: {vote}</span>
-            {!voteLocked && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCycleVote(entry!.id);
-                }}
-                disabled={vote === 0 && remainingVotes <= 0}
-                className="rounded-lg bg-blue-500 px-2 py-1 text-xs font-medium text-white transition-transform duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
-              >
-                {vote >= 1 ? "Stimme zurücknehmen" : remainingVotes > 0 ? "+1" : "Keine Stimmen frei"}
-              </button>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-[var(--color-text-muted)]">Meine Stimmen: {vote}</span>
+            <span className="rounded bg-[var(--color-border)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-muted)]" aria-hidden="true">
+              {vote}/{MAX_VOTES}
+            </span>
+            {voteLocked ? (
+              <span className="text-xs text-[var(--color-text-muted)]" title={voteFreezeReason ?? undefined}>
+                {voteFreezeReason ?? "Voting beendet."}
+              </span>
+            ) : (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onVoteMinus(entry!.id);
+                  }}
+                  disabled={vote <= 0}
+                  title="Eine Stimme zurücknehmen"
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] px-2 py-1 text-xs font-medium text-[var(--color-text-primary)] transition-transform duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                  aria-label="Stimme abziehen"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onVotePlus(entry!.id);
+                  }}
+                  disabled={remainingVotes <= 0}
+                  title="Eine Stimme vergeben"
+                  className="rounded-lg bg-blue-500 px-2 py-1 text-xs font-medium text-white transition-transform duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                  aria-label="Stimme hinzufügen"
+                >
+                  +
+                </button>
+              </div>
             )}
           </div>
         </div>
