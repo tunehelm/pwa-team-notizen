@@ -65,6 +65,16 @@ export function useRequirePasswordSetup(): {
       setAuthError("config");
       return;
     }
+    // Ohne gespeicherte Session sofort Anmeldebildschirm zeigen (kein Warten auf getSession).
+    const hasStoredSession =
+      typeof localStorage !== "undefined" &&
+      Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)).some(
+        (k) => k?.startsWith("sb-") ?? false
+      );
+    if (!hasStoredSession) {
+      setLoading(false);
+    }
+
     let isMounted = true;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
