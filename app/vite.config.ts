@@ -49,8 +49,18 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
-        globPatterns: mode === 'development' ? [] : ['**/*.{js,css,html,ico,png,svg,webp,webmanifest}'],
+        globPatterns: mode === 'development' ? [] : ['**/*.{js,css,ico,png,svg,webp,webmanifest}'],
         navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/auth/, /supabase/],
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true,
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+            handler: 'NetworkOnly',
+          },
+        ],
         // Terser-Workaround: Service Worker nicht minifizieren
         mode: 'development',
       },

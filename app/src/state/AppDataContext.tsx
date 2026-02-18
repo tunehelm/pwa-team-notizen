@@ -50,6 +50,16 @@ import {
 import { AppDataContext, type AppDataContextValue, type TrashFolderItem, type TrashNoteItem } from './appDataStore'
 
 const CONTENT_SAVE_DEBOUNCE_MS = 450
+const DATA_FETCH_TIMEOUT_MS = 20_000
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`[timeout] ${label} nach ${ms}ms`)), ms),
+    ),
+  ])
+}
 
 export function AppDataProvider({ children, userId }: { children: ReactNode; userId?: string | null }) {
   const [folders, setFolders] = useState<FolderItem[]>([])
@@ -166,18 +176,25 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
       // ignore sync errors
     }
 
-    // 4) Fetch fresh data from Supabase
+    // 4) Fetch fresh data from Supabase (mit Timeout-Schutz)
     try {
-      const [loadedFolders, userPins] = await Promise.all([fetchFolders(), fetchUserPins()])
+      const [loadedFolders, userPins] = await withTimeout(
+        Promise.all([fetchFolders(), fetchUserPins()]),
+        DATA_FETCH_TIMEOUT_MS,
+        'fetchFolders+fetchUserPins',
+      )
       const pinIdSet = new Set(userPins.map((p) => p.item_id))
       setUserPinIds(pinIdSet)
 
-      // Override pinned based on user_pins
       const foldersWithPins = loadedFolders.map((f) => ({ ...f, pinned: pinIdSet.has(f.id) }))
       console.log('[AppDataContext] loadFoldersAndNotes folders', foldersWithPins)
       setFolders(foldersWithPins)
 
-      const notesByFolder = await Promise.all(loadedFolders.map((folder: FolderItem) => fetchNotes(folder.id)))
+      const notesByFolder = await withTimeout(
+        Promise.all(loadedFolders.map((folder: FolderItem) => fetchNotes(folder.id))),
+        DATA_FETCH_TIMEOUT_MS,
+        'fetchNotes (all folders)',
+      )
       console.log('[AppDataContext] loadFoldersAndNotes notesByFolder', notesByFolder)
       const allNotes = notesByFolder.flat().map((n) => ({ ...n, pinned: pinIdSet.has(n.id) }))
       setNotes(allNotes)
@@ -185,7 +202,11 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
       let trashFolders: TrashFolderItem[] = []
       let trashNotes: TrashNoteItem[] = []
       try {
-        ;[trashFolders, trashNotes] = await Promise.all([fetchTrashFolders(), fetchTrashNotes()])
+        ;[trashFolders, trashNotes] = await withTimeout(
+          Promise.all([fetchTrashFolders(), fetchTrashNotes()]),
+          DATA_FETCH_TIMEOUT_MS,
+          'fetchTrash',
+        )
         console.debug('[Trash] loadFoldersAndNotes', { folders: trashFolders.length, notes: trashNotes.length })
       } catch (trashError) {
         console.error('[Trash] failed', trashError)

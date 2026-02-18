@@ -54,12 +54,14 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
     return () => clearInterval(interval)
   }, [refreshData])
 
-  // ── Refresh-Handler ──
+  // ── Refresh-Handler (mit Timeout-Schutz, max 15 s) ──
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
+    const timeout = setTimeout(() => setIsRefreshing(false), 15_000)
     try {
       await refreshData()
     } finally {
+      clearTimeout(timeout)
       setTimeout(() => setIsRefreshing(false), 600)
     }
   }, [refreshData])
