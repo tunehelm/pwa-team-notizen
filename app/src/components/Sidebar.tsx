@@ -30,6 +30,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     currentUserName,
     currentUserEmail,
     currentUserId,
+    profileLoaded,
     folders: allFolders,
     getMainFolderItems,
     getPinnedFolderItems,
@@ -38,7 +39,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     moveNoteToFolder,
   } = useAppData()
 
-  const isAdmin = isAdminEmail(currentUserEmail)
+  const isAdmin = profileLoaded && isAdminEmail(currentUserEmail)
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [isEditingName, setEditingName] = useState(false)

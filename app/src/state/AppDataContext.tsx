@@ -63,26 +63,31 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
   const [apiError, setApiError] = useState<string | null>(null)
   const [currentUserEmail, setCurrentUserEmail] = useState('')
   const [currentUserName, setCurrentUserName] = useState('')
+  const [profileLoaded, setProfileLoaded] = useState(false)
   const [userPinIds, setUserPinIds] = useState<Set<string>>(new Set())
 
   // Load current user profile (email + display_name from user_metadata)
   // and upsert into profiles table so other team members can see the name
   useEffect(() => {
-    if (!userId) return
+    if (!userId) {
+      setProfileLoaded(true)
+      return
+    }
     void supabase.auth.getUser().then(({ data }) => {
       const user = data.user
-      if (!user) return
-      const email = user.email ?? ''
-      if (email) setCurrentUserEmail(email)
-      const meta = user.user_metadata
-      const name = (meta?.display_name as string) || (meta?.full_name as string) || ''
-      if (name) setCurrentUserName(name)
-
-      // Upsert into profiles table (so team members can see each other's names)
-      void supabase
-        .from('profiles')
-        .upsert({ id: user.id, email, display_name: name, updated_at: new Date().toISOString() }, { onConflict: 'id' })
-        .then(({ error }) => { if (error) console.warn('[profiles] upsert failed:', error.message) })
+      if (user) {
+        const email = user.email ?? ''
+        if (email) setCurrentUserEmail(email)
+        const meta = user.user_metadata
+        const name = (meta?.display_name as string) || (meta?.full_name as string) || ''
+        if (name) setCurrentUserName(name)
+        // Upsert into profiles table (so team members can see each other's names)
+        void supabase
+          .from('profiles')
+          .upsert({ id: user.id, email, display_name: name, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+          .then(({ error }) => { if (error) console.warn('[profiles] upsert failed:', error.message) })
+      }
+      setProfileLoaded(true)
     })
   }, [userId])
 
@@ -252,6 +257,7 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
       currentUserId: userId ?? '',
       currentUserEmail,
       currentUserName,
+      profileLoaded,
       apiError,
       folders,
       notes,
@@ -640,7 +646,7 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
         await loadFoldersAndNotes()
       },
     }),
-    [apiError, currentUserEmail, currentUserName, folders, loadFoldersAndNotes, notes, replaceFolderNotes, showApiError, trash, userId],
+    [apiError, currentUserEmail, currentUserName, profileLoaded, folders, loadFoldersAndNotes, notes, replaceFolderNotes, showApiError, trash, userId],
   )
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>

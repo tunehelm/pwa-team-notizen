@@ -13,6 +13,8 @@ export interface AppDataContextValue {
   currentUserId: string
   currentUserEmail: string
   currentUserName: string
+  /** True after getUser() has run once (email/name resolved or known missing). */
+  profileLoaded: boolean
   apiError: string | null
   folders: FolderItem[]
   notes: NoteItem[]
