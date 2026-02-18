@@ -4,7 +4,7 @@ import { SidebarLayout } from "../components/SidebarLayout";
 import { supabase } from "../lib/supabase";
 import { useAppData } from "../state/useAppData";
 import { isAdminEmail } from "../lib/admin";
-import { getWeekKey, getNextWeekKey } from "../lib/salesChallengeUtils";
+import { getWeekKey, getNextWeekKey } from "../lib/sales/weekKey";
 
 function formatCountdown(until: Date): string {
   const now = new Date();
@@ -36,15 +36,19 @@ function formatAt(iso: string): string {
 }
 
 export function AdminDashboardPage() {
-  const { currentUserEmail } = useAppData();
-  const isAdmin = isAdminEmail(currentUserEmail);
+  const { currentUserEmail, profileLoaded } = useAppData();
+  const isAdmin = profileLoaded && isAdminEmail(currentUserEmail);
   const [challenge, setChallenge] = useState<{
+    week_key?: string;
+    title?: string | null;
+    status: string;
     freeze_at: string;
     reveal_at: string;
     ends_at: string;
-    status: string;
+    category?: string | null;
   } | null>(null);
   const [backlogPlannedNext, setBacklogPlannedNext] = useState(false);
+  const [backlogPlannedTitle, setBacklogPlannedTitle] = useState<string | null>(null);
   const [backlogDraftCount, setBacklogDraftCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
@@ -58,12 +62,12 @@ export function AdminDashboardPage() {
       const [chRes, plannedRes, draftRes] = await Promise.all([
         supabase
           .from("sales_challenges")
-          .select("freeze_at, reveal_at, ends_at, status")
+          .select("week_key, title, status, freeze_at, reveal_at, ends_at, category")
           .eq("week_key", weekKey)
           .maybeSingle(),
         supabase
           .from("sales_backlog")
-          .select("id")
+          .select("id, title")
           .eq("status", "planned")
           .eq("planned_week_key", nextWeekKey)
           .limit(1)
@@ -76,7 +80,9 @@ export function AdminDashboardPage() {
       if (cancelled) return;
       if (chRes.data) setChallenge(chRes.data as typeof challenge);
       if (cancelled) return;
-      setBacklogPlannedNext(!!plannedRes.data);
+      const planned = plannedRes.data as { id: string; title?: string } | null;
+      setBacklogPlannedNext(!!planned);
+      setBacklogPlannedTitle(planned?.title?.trim() || null);
       setBacklogDraftCount(draftRes.count ?? 0);
       setLoading(false);
     })();
@@ -90,11 +96,20 @@ export function AdminDashboardPage() {
     return () => clearInterval(id);
   }, []);
 
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!profileLoaded || (!isAdmin && profileLoaded)) {
+    if (!profileLoaded) {
+      return (
+        <SidebarLayout title="Admin Dashboard">
+          <div className="flex min-h-[40vh] items-center justify-center">
+            <p className="text-sm text-[var(--color-text-muted)]">Lade…</p>
+          </div>
+        </SidebarLayout>
+      );
+    }
+    return <Navigate to="/" replace />;
+  }
 
   const endDate = challenge?.ends_at ? new Date(challenge.ends_at) : null;
-  const archiveAt = endDate;
-  const weekStartAt = endDate ? new Date(endDate.getTime() + 5 * 60 * 1000) : null;
 
   return (
     <SidebarLayout title="Admin Dashboard">
@@ -108,8 +123,16 @@ export function AdminDashboardPage() {
             {/* Nächste Aktionen */}
             <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
               <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Nächste Aktionen</h2>
+              {challenge?.title && (
+                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                  {challenge.week_key} · {challenge.title}
+                </p>
+              )}
               {!challenge ? (
-                <p className="mt-2 text-sm text-[var(--color-text-muted)]">Keine aktive Challenge gefunden.</p>
+                <div className="mt-2 space-y-1 text-sm text-[var(--color-text-muted)]">
+                  <p>Keine aktive Challenge gefunden.</p>
+                  <p>Hinweis: Week-start Cron prüfen.</p>
+                </div>
               ) : (
                 <ul className="mt-3 space-y-2 text-sm">
                   <li className="flex flex-wrap justify-between gap-x-2 gap-y-1">
@@ -120,16 +143,10 @@ export function AdminDashboardPage() {
                     <span className="text-[var(--color-text-muted)]">Reveal (Fr 16:00)</span>
                     <span>{formatCountdown(new Date(challenge.reveal_at))} · {formatAt(challenge.reveal_at)}</span>
                   </li>
-                  {archiveAt && (
-                    <li className="flex justify-between gap-2">
-                      <span className="text-[var(--color-text-muted)]">Archivierung (Mo 11:00)</span>
-                      <span>{formatCountdown(archiveAt)}</span>
-                    </li>
-                  )}
-                  {weekStartAt && (
-                    <li className="flex justify-between gap-2">
-                      <span className="text-[var(--color-text-muted)]">Week-Start (Mo 11:05)</span>
-                      <span>{formatCountdown(weekStartAt)}</span>
+                  {endDate && (
+                    <li className="flex flex-wrap justify-between gap-x-2 gap-y-1">
+                      <span className="text-[var(--color-text-muted)]">Ende der Woche (ends_at)</span>
+                      <span>{formatCountdown(endDate)} · {formatAt(challenge.ends_at)}</span>
                     </li>
                   )}
                 </ul>
@@ -140,7 +157,9 @@ export function AdminDashboardPage() {
             <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
               <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Backlog Status</h2>
               <ul className="mt-3 space-y-1 text-sm text-[var(--color-text-muted)]">
-                <li>Geplant für nächste Woche: {backlogPlannedNext ? "Ja" : "Nein"}</li>
+                <li>
+                  Geplant für nächste Woche: {backlogPlannedNext ? (backlogPlannedTitle ? `Ja – ${backlogPlannedTitle}` : "Ja") : "Nein"}
+                </li>
                 <li>Draft-Items: {backlogDraftCount}</li>
               </ul>
               <Link
