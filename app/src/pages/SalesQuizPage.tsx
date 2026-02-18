@@ -76,6 +76,7 @@ export function SalesQuizPage() {
   const [loadCounter, setLoadCounter] = useState(0);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
+  const [draftText, setDraftText] = useState("");
 
   const location = useLocation();
   const weekKey = useMemo(() => {
@@ -177,6 +178,19 @@ export function SalesQuizPage() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  // Draft-Text nur bei Wechsel der bearbeiteten Entry aus Server-Daten füllen (verhindert Reset beim Tippen)
+  const myEntryIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = myEntry?.id ?? null;
+    if (id === myEntryIdRef.current) return;
+    myEntryIdRef.current = id;
+    const text = myEntry ? (myEntry.draft_text ?? myEntry.text ?? "") : "";
+    setDraftText(text);
+    if (import.meta.env.DEV) {
+      console.debug("[SalesQuiz] draft re-init", { entryId: id });
+    }
+  }, [myEntry?.id, myEntry]); // myEntry für Text-Zugriff; Re-Run nur wenn id wechselt (Ref-Guard oben)
 
   const totalVotes = winners?.total_votes ?? liveTotalVotes ?? 0;
   const myVotesUsed = myVotes.reduce((s, v) => s + v.weight, 0);
@@ -280,7 +294,7 @@ export function SalesQuizPage() {
 
   const publishEntry = useCallback(async () => {
     if (!myEntry || editLocked) return;
-    const text = (myEntry.draft_text ?? myEntry.text).trim() || myEntry.text;
+    const text = draftText.trim() || myEntry.text;
     await supabase
       .from("sales_entries")
       .update({
@@ -292,7 +306,7 @@ export function SalesQuizPage() {
       })
       .eq("id", myEntry.id);
     void loadData();
-  }, [myEntry, editLocked, loadData]);
+  }, [myEntry, editLocked, draftText, loadData]);
 
   if (loading) {
     return (
@@ -407,8 +421,8 @@ export function SalesQuizPage() {
           ) : (
             <>
               <textarea
-                value={myEntry?.draft_text ?? myEntry?.text ?? ""}
-                onChange={(e) => setMyEntry((prev) => (prev ? { ...prev, draft_text: e.target.value } : null))}
+                value={draftText}
+                onChange={(e) => setDraftText(e.target.value)}
                 placeholder="Dein Spruch…"
                 rows={3}
                 className="mt-2 w-full resize-none rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-page)] px-3 py-2 text-sm"
@@ -416,7 +430,7 @@ export function SalesQuizPage() {
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => myEntry && void saveDraft(myEntry.draft_text ?? myEntry.text)}
+                  onClick={() => myEntry && void saveDraft(draftText)}
                   className="rounded-xl bg-slate-200 px-3 py-1.5 text-xs font-medium dark:bg-slate-700"
                 >
                   Entwurf speichern
