@@ -21,6 +21,13 @@ interface Message {
   read: boolean
 }
 
+interface RegisteredUser {
+  id: string
+  email: string | null
+  created_at: string
+  last_sign_in_at: string | null
+}
+
 export function TeamHubPage() {
   const { currentUserId, currentUserEmail, currentUserName, folders, notes } = useAppData()
   const [members, setMembers] = useState<TeamMember[]>([])
@@ -37,6 +44,12 @@ export function TeamHubPage() {
   const [showMessages, setShowMessages] = useState(false)
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesError, setMessagesError] = useState<string | null>(null)
+
+  // Admin: Registrierte Benutzer (Dropdown)
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([])
+  const [showRegisteredUsers, setShowRegisteredUsers] = useState(false)
+  const [registeredUsersLoading, setRegisteredUsersLoading] = useState(false)
+  const [registeredUsersError, setRegisteredUsersError] = useState<string | null>(null)
 
   // Lade alle Profile aus der profiles-Tabelle und ergänze Owner-IDs
   useEffect(() => {
@@ -105,6 +118,27 @@ export function TeamHubPage() {
   }, [loadMessages])
 
   const unreadCount = messages.filter((m) => !m.read).length
+
+  // Admin: Registrierte Benutzer laden (nur beim ersten Öffnen)
+  const loadRegisteredUsers = useCallback(async () => {
+    if (!isAdmin) return
+    setRegisteredUsersLoading(true)
+    setRegisteredUsersError(null)
+    const { data, error } = await supabase.rpc('get_registered_users_for_admin')
+    setRegisteredUsersLoading(false)
+    if (error) {
+      setRegisteredUsersError('Liste konnte nicht geladen werden.')
+      setRegisteredUsers([])
+      return
+    }
+    setRegisteredUsers((data ?? []) as RegisteredUser[])
+  }, [isAdmin])
+
+  const onToggleRegisteredUsers = () => {
+    const next = !showRegisteredUsers
+    setShowRegisteredUsers(next)
+    if (next && registeredUsers.length === 0 && !registeredUsersLoading) void loadRegisteredUsers()
+  }
 
   // Nachricht senden (normale User)
   async function sendMessage() {
@@ -399,6 +433,90 @@ export function TeamHubPage() {
                         </div>
                       ))}
                     </>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {/* ── Admin: Registrierte Benutzer ── */}
+        {isAdmin ? (
+          <section className="mt-6">
+            <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-sm">
+              <button
+                type="button"
+                onClick={onToggleRegisteredUsers}
+                className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                  <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 stroke-[var(--color-text-muted)]" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">Registrierte Benutzer</p>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    {showRegisteredUsers && registeredUsers.length > 0
+                      ? `${registeredUsers.length} Benutzer`
+                      : 'Liste anzeigen'}
+                  </p>
+                </div>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className={`h-4 w-4 shrink-0 text-[var(--color-text-muted)] transition-transform ${showRegisteredUsers ? 'rotate-90' : ''}`}
+                >
+                  <path d="M9 6l6 6-6 6" />
+                </svg>
+              </button>
+
+              {showRegisteredUsers ? (
+                <div className="border-t border-[var(--color-border)]">
+                  {registeredUsersError ? (
+                    <div className="px-4 py-6 text-center text-sm text-red-500">
+                      {registeredUsersError}
+                    </div>
+                  ) : registeredUsersLoading ? (
+                    <div className="px-4 py-6 text-center text-sm text-[var(--color-text-muted)]">
+                      Wird geladen…
+                    </div>
+                  ) : registeredUsers.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-sm text-[var(--color-text-muted)]">
+                      Keine registrierten Benutzer gefunden.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[320px] text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-[var(--color-border)] bg-slate-50/50 dark:bg-slate-800/50">
+                            <th className="px-4 py-2.5 font-medium text-[var(--color-text-secondary)]">E-Mail</th>
+                            <th className="px-4 py-2.5 font-medium text-[var(--color-text-secondary)]">Registriert am</th>
+                            <th className="px-4 py-2.5 font-medium text-[var(--color-text-secondary)]">Letzter Login</th>
+                            <th className="px-4 py-2.5 font-medium text-[var(--color-text-secondary)]">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {registeredUsers.map((u) => {
+                            const regDate = u.created_at ? new Date(u.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '–'
+                            const lastSignIn = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–'
+                            const status = u.last_sign_in_at ? 'Aktiv' : 'Noch nie eingeloggt'
+                            return (
+                              <tr key={u.id} className="border-b border-[var(--color-border)] last:border-b-0">
+                                <td className="px-4 py-2.5 text-[var(--color-text-primary)]">{u.email ?? '–'}</td>
+                                <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{regDate}</td>
+                                <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{lastSignIn}</td>
+                                <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{status}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </div>
               ) : null}
