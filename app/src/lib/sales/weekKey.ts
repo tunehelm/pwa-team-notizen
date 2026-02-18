@@ -40,3 +40,10 @@ export function getNextWeekKey(date: Date): string {
   d.setUTCDate(d.getUTCDate() + 7);
   return getWeekKey(d);
 }
+
+/** Week-Key der Vorwoche (z. B. für Archiv-Check). */
+export function getPreviousWeekKey(date: Date): string {
+  const d = new Date(date);
+  d.setUTCDate(d.getUTCDate() - 7);
+  return getWeekKey(d);
+}

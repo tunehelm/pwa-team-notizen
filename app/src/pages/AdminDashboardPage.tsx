@@ -4,7 +4,7 @@ import { SidebarLayout } from "../components/SidebarLayout";
 import { supabase } from "../lib/supabase";
 import { useAppData } from "../state/useAppData";
 import { isAdminEmail } from "../lib/admin";
-import { getWeekKey, getNextWeekKey } from "../lib/sales/weekKey";
+import { getWeekKey, getNextWeekKey, getPreviousWeekKey } from "../lib/sales/weekKey";
 
 function formatCountdown(until: Date): string {
   const now = new Date();
@@ -52,14 +52,16 @@ export function AdminDashboardPage() {
   const [backlogDraftCount, setBacklogDraftCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
+  const [bestofPrevWeekCount, setBestofPrevWeekCount] = useState<number>(0);
 
   useEffect(() => {
     if (!isAdmin) return;
     const weekKey = getWeekKey(new Date());
     const nextWeekKey = getNextWeekKey(new Date());
+    const prevWeekKey = getPreviousWeekKey(new Date());
     let cancelled = false;
     (async () => {
-      const [chRes, plannedRes, draftRes] = await Promise.all([
+      const [chRes, plannedRes, draftRes, bestofRes] = await Promise.all([
         supabase
           .from("sales_challenges")
           .select("week_key, title, status, freeze_at, reveal_at, ends_at, category")
@@ -76,6 +78,10 @@ export function AdminDashboardPage() {
           .from("sales_backlog")
           .select("id", { count: "exact", head: true })
           .eq("status", "draft"),
+        supabase
+          .from("sales_bestof")
+          .select("id", { count: "exact", head: true })
+          .eq("challenge_week_key", prevWeekKey),
       ]);
       if (cancelled) return;
       if (chRes.data) setChallenge(chRes.data as typeof challenge);
@@ -84,6 +90,7 @@ export function AdminDashboardPage() {
       setBacklogPlannedNext(!!planned);
       setBacklogPlannedTitle(planned?.title?.trim() || null);
       setBacklogDraftCount(draftRes.count ?? 0);
+      setBestofPrevWeekCount(bestofRes.count ?? 0);
       setLoading(false);
     })();
     return () => {
@@ -110,6 +117,40 @@ export function AdminDashboardPage() {
   }
 
   const endDate = challenge?.ends_at ? new Date(challenge.ends_at) : null;
+
+  // System Health (nur aus bestehenden Daten, Admin-only)
+  const now = new Date();
+  const weekStartOk = !!challenge;
+  const freezeOk = !challenge
+    ? true
+    : now <= new Date(challenge.freeze_at) || challenge.status !== "active";
+  const revealOk = !challenge
+    ? true
+    : now <= new Date(challenge.reveal_at) || challenge.status === "revealed";
+  const archiveOk = bestofPrevWeekCount > 0;
+
+  const healthRows: { label: string; ok: boolean; message: string }[] = [
+    {
+      label: "Week Start",
+      ok: weekStartOk,
+      message: weekStartOk ? "OK" : "Week-Start nicht ausgeführt",
+    },
+    {
+      label: "Freeze",
+      ok: freezeOk,
+      message: freezeOk ? "OK" : "Freeze nicht ausgeführt",
+    },
+    {
+      label: "Reveal",
+      ok: revealOk,
+      message: revealOk ? "OK" : "Reveal nicht ausgeführt",
+    },
+    {
+      label: "Archivierung",
+      ok: archiveOk,
+      message: archiveOk ? "OK" : "Archivierung fehlt",
+    },
+  ];
 
   return (
     <SidebarLayout title="Admin Dashboard">
@@ -152,6 +193,29 @@ export function AdminDashboardPage() {
                 </ul>
               )}
             </section>
+
+            {/* System Health (Admin-only) */}
+            {isAdmin && (
+              <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
+                <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">System Health</h2>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {healthRows.map((row) => (
+                    <li key={row.label} className="flex items-center gap-2">
+                      <span
+                        className={`h-2 w-2 shrink-0 rounded-full ${
+                          row.ok ? "bg-emerald-500" : "bg-amber-500"
+                        }`}
+                        aria-hidden
+                      />
+                      <span className="text-[var(--color-text-secondary)]">{row.label}</span>
+                      <span className={row.ok ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
+                        {row.message}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             {/* Backlog Status */}
             <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
