@@ -1,0 +1,15 @@
+# Edge Functions: Cron-Jobs rufen mit Service-Role-Key auf (Bearer).
+# Standard verify_jwt = true erwartet User-JWT und führt bei Service-Role zu 401.
+# Mit verify_jwt = false akzeptieren die Functions den Service-Role-Key (z. B. von cron-job.org).
+
+[functions.sales-week-start]
+verify_jwt = false
+
+[functions.sales-freeze]
+verify_jwt = false
+
+[functions.sales-reveal]
+verify_jwt = false
+
+[functions.sales-archive-and-rollover]
+verify_jwt = false
