@@ -21,3 +21,4 @@ dev-dist
 *.sw?
 *.bak
 supabase/temp/
+supabase/.temp/
