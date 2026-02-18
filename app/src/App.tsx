@@ -18,8 +18,22 @@ import { supabase } from "./lib/supabase";
 
 const DEBUG_AUTH = import.meta.env.VITE_DEBUG_AUTH === "true";
 
+/** Entfernt alle Supabase-Auth-Einträge aus localStorage, damit ein Neustart ohne hängende Session läuft. */
+function clearSupabaseAuthStorage(): void {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("sb-")) keys.push(key);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // ignore
+  }
+}
+
 function App() {
-  const { loading, session, needsPasswordSetup, authError, clearAuthError } = useRequirePasswordSetup();
+  const { loading, session, needsPasswordSetup, authError } = useRequirePasswordSetup();
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
 
   useEffect(() => {
@@ -47,9 +61,17 @@ function App() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const handleSignOutAndClear = async () => {
-    await supabase.auth.signOut();
-    clearAuthError();
+  /** Abmelden auch bei hängendem signOut(): Session lokal löschen und neu laden. */
+  const handleSignOutAndClear = () => {
+    clearSupabaseAuthStorage();
+    void supabase.auth.signOut(); // fire-and-forget, kann bei Timeout hängen
+    window.location.reload();
+  };
+
+  /** Im Fehlerfall: Session verwerfen und neu laden, damit kein Timeout mehr entsteht. */
+  const handleReloadAfterError = () => {
+    clearSupabaseAuthStorage();
+    window.location.reload();
   };
 
   // Required render priority: authError → loading → no session → recovery → password setup → main app
@@ -68,14 +90,14 @@ function App() {
         <div className="flex flex-wrap justify-center gap-3">
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={handleReloadAfterError}
             className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
           >
             Seite neu laden
           </button>
           <button
             type="button"
-            onClick={() => void handleSignOutAndClear()}
+            onClick={handleSignOutAndClear}
             className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
           >
             Abmelden
