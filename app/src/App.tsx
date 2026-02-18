@@ -10,6 +10,7 @@ import { TeamHubPage } from "./pages/TeamHubPage";
 import { SalesQuizPage } from "./pages/SalesQuizPage";
 import { SalesBacklogPage } from "./pages/SalesBacklogPage";
 import { AdminDashboardPage } from "./pages/AdminDashboardPage";
+import { AdminSalesStatsPage } from "./pages/AdminSalesStatsPage";
 import { TrashPage } from "./pages/TrashPage";
 import { AppDataProvider } from "./state/AppDataContext";
 import { useRequirePasswordSetup } from "./hooks/useRequirePasswordSetup";
@@ -123,6 +124,7 @@ function App() {
           <Route path="/sales-quiz" element={<SalesQuizPage />} />
           <Route path="/admin" element={<AdminDashboardPage />} />
           <Route path="/admin/sales-backlog" element={<SalesBacklogPage />} />
+          <Route path="/admin/sales-stats" element={<AdminSalesStatsPage />} />
           <Route path="/folder/:id" element={<FolderPage />} />
           <Route path="/note/:id" element={<NotePage />} />
           <Route path="/trash" element={<TrashPage />} />

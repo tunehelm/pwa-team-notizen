@@ -732,6 +732,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </svg>
                 Quiz-Backlog
               </Link>
+              <Link
+                to="/admin/sales-stats"
+                onClick={onClose}
+                className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
+                  location.pathname === '/admin/sales-stats'
+                    ? 'bg-blue-500/20 text-blue-400 font-medium'
+                    : ''
+                }`}
+                style={location.pathname === '/admin/sales-stats' ? undefined : { color: 'var(--color-sidebar-text-muted)' }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                  <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Quiz Statistik
+              </Link>
             </>
           )}
           <Link

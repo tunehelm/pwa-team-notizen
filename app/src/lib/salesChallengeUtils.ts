@@ -31,3 +31,14 @@ export function getNextWeekKey(date: Date): string {
   d.setUTCDate(d.getUTCDate() + 7);
   return getWeekKey(d);
 }
+
+/** Last N week keys including current week (oldest first). E.g. getWeekKeysLastN(now, 4) => [W-3, W-2, W-1, current]. */
+export function getWeekKeysLastN(date: Date, n: number): string[] {
+  const keys: string[] = [];
+  const d = new Date(date);
+  for (let i = 0; i < n; i++) {
+    keys.push(getWeekKey(d));
+    d.setUTCDate(d.getUTCDate() - 7);
+  }
+  return keys.reverse();
+}
