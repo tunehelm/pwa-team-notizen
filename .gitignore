@@ -20,3 +20,4 @@ dev-dist
 .idea
 *.sw?
 *.bak
+supabase/temp/
