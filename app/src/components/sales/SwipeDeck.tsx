@@ -18,11 +18,12 @@ const CARD_COLORS = [
 type Props = {
   entries: SwipeDeckEntry[];
   getMyWeight: (entryId: string) => 0 | 1 | 2;
+  remainingVotes: number;
   onCycleVote: (entryId: string) => void;
   voteLocked: boolean;
 };
 
-export function SwipeDeck({ entries, getMyWeight, onCycleVote, voteLocked }: Props) {
+export function SwipeDeck({ entries, getMyWeight, remainingVotes, onCycleVote, voteLocked }: Props) {
   const [index, setIndex] = useState(0);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
@@ -120,9 +121,10 @@ export function SwipeDeck({ entries, getMyWeight, onCycleVote, voteLocked }: Pro
                   e.stopPropagation();
                   onCycleVote(entry!.id);
                 }}
-                className="rounded-lg bg-blue-500 px-2 py-1 text-xs font-medium text-white transition-transform duration-150 active:scale-95"
+                disabled={vote === 0 && remainingVotes <= 0}
+                className="rounded-lg bg-blue-500 px-2 py-1 text-xs font-medium text-white transition-transform duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
               >
-                {vote === 0 ? "0 → 1" : vote === 1 ? "1 → 2" : "2 → 0"}
+                {vote >= 1 ? "Stimme zurücknehmen" : remainingVotes > 0 ? "+1" : "Keine Stimmen frei"}
               </button>
             )}
           </div>

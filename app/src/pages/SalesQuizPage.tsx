@@ -199,6 +199,7 @@ export function SalesQuizPage() {
   const editLocked = challenge?.edit_deadline_at ? new Date(challenge.edit_deadline_at) <= now : true;
   const voteLocked = challenge?.vote_deadline_at ? new Date(challenge.vote_deadline_at) <= now : true;
   const isFrozen = challenge?.freeze_at ? new Date(challenge.freeze_at) <= now : false;
+  const voteDisabled = voteLocked || isFrozen;
 
   // Shuffle pro Page-Load (loadCounter), stabil solange Liste gleich bleibt (challenge + entry ids)
   const shuffledEntries = useMemo(
@@ -212,7 +213,7 @@ export function SalesQuizPage() {
 
   const setVote = useCallback(
     async (entryId: string, nextWeight: number) => {
-      if (!challenge || !userId || voteLocked) return;
+      if (!challenge || !userId || voteDisabled) return;
       setVoteError(null);
       const current = myVotes.find((v) => v.entry_id === entryId)?.weight ?? 0;
       const newTotal = myVotesUsed - current + nextWeight;
@@ -260,7 +261,7 @@ export function SalesQuizPage() {
       const { data: total } = await supabase.rpc("get_sales_challenge_total_votes", { p_challenge_id: challenge.id });
       setLiveTotalVotes(typeof total === "number" ? total : 0);
     },
-    [challenge, userId, voteLocked, myVotesUsed, myVotes]
+    [challenge, userId, voteDisabled, myVotesUsed, myVotes]
   );
 
   const saveDraft = useCallback(
@@ -362,6 +363,7 @@ export function SalesQuizPage() {
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
           <span className="text-[var(--color-text-secondary)]">🔥 Diese Woche: {totalVotes} Stimmen</span>
           <span className="text-[var(--color-text-secondary)]">🎯 Deine Stimmen: {myVotesUsed} von 3</span>
+          <span className="text-[var(--color-text-secondary)]">Verbleibend: {Math.max(0, 3 - myVotesUsed)}</span>
         </div>
 
         {/* Original Card */}
@@ -466,16 +468,21 @@ export function SalesQuizPage() {
             {voteError && (
               <p className="mb-3 text-sm text-amber-600 dark:text-amber-400">{voteError}</p>
             )}
-            {voteLocked && (
+            {voteDisabled && (
               <p className="mb-3 text-xs text-[var(--color-text-muted)]">
-                Voting geschlossen (Deadline: {challenge.vote_deadline_at ? new Date(challenge.vote_deadline_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "—"})
+                {isFrozen ? "Voting beendet (Freeze)." : `Voting geschlossen (Deadline: ${challenge.vote_deadline_at ? new Date(challenge.vote_deadline_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "—"})`}
               </p>
             )}
             <SwipeDeck
               entries={shuffledEntries.map((e) => ({ id: e.id, text: e.text }))}
               getMyWeight={(entryId) => getVoteForEntry(entryId) as 0 | 1 | 2}
-              onCycleVote={(entryId) => setVote(entryId, getVoteForEntry(entryId) === 0 ? 1 : getVoteForEntry(entryId) === 1 ? 2 : 0)}
-              voteLocked={voteLocked}
+              remainingVotes={Math.max(0, 3 - myVotesUsed)}
+              onCycleVote={(entryId) => {
+                const cur = getVoteForEntry(entryId);
+                if (cur >= 1) void setVote(entryId, 0);
+                else if (myVotesUsed < 3) void setVote(entryId, 1);
+              }}
+              voteLocked={voteDisabled}
             />
           </section>
         )}
