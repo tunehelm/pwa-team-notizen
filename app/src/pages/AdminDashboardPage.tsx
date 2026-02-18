@@ -6,6 +6,8 @@ import { useAppData } from "../state/useAppData";
 import { isAdminEmail } from "../lib/admin";
 import { getWeekKey, getNextWeekKey, getPreviousWeekKey } from "../lib/sales/weekKey";
 
+const TEST_WEEK_KEY = "2099-W01";
+
 function formatCountdown(until: Date): string {
   const now = new Date();
   const ms = until.getTime() - now.getTime();
@@ -53,6 +55,14 @@ export function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
   const [bestofPrevWeekCount, setBestofPrevWeekCount] = useState<number>(0);
+
+  // Quiz-Testdaten (Admin-only): Accordion + Buttons
+  const [showTestTools, setShowTestTools] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [createTestWeekLoading, setCreateTestWeekLoading] = useState(false);
+  const [createTestWeekError, setCreateTestWeekError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -102,6 +112,66 @@ export function AdminDashboardPage() {
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  const resetTestData = async () => {
+    setConfirmResetOpen(false);
+    setResetting(true);
+    setResetError(null);
+    try {
+      const { data: challenges } = await supabase
+        .from("sales_challenges")
+        .select("id")
+        .eq("week_key", TEST_WEEK_KEY);
+      const ids = (challenges ?? []).map((c: { id: string }) => c.id);
+
+      if (ids.length > 0) {
+        await supabase.from("sales_votes").delete().in("challenge_id", ids);
+        await supabase.from("sales_winners").delete().in("challenge_id", ids);
+        await supabase.from("sales_entries").delete().in("challenge_id", ids);
+      }
+      await supabase.from("sales_bestof").delete().eq("challenge_week_key", TEST_WEEK_KEY);
+      await supabase.from("sales_backlog").delete().eq("planned_week_key", TEST_WEEK_KEY);
+      if (ids.length > 0) {
+        await supabase.from("sales_backlog").delete().in("used_in_challenge_id", ids);
+        await supabase.from("sales_challenges").delete().in("id", ids);
+      }
+      setTick((t) => t + 1);
+    } catch (e) {
+      setResetError(e instanceof Error ? e.message : "Reset fehlgeschlagen.");
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const createTestWeek = async () => {
+    setCreateTestWeekLoading(true);
+    setCreateTestWeekError(null);
+    try {
+      const { data: existing } = await supabase
+        .from("sales_backlog")
+        .select("id")
+        .eq("planned_week_key", TEST_WEEK_KEY)
+        .eq("status", "planned")
+        .maybeSingle();
+      if (existing) {
+        setCreateTestWeekError("Testwoche ist bereits geplant.");
+        return;
+      }
+      const { error } = await supabase.from("sales_backlog").insert({
+        status: "planned",
+        category: "Allgemein",
+        title: `Testwoche ${TEST_WEEK_KEY}`,
+        original_text: "Test",
+        planned_week_key: TEST_WEEK_KEY,
+      });
+      if (error) throw error;
+      setTick((t) => t + 1);
+    } catch (e) {
+      setCreateTestWeekError(e instanceof Error ? e.message : "Anlegen fehlgeschlagen.");
+    } finally {
+      setCreateTestWeekLoading(false);
+    }
+  };
 
   if (!profileLoaded || (!isAdmin && profileLoaded)) {
     if (!profileLoaded) {
@@ -215,6 +285,88 @@ export function AdminDashboardPage() {
                   ))}
                 </ul>
               </section>
+            )}
+
+            {/* Quiz-Testdaten (Admin-only, week_key=2099-W01) */}
+            {isAdmin && (
+              <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowTestTools(!showTestTools)}
+                  className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm font-semibold text-[var(--color-text-primary)] hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <span>Quiz-Testdaten</span>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className={`h-4 w-4 transition-transform ${showTestTools ? "rotate-90" : ""}`}
+                  >
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </button>
+                {showTestTools && (
+                  <div className="border-t border-[var(--color-border)] px-4 py-3 space-y-3">
+                    {resetError && (
+                      <p className="text-sm text-red-500">{resetError}</p>
+                    )}
+                    {createTestWeekError && (
+                      <p className="text-sm text-red-500">{createTestWeekError}</p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={resetting}
+                        onClick={() => setConfirmResetOpen(true)}
+                        className="rounded-lg border border-amber-500 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 disabled:opacity-50"
+                      >
+                        {resetting ? "Lösche…" : "Testdaten zurücksetzen"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={createTestWeekLoading}
+                        onClick={() => void createTestWeek()}
+                        className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-page)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        {createTestWeekLoading ? "Anlegen…" : "Testwoche anlegen"}
+                      </button>
+                    </div>
+                    <p className="text-xs text-[var(--color-text-muted)]">
+                      Nur {TEST_WEEK_KEY}. Kein Einfluss auf echte Wochen.
+                    </p>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {confirmResetOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" role="dialog" aria-modal="true" aria-labelledby="confirm-reset-title">
+                <div className="w-full max-w-sm rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 shadow-xl">
+                  <h3 id="confirm-reset-title" className="text-sm font-semibold text-[var(--color-text-primary)]">
+                    Testdaten wirklich löschen?
+                  </h3>
+                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                    Alle Quiz-Daten für {TEST_WEEK_KEY} werden entfernt. Nicht rückgängig machbar.
+                  </p>
+                  <div className="mt-4 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmResetOpen(false)}
+                      className="rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm font-medium"
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void resetTestData()}
+                      className="rounded-lg bg-amber-500 px-3 py-2 text-sm font-medium text-white hover:bg-amber-600"
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Backlog Status */}
