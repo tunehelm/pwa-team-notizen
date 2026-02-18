@@ -55,11 +55,13 @@ function App() {
   // Required render priority: authError → loading → no session → recovery → password setup → main app
   if (authError) {
     const message =
-      authError === "timeout"
-        ? "Anmeldung dauert zu lange. Bitte Netzwerk prüfen oder abmelden und erneut versuchen."
-        : authError === "session_invalid"
-          ? "Sitzung ungültig. Bitte erneut anmelden."
-          : "Fehler beim Laden der Anmeldung. Bitte Seite neu laden oder abmelden.";
+      authError === "config"
+        ? "Anmeldung nicht konfiguriert (Supabase URL/Key fehlt). Bitte Administrator informieren."
+        : authError === "timeout"
+          ? "Anmeldung dauert zu lange. Bitte Netzwerk prüfen oder abmelden und erneut versuchen."
+          : authError === "session_invalid"
+            ? "Sitzung ungültig. Bitte erneut anmelden."
+            : "Fehler beim Laden der Anmeldung. Bitte Seite neu laden oder abmelden.";
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--color-bg-app)] px-6">
         <p className="text-center text-sm text-[var(--color-text-secondary)]">{message}</p>

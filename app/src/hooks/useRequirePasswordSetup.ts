@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
+import { supabase, hasValidAuthConfig } from "../lib/supabase";
 
 const MIN_PASSWORD_LENGTH = 8;
 const LOADING_TIMEOUT_MS = 10_000;
@@ -60,6 +60,11 @@ export function useRequirePasswordSetup(): {
   }, [loading, session, needsPasswordSetup]);
 
   useEffect(() => {
+    if (!hasValidAuthConfig) {
+      setLoading(false);
+      setAuthError("config");
+      return;
+    }
     let isMounted = true;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
