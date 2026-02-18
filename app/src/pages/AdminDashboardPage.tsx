@@ -311,6 +311,12 @@ export function AdminDashboardPage() {
                       >
                         {createTestWeekLoading ? "Anlegen…" : "Testwoche anlegen"}
                       </button>
+                      <Link
+                        to={`/sales-quiz?week=${TEST_WEEK_KEY}`}
+                        className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-page)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-800"
+                      >
+                        Zur Testwoche
+                      </Link>
                     </div>
                     <p className="text-xs text-[var(--color-text-muted)]">
                       Nur {TEST_WEEK_KEY}. Kein Einfluss auf echte Wochen.

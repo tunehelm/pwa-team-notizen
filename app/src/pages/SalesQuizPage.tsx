@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { SwipeDeck } from "../components/sales/SwipeDeck";
 import { SidebarLayout } from "../components/SidebarLayout";
 import { supabase } from "../lib/supabase";
 import { getWeekKey } from "../lib/salesChallengeUtils";
+
+const WEEK_QUERY_REGEX = /^\d{4}-W\d{2}$/;
+
+function parseWeekFromSearch(search: string): string | null {
+  const week = new URLSearchParams(search).get("week");
+  return week && WEEK_QUERY_REGEX.test(week) ? week : null;
+}
 
 type Challenge = {
   id: string;
@@ -69,7 +77,11 @@ export function SalesQuizPage() {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
 
-  const weekKey = useMemo(() => getWeekKey(new Date()), []);
+  const location = useLocation();
+  const weekKey = useMemo(() => {
+    const fromQuery = parseWeekFromSearch(location.search);
+    return fromQuery ?? getWeekKey(new Date());
+  }, [location.search]);
   const [userId, setUserId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -321,7 +333,8 @@ export function SalesQuizPage() {
           </div>
         )}
 
-        {/* Header Ticker */}
+        {/* Week-Anzeige + Header Ticker */}
+        <p className="mb-2 text-xs text-[var(--color-text-muted)]">Week: {weekKey}</p>
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
           <span className="text-[var(--color-text-secondary)]">🔥 Diese Woche: {totalVotes} Stimmen</span>
           <span className="text-[var(--color-text-secondary)]">🎯 Deine Stimmen: {myVotesUsed} von 3</span>
