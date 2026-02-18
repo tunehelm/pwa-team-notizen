@@ -10,7 +10,7 @@ import { TeamHubPage } from "./pages/TeamHubPage";
 import { SalesQuizPage } from "./pages/SalesQuizPage";
 import { SalesBacklogPage } from "./pages/SalesBacklogPage";
 import { AdminDashboardPage } from "./pages/AdminDashboardPage";
-import { AdminSalesStatsPage } from "./pages/AdminSalesStatsPage";
+import { AdminSalesStatsPage } from "./pages/admin/AdminSalesStatsPage";
 import { TrashPage } from "./pages/TrashPage";
 import { AppDataProvider } from "./state/AppDataContext";
 import { useRequirePasswordSetup } from "./hooks/useRequirePasswordSetup";
