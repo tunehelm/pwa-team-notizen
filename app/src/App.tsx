@@ -95,8 +95,25 @@ function App() {
     window.location.reload();
   };
 
+  // Supabase leitet oft auf Site URL (/) mit Hash weiter, nicht auf /auth/callback. Dann hier umleiten.
+  const pathname = window.location.pathname;
+  const hash = window.location.hash;
+  if (
+    pathname !== "/auth/callback" &&
+    hash.includes("type=recovery") &&
+    (hash.includes("access_token=") || hash.includes("code="))
+  ) {
+    window.location.replace(window.location.origin + "/auth/callback" + hash);
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--color-bg-app)]">
+        <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+        <p className="text-sm text-[var(--color-text-secondary)]">Wird weitergeleitet…</p>
+      </div>
+    );
+  }
+
   // Callback zuerst: Nach Klick auf Reset-/Invite-Link darf hier nichts anderes laufen (kein authError/loading).
-  if (window.location.pathname === "/auth/callback") {
+  if (pathname === "/auth/callback") {
     return <AuthCallbackPage />;
   }
 
