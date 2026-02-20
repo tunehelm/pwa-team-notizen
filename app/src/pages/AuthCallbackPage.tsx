@@ -1,99 +1,81 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-type Status = "processing" | "error";
+const RECOVERY_FLAG = "auth:pendingRecovery";
 
 /**
- * Dedicated auth callback page for Supabase PKCE + implicit flows.
- * Exchanges ?code=… for a session, persists recovery flag, then redirects to /.
+ * Verarbeitet Redirect nach E-Mail-Link (Passwort-Reset, Einladung, Magic Link).
+ * Liest ?code= (PKCE) oder verlässt sich auf detectSessionInUrl für Hash,
+ * setzt ggf. Recovery-Flag und leitet auf / weiter.
  */
 export function AuthCallbackPage() {
-  const [status, setStatus] = useState<Status>("processing");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [status, setStatus] = useState<"loading" | "error">("loading");
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
 
-    async function handleCallback() {
+    const run = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const hash = window.location.hash;
+      const isRecovery =
+        hash.includes("type=recovery") || params.get("type") === "recovery";
+      const isInvite =
+        hash.includes("type=invite") || params.get("type") === "invite";
+
       try {
-        const params = new URLSearchParams(window.location.search);
-        const code = params.get("code");
-        const hashHasToken =
-          window.location.hash.includes("access_token") ||
-          window.location.hash.includes("type=");
-
-        if (!code && !hashHasToken) {
-          if (!cancelled) {
-            setStatus("error");
-            setErrorMsg(
-              "Kein gültiger Auth-Link erkannt. Bitte den Link erneut anfordern."
-            );
-          }
-          return;
-        }
-
         if (code) {
-          let isRecovery = false;
-          const { data: listener } = supabase.auth.onAuthStateChange(
-            (event) => {
-              if (event === "PASSWORD_RECOVERY") isRecovery = true;
-            }
-          );
-
           const { error } = await supabase.auth.exchangeCodeForSession(code);
-          listener.subscription.unsubscribe();
           if (cancelled) return;
-
           if (error) {
-            const {
-              data: { session },
-            } = await supabase.auth.getSession();
-            if (session) {
-              window.history.replaceState({}, document.title, "/");
-              window.location.replace("/");
-              return;
-            }
             setStatus("error");
-            setErrorMsg(error.message);
+            setErrorMessage(error.message);
             return;
           }
-
-          if (isRecovery) {
+          if (isRecovery || isInvite) {
             try {
-              sessionStorage.setItem("auth:pendingRecovery", "true");
+              sessionStorage.setItem(RECOVERY_FLAG, "true");
             } catch {
               /* ignore */
             }
           }
+          window.location.replace(window.location.origin + "/");
+          return;
         }
 
-        // Hash-based implicit flow: Supabase auto-detects via detectSessionInUrl.
-        // Poll briefly until the session is established.
-        if (hashHasToken && !code) {
-          for (let attempt = 0; attempt < 15; attempt++) {
-            const {
-              data: { session },
-            } = await supabase.auth.getSession();
-            if (session) break;
-            await new Promise<void>((r) => setTimeout(r, 300));
-          }
-        }
-
+        // Hash-Flow: Supabase liest mit detectSessionInUrl die Tokens aus dem Hash.
+        // Kurz warten, dann Session prüfen und weiterleiten.
+        await new Promise((r) => setTimeout(r, 800));
         if (cancelled) return;
-        window.history.replaceState({}, document.title, "/");
-        window.location.replace("/");
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (cancelled) return;
+
+        if (session) {
+          if (isRecovery || isInvite) {
+            try {
+              sessionStorage.setItem(RECOVERY_FLAG, "true");
+            } catch {
+              /* ignore */
+            }
+          }
+          window.location.replace(window.location.origin + "/");
+          return;
+        }
+
+        setStatus("error");
+        setErrorMessage("Session konnte nicht hergestellt werden. Link evtl. abgelaufen – bitte erneut anfordern.");
       } catch (err) {
         if (cancelled) return;
         setStatus("error");
-        setErrorMsg(
-          err instanceof Error
-            ? err.message
-            : "Unbekannter Fehler bei der Anmeldung."
-        );
+        setErrorMessage(err instanceof Error ? err.message : "Unbekannter Fehler");
       }
-    }
+    };
 
-    void handleCallback();
+    void run();
     return () => {
       cancelled = true;
     };
@@ -102,27 +84,25 @@ export function AuthCallbackPage() {
   if (status === "error") {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--color-bg-app)] px-6">
-        <p className="text-center text-sm text-red-600 dark:text-red-400">
-          {errorMsg ?? "Unbekannter Fehler"}
+        <p className="text-center text-sm text-[var(--color-text-secondary)]">
+          {errorMessage}
         </p>
         <a
           href="/"
           className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
         >
-          Zurück zur Anmeldung
+          Zur Startseite
         </a>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-app)]">
-      <div className="text-center">
-        <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          Verarbeite Login-Link…
-        </p>
-      </div>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--color-bg-app)]">
+      <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+      <p className="text-sm text-[var(--color-text-secondary)]">
+        Wird weitergeleitet…
+      </p>
     </div>
   );
 }

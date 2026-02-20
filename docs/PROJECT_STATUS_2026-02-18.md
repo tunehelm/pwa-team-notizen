@@ -7,9 +7,11 @@
 - Login funktioniert
 
 ## Supabase
+- **Plan: Pro** (250 GB Egress, 7 Tage Logs, tägliche Backups)
 - Neuer Secret Key erstellt
 - Service Role Secret in Edge Functions gesetzt (Name: SERVICE_ROLE_KEY)
 - verify_jwt = false für Cron-Functions
+- Egress/Polling/Auth-Recovery: Verlauf und Änderungen → **docs/SUPABASE_EGRESS_POLLING_VERLAUF.md**
 
 ## Edge Functions Status
 - sales-week-start: OK

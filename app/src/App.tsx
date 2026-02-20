@@ -95,6 +95,11 @@ function App() {
     window.location.reload();
   };
 
+  // Callback zuerst: Nach Klick auf Reset-/Invite-Link darf hier nichts anderes laufen (kein authError/loading).
+  if (window.location.pathname === "/auth/callback") {
+    return <AuthCallbackPage />;
+  }
+
   // Required render priority: authError → loading → no session → recovery → password setup → main app
   if (authError) {
     const message =
@@ -137,11 +142,6 @@ function App() {
         </div>
       </div>
     );
-  }
-
-  // Auth callback MUSS ohne Session erreichbar sein (tauscht ?code= in Session um)
-  if (window.location.pathname === "/auth/callback") {
-    return <AuthCallbackPage />;
   }
 
   if (!session) {
@@ -383,21 +383,39 @@ function SetNewPasswordPage({ onDone, title, subtitle, buttonLabel }: {
       setMessage({ type: "error", text: "Das Passwort muss mindestens 8 Zeichen haben." });
       return;
     }
+    setSubmitting(true);
+    setMessage(null);
+
+    const TIMEOUT_MS = 15_000;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      window.setTimeout(
+        () => reject(new Error("Zeitüberschreitung. Bitte Netzwerk prüfen und erneut versuchen.")),
+        TIMEOUT_MS
+      );
+    });
+
     try {
-      setSubmitting(true);
-      setMessage(null);
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-        data: { password_set: true },
-      });
+      const { error } = await Promise.race([
+        supabase.auth.updateUser({
+          password: newPassword,
+          data: { password_set: true },
+        }),
+        timeoutPromise,
+      ]);
+
       if (error) {
-        setMessage({ type: "error", text: `Fehler: ${error.message}` });
+        console.error("[SetNewPasswordPage] updateUser error", error);
+        setMessage({
+          type: "error",
+          text: `Fehler: ${error.message}. Bei „Waiting for verification“ in Supabase den Nutzer dort öffnen und E-Mail bestätigen, dann erneut versuchen.`,
+        });
         return;
       }
       setMessage({ type: "success", text: "Passwort wurde gesetzt. Du wirst weitergeleitet…" });
       window.setTimeout(() => onDone(), 1500);
     } catch (err) {
       const text = err instanceof Error ? err.message : "Unbekannter Fehler";
+      console.error("[SetNewPasswordPage] exception", err);
       setMessage({ type: "error", text });
     } finally {
       setSubmitting(false);
