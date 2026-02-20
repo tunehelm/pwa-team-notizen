@@ -14,6 +14,7 @@ export function AuthCallbackPage() {
 
   useEffect(() => {
     let cancelled = false;
+    let cleanup: (() => void) | null = null;
 
     const run = async () => {
       const params = new URLSearchParams(window.location.search);
@@ -44,17 +45,10 @@ export function AuthCallbackPage() {
           return;
         }
 
-        // Hash-Flow: Supabase liest mit detectSessionInUrl die Tokens aus dem Hash.
-        // Kurz warten, dann Session prüfen und weiterleiten.
-        await new Promise((r) => setTimeout(r, 800));
-        if (cancelled) return;
-
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (cancelled) return;
-
-        if (session) {
+        // Hash-Flow: Supabase parst den Hash (detectSessionInUrl) und feuert onAuthStateChange.
+        // Listener statt getSession() vermeidet "The operation was aborted".
+        const done = () => {
+          if (cancelled) return;
           if (isRecovery || isInvite) {
             try {
               sessionStorage.setItem(RECOVERY_FLAG, "true");
@@ -63,11 +57,31 @@ export function AuthCallbackPage() {
             }
           }
           window.location.replace(window.location.origin + "/");
-          return;
-        }
+        };
 
-        setStatus("error");
-        setErrorMessage("Session konnte nicht hergestellt werden. Link evtl. abgelaufen – bitte erneut anfordern.");
+        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session) done();
+        });
+
+        const t = window.setTimeout(() => {
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) done();
+          }).catch(() => { /* ignore */ });
+        }, 1200);
+
+        const fail = window.setTimeout(() => {
+          if (cancelled) return;
+          sub.subscription.unsubscribe();
+          window.clearTimeout(t);
+          setStatus("error");
+          setErrorMessage("Session konnte nicht hergestellt werden. Link evtl. abgelaufen – bitte erneut anfordern.");
+        }, 8000);
+
+        cleanup = () => {
+          window.clearTimeout(t);
+          window.clearTimeout(fail);
+          sub.subscription.unsubscribe();
+        };
       } catch (err) {
         if (cancelled) return;
         setStatus("error");
@@ -78,6 +92,7 @@ export function AuthCallbackPage() {
     void run();
     return () => {
       cancelled = true;
+      cleanup?.();
     };
   }, []);
 
