@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { AuthCallbackPage } from "./pages/AuthCallbackPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { FolderPage } from "./pages/FolderPage";
 import { NotePage } from "./pages/NotePage";
@@ -34,8 +35,27 @@ function clearSupabaseAuthStorage(): void {
 
 function App() {
   const { loading, session, needsPasswordSetup, authError } = useRequirePasswordSetup();
-  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
 
+  // Recovery-Flag: aus sessionStorage (nach AuthCallbackPage-Redirect) oder live via Event/Hash.
+  const [isRecoveryMode, setIsRecoveryMode] = useState(() => {
+    try {
+      return sessionStorage.getItem("auth:pendingRecovery") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  // sessionStorage-Flag aufräumen sobald Session da ist
+  useEffect(() => {
+    if (!session || !isRecoveryMode) return;
+    try {
+      sessionStorage.removeItem("auth:pendingRecovery");
+    } catch {
+      /* ignore */
+    }
+  }, [session, isRecoveryMode]);
+
+  // Fallback: Hash-basierter Recovery-Link (impliziter Flow)
   useEffect(() => {
     const hash = window.location.hash;
     if (DEBUG_AUTH && hash) {
@@ -54,6 +74,7 @@ function App() {
     if (session && isRecoveryHash) setIsRecoveryMode(true);
   }, [session]);
 
+  // Fallback: PASSWORD_RECOVERY Event (alle Flows)
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") setIsRecoveryMode(true);
@@ -116,6 +137,11 @@ function App() {
         </div>
       </div>
     );
+  }
+
+  // Auth callback MUSS ohne Session erreichbar sein (tauscht ?code= in Session um)
+  if (window.location.pathname === "/auth/callback") {
+    return <AuthCallbackPage />;
   }
 
   if (!session) {
@@ -213,7 +239,7 @@ function LoginPage() {
       setMessage(null);
       setSubmitting(true);
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       });
       if (error) {
         setMessage({ type: "error", text: `Fehler: ${error.message}` });
