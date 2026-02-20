@@ -18,8 +18,8 @@ function isDesktop() {
   return typeof window !== 'undefined' && window.innerWidth >= 1024
 }
 
-/** Auto-Polling Intervall in ms */
-const POLL_INTERVAL = 30_000
+/** Auto-Polling Intervall in ms (24 h); bei Bedarf manuell refreshen */
+const POLL_INTERVAL = 24 * 60 * 60 * 1000
 
 
 export function SidebarLayout({ children, title }: SidebarLayoutProps) {
@@ -46,7 +46,7 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // ── Auto-Polling alle 30 Sekunden ──
+  // ── Auto-Polling alle 24 Stunden (manueller Refresh bei Bedarf) ──
   useEffect(() => {
     const interval = setInterval(() => {
       void refreshData()
