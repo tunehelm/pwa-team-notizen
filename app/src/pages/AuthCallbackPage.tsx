@@ -55,6 +55,9 @@ export function AuthCallbackPage() {
             } catch {
               /* ignore */
             }
+            // Query-Parameter als Fallback, falls sessionStorage beim Redirect verloren geht
+            window.location.replace(window.location.origin + "/?recovery=1");
+            return;
           }
           window.location.replace(window.location.origin + "/");
         };

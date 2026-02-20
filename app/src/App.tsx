@@ -36,13 +36,16 @@ function clearSupabaseAuthStorage(): void {
 function App() {
   const { loading, session, needsPasswordSetup, authError } = useRequirePasswordSetup();
 
-  // Recovery-Flag: aus sessionStorage (nach AuthCallbackPage-Redirect) oder live via Event/Hash.
+  // Recovery-Flag: aus sessionStorage, aus ?recovery=1 (Callback-Redirect) oder live via Event/Hash.
   const [isRecoveryMode, setIsRecoveryMode] = useState(() => {
     try {
-      return sessionStorage.getItem("auth:pendingRecovery") === "true";
+      if (sessionStorage.getItem("auth:pendingRecovery") === "true") return true;
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("recovery") === "1") return true;
     } catch {
-      return false;
+      /* ignore */
     }
+    return false;
   });
 
   // sessionStorage-Flag aufräumen sobald Session da ist
@@ -55,7 +58,17 @@ function App() {
     }
   }, [session, isRecoveryMode]);
 
-  // Fallback: Hash-basierter Recovery-Link (impliziter Flow)
+  // ?recovery=1 aus URL entfernen, sobald wir es erkannt haben (bleibt nicht in Adresszeile)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("recovery") === "1") {
+      params.delete("recovery");
+      const search = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (search ? "?" + search : ""));
+    }
+  }, [isRecoveryMode]);
+
+  // Fallback: Hash enthält type=recovery → Recovery-Modus erzwingen (Passwort setzen), Hash danach entfernen
   useEffect(() => {
     const hash = window.location.hash;
     if (DEBUG_AUTH && hash) {
@@ -70,8 +83,17 @@ function App() {
               : "other";
       console.debug("[Auth:hash]", { hash: hash.slice(0, 80), type });
     }
-    const isRecoveryHash = hash.includes("type=recovery");
-    if (session && isRecoveryHash) setIsRecoveryMode(true);
+    const isRecoveryHash = hash.includes("type=recovery") || hash.includes("type=invite");
+    if (session && isRecoveryHash) {
+      setIsRecoveryMode(true);
+      try {
+        sessionStorage.setItem("auth:pendingRecovery", "true");
+      } catch {
+        /* ignore */
+      }
+      // Hash aus URL entfernen (Tokens nicht in History/Addressbar lassen)
+      if (hash) window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
   }, [session]);
 
   // Fallback: PASSWORD_RECOVERY Event (alle Flows)
