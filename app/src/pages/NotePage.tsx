@@ -695,11 +695,15 @@ function NoteEditor({
 
     function handleClick(e: Event) {
       const target = e.target as HTMLElement
-      // Link-Klick: in contenteditable öffnet der Browser Links nicht nativ → manuell öffnen
+      // Link-Klick: Ctrl+Klick (Windows) oder Cmd+Klick (Mac) öffnet Link in neuem Tab
       const anchor = (target instanceof HTMLAnchorElement ? target : target.closest('a')) as HTMLAnchorElement | null
       if (anchor && editor!.contains(anchor) && anchor.href) {
-        e.preventDefault()
-        window.open(anchor.href, '_blank', 'noopener,noreferrer')
+        const me = e as MouseEvent
+        if (me.ctrlKey || me.metaKey) {
+          e.preventDefault()
+          window.open(anchor.href, '_blank', 'noopener,noreferrer')
+        }
+        // Ohne Modifier: normales contenteditable-Verhalten (Cursor setzen)
         return
       }
       if (target instanceof HTMLImageElement && editor!.contains(target)) {

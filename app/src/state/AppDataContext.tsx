@@ -27,6 +27,7 @@ import { supabase } from '../lib/supabase'
 import {
   cacheFolders,
   cacheNotes,
+  clearFoldersAndNotesCache,
   loadCachedFolders,
   loadCachedNotes,
   addPendingChange,
@@ -69,6 +70,8 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
     notes: [],
   })
   const contentSaveTimersRef = useRef<Map<string, number>>(new Map())
+  /** Letzter noch nicht nach Supabase gespeicherter Inhalt je NoteId (für Flush vor Refresh). */
+  const pendingContentRef = useRef<Map<string, string>>(new Map())
 
   const [apiError, setApiError] = useState<string | null>(null)
   const [currentUserEmail, setCurrentUserEmail] = useState('')
@@ -126,19 +129,27 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
     })
   }, [])
 
-  const loadFoldersAndNotes = useCallback(async () => {
-    // 1) Load from local cache first (instant)
-    const [cachedFolders, cachedNotes] = await Promise.all([
-      loadCachedFolders(),
-      loadCachedNotes(),
-    ])
-    if (cachedFolders && cachedFolders.length > 0) {
-      console.log('[AppDataContext] Using cached folders', cachedFolders.length)
-      setFolders(cachedFolders)
-    }
-    if (cachedNotes && cachedNotes.length > 0) {
-      console.log('[AppDataContext] Using cached notes', cachedNotes.length)
-      setNotes(cachedNotes)
+  const loadFoldersAndNotes = useCallback(async (forceFromServer = false) => {
+    let cachedFolders: FolderItem[] | null = null
+    let cachedNotes: NoteItem[] | null = null
+
+    if (forceFromServer) {
+      await clearFoldersAndNotesCache()
+      console.log('[AppDataContext] Force from server – Cache geleert')
+    } else {
+      // 1) Load from local cache first (instant)
+      ;[cachedFolders, cachedNotes] = await Promise.all([
+        loadCachedFolders(),
+        loadCachedNotes(),
+      ])
+      if (cachedFolders && cachedFolders.length > 0) {
+        console.log('[AppDataContext] Using cached folders', cachedFolders.length)
+        setFolders(cachedFolders)
+      }
+      if (cachedNotes && cachedNotes.length > 0) {
+        console.log('[AppDataContext] Using cached notes', cachedNotes.length)
+        setNotes(cachedNotes)
+      }
     }
 
     // 2) If offline, stop here
@@ -489,8 +500,11 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
         if (existingTimer) {
           window.clearTimeout(existingTimer)
         }
+        // Inhalt für möglichen Flush (z.B. vor Refresh) vormerken
+        pendingContentRef.current.set(noteId, content)
 
         const timeoutId = window.setTimeout(() => {
+          pendingContentRef.current.delete(noteId)
           if (!isOnline()) {
             // Queue for later sync
             void addPendingChange({ type: 'updateNote', noteId, payload: { content } })
@@ -663,8 +677,25 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
           showApiError('Papierkorb konnte nicht geleert werden.', error)
         }
       },
-      refreshData: async () => {
-        await loadFoldersAndNotes()
+      refreshData: async (forceFromServer = false) => {
+        // Flush: offene Debounce-Saves sofort nach Supabase schreiben bevor Daten geholt werden
+        if (pendingContentRef.current.size > 0) {
+          const flushEntries = Array.from(pendingContentRef.current.entries())
+          for (const [noteId, content] of flushEntries) {
+            const timer = contentSaveTimersRef.current.get(noteId)
+            if (timer) {
+              window.clearTimeout(timer)
+              contentSaveTimersRef.current.delete(noteId)
+            }
+            pendingContentRef.current.delete(noteId)
+            try {
+              await updateNoteApi(noteId, { content })
+            } catch {
+              void addPendingChange({ type: 'updateNote', noteId, payload: { content } })
+            }
+          }
+        }
+        await loadFoldersAndNotes(forceFromServer)
       },
     }),
     [apiError, currentUserEmail, currentUserName, profileLoaded, folders, loadFoldersAndNotes, notes, replaceFolderNotes, showApiError, trash, userId],
