@@ -213,6 +213,8 @@ function NoteEditor({
   // Link-Dialog state
   const [linkUrl, setLinkUrl] = useState('')
   const [linkLabel, setLinkLabel] = useState('')
+  /** Gespeicherte Cursor-Position für Link-Einfügen (geht verloren wenn User ins URL-Feld tippt). */
+  const savedLinkSelectionRef = useRef<Range | null>(null)
 
   // Table dialog state
   const [tableRows, setTableRows] = useState(3)
@@ -698,12 +700,8 @@ function NoteEditor({
       // Link-Klick: Ctrl+Klick (Windows) oder Cmd+Klick (Mac) öffnet Link in neuem Tab
       const anchor = (target instanceof HTMLAnchorElement ? target : target.closest('a')) as HTMLAnchorElement | null
       if (anchor && editor!.contains(anchor) && anchor.href) {
-        const me = e as unknown as MouseEvent
-        if (me.ctrlKey || me.metaKey) {
-          e.preventDefault()
-          window.open(anchor.href, '_blank', 'noopener,noreferrer')
-        }
-        // Ohne Modifier: normales contenteditable-Verhalten (Cursor setzen)
+        e.preventDefault()
+        window.open(anchor.href, '_blank', 'noopener,noreferrer')
         return
       }
       if (target instanceof HTMLImageElement && editor!.contains(target)) {
@@ -967,28 +965,17 @@ function NoteEditor({
           if (headingSpan) {
             const content = headingSpan.textContent || ''
             if (content.replace(/[\u200B\s]/g, '') === '') {
-              // Leerer Span auf neuer Zeile (Browser hat korrekt gesplittet) → Styles entfernen
+              // Leerer Span auf neuer Zeile → Heading-Styles entfernen
               headingSpan.style.fontSize = ''
               headingSpan.style.fontWeight = ''
             } else {
-              // Span enthält noch den alten H1-Text → nicht anfassen!
-              // Stattdessen Reset-Span am Cursor einfügen, damit neuer Text normal ist
-              const resetSpan = document.createElement('span')
-              resetSpan.style.fontSize = '1em'
-              resetSpan.style.fontWeight = 'normal'
-              resetSpan.appendChild(document.createTextNode('\u200B'))
-
-              const range = s.getRangeAt(0)
-              range.collapse(false)
-              range.insertNode(resetSpan)
-
-              if (resetSpan.firstChild) {
-                const nr = document.createRange()
-                nr.setStartAfter(resetSpan.firstChild)
-                nr.collapse(true)
-                s.removeAllRanges()
-                s.addRange(nr)
-              }
+              // Cursor steckt noch im alten Heading-Span → Cursor NACH den Span setzen
+              // (kein \u200B einfügen – das verursacht Cursor-Verwirrung und unlesbaren Text)
+              const nr = document.createRange()
+              nr.setStartAfter(headingSpan)
+              nr.collapse(true)
+              s.removeAllRanges()
+              s.addRange(nr)
             }
           }
 
@@ -1294,6 +1281,16 @@ function NoteEditor({
     if (!url) return
     const label = linkLabel.trim() || url
     editorRef.current?.focus()
+    // Cursor-Position wiederherstellen (geht verloren wenn User ins URL-Feld getippt hat)
+    const savedRange = savedLinkSelectionRef.current
+    if (savedRange) {
+      const sel = document.getSelection()
+      if (sel) {
+        sel.removeAllRanges()
+        sel.addRange(savedRange)
+      }
+      savedLinkSelectionRef.current = null
+    }
     document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" rel="noopener" style="color:#3b82f6;text-decoration:underline">${label}</a>&nbsp;`)
     syncEditorContent()
     setLinkUrl('')
@@ -1910,7 +1907,13 @@ function NoteEditor({
           <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => setActivePanel((p) => (p === 'table' ? 'none' : 'table'))} className={`${tbtn} ${activePanel === 'table' ? tbtnActive : tbtnDefault}`} aria-label="Tabelle einfügen" title="Tabelle einfügen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" /></svg>
           </button>
-          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => setActivePanel((p) => (p === 'link' ? 'none' : 'link'))} className={`${tbtn} ${activePanel === 'link' ? tbtnActive : tbtnDefault}`} aria-label="Link">
+          <button type="button" onMouseDown={keepEditorFocus} onTouchStart={keepEditorFocus} onClick={() => {
+            const sel = document.getSelection()
+            if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+              savedLinkSelectionRef.current = sel.getRangeAt(0).cloneRange()
+            }
+            setActivePanel((p) => (p === 'link' ? 'none' : 'link'))
+          }} className={`${tbtn} ${activePanel === 'link' ? tbtnActive : tbtnDefault}`} aria-label="Link">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg>
           </button>
           <button type="button" onClick={openDrawing} className={`${tbtn} ${tbtnDefault}`} aria-label="Zeichnen">
