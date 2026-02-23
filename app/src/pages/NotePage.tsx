@@ -1566,6 +1566,27 @@ function NoteEditor({
   /* ── Foto/Datei-Upload ── */
 
   function handleFileUpload(accept: string) {
+    // Cursor-Position vor dem Öffnen des Datei-Pickers sichern (Picker stiehlt den Focus)
+    const savedRange = (() => {
+      const sel = document.getSelection()
+      if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+        return sel.getRangeAt(0).cloneRange()
+      }
+      return null
+    })()
+
+    const insertIntoEditor = (html: string) => {
+      const editor = editorRef.current
+      if (!editor) return
+      editor.focus()
+      if (savedRange) {
+        const sel = document.getSelection()
+        if (sel) { sel.removeAllRanges(); sel.addRange(savedRange) }
+      }
+      document.execCommand('insertHTML', false, html)
+      syncEditorContent()
+    }
+
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = accept
@@ -1576,8 +1597,6 @@ function NoteEditor({
       void (async () => {
         try {
           const url = await uploadMedia(file, file.name)
-          editorRef.current?.focus()
-
           let html = ''
           if (file.type.startsWith('image/')) {
             html = `<div class="img-wrap" contenteditable="false" style="margin:8px 0"><img src="${url}" alt="${file.name}" style="max-width:100%;width:400px;border-radius:12px;display:block" /></div><p><br></p>`
@@ -1588,18 +1607,15 @@ function NoteEditor({
           } else {
             html = `<a href="${url}" download="${file.name}" style="color:#3b82f6;text-decoration:underline">📎 ${file.name}</a>&nbsp;`
           }
-
-          document.execCommand('insertHTML', false, html)
-          syncEditorContent()
+          insertIntoEditor(html)
         } catch (err) {
           console.error('[NotePage] File upload failed, using Base64 fallback:', err)
           const reader = new FileReader()
           reader.onload = () => {
-            editorRef.current?.focus()
             const dataUrl = reader.result as string
             let html = ''
             if (file.type.startsWith('image/')) {
-              html = `<img src="${dataUrl}" alt="${file.name}" style="max-width:100%;width:400px;border-radius:12px;margin:8px 0" /><p><br></p>`
+              html = `<div class="img-wrap" contenteditable="false" style="margin:8px 0"><img src="${dataUrl}" alt="${file.name}" style="max-width:100%;width:400px;border-radius:12px;display:block" /></div><p><br></p>`
             } else if (file.type.startsWith('video/')) {
               html = `<video src="${dataUrl}" controls style="max-width:100%;border-radius:12px;margin:8px 0"></video><p><br></p>`
             } else if (file.type.startsWith('audio/')) {
@@ -1607,8 +1623,7 @@ function NoteEditor({
             } else {
               html = `<a href="${dataUrl}" download="${file.name}" style="color:#3b82f6;text-decoration:underline">📎 ${file.name}</a>&nbsp;`
             }
-            document.execCommand('insertHTML', false, html)
-            syncEditorContent()
+            insertIntoEditor(html)
           }
           reader.readAsDataURL(file)
         }
