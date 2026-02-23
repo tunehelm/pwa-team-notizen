@@ -2,7 +2,7 @@ import { createContext, useContext, type ReactNode } from 'react'
 
 export interface LayoutContextValue {
   setSidebarOpen: (v: boolean | ((prev: boolean) => boolean)) => void
-  onRefresh: () => void
+  onRefresh: (forceFromServer?: boolean) => void
   isRefreshing: boolean
   /** Öffnet Suche – auf Desktop: Suchfeld im Header, auf Mobile: Navigation zu /search */
   onSearch: () => void
