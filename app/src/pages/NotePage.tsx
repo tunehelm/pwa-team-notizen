@@ -194,6 +194,8 @@ function NoteEditor({
   const editorRef = useRef<HTMLDivElement>(null)
   const latestTitleRef = useRef(note?.title ?? 'Neue Notiz')
   const initAppliedForNoteIdRef = useRef<string | null>(null)
+  /** Inhalt, den wir zuletzt aus Server/Draft in den Editor geschrieben haben – damit wir bei Refresh (neues note.content) nachziehen. */
+  const lastAppliedContentRef = useRef<string | undefined>(undefined)
 
   useEffect(() => {
     latestTitleRef.current = titleValue
@@ -337,9 +339,22 @@ function NoteEditor({
     })
   }
 
-  // Apply draft or server content once per note when editor is mounted (fixes reload: draft visible immediately)
+  // Apply draft or server content when editor is mounted; after Refresh (note.content from server changes) always show server content
   useEffect(() => {
     if (!note?.id || !editorRef.current || !editorMounted) return
+
+    const serverContent = note.content ?? ''
+
+    // Server hat neuen Inhalt geliefert (z. B. nach Refresh) → immer Server anzeigen, Draft verwerfen
+    if (initAppliedForNoteIdRef.current === note.id && lastAppliedContentRef.current !== serverContent) {
+      clearDraft(note.id)
+      editorRef.current.innerHTML = serverContent
+      latestContentRef.current = serverContent
+      lastAppliedContentRef.current = serverContent
+      const mountId = window.setTimeout(() => { const ed = editorRef.current; if (ed) mountSmartBlocks(ed) }, 0)
+      return () => window.clearTimeout(mountId)
+    }
+
     if (initAppliedForNoteIdRef.current === note.id) return
 
     initAppliedForNoteIdRef.current = note.id
@@ -350,6 +365,7 @@ function NoteEditor({
       setTitleValue(draft.title)
       latestTitleRef.current = draft.title
       latestContentRef.current = draft.content
+      lastAppliedContentRef.current = draft.content
       setDraftRestored(true)
       const t = window.setTimeout(() => setDraftRestored(false), 4000)
       const mountId = window.setTimeout(() => { const ed = editorRef.current; if (ed) mountSmartBlocks(ed) }, 0)
@@ -359,8 +375,9 @@ function NoteEditor({
       }
     }
 
-    editorRef.current.innerHTML = note.content ?? ''
-    latestContentRef.current = note.content ?? ''
+    editorRef.current.innerHTML = serverContent
+    latestContentRef.current = serverContent
+    lastAppliedContentRef.current = serverContent
     clearDraft(note.id)
     const mountId = window.setTimeout(() => { const ed = editorRef.current; if (ed) mountSmartBlocks(ed) }, 0)
     return () => window.clearTimeout(mountId)
