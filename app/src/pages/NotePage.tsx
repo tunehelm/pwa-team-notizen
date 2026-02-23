@@ -396,6 +396,7 @@ function NoteEditor({
 
   function syncEditorContent() {
     const html = editorRef.current?.innerHTML ?? ''
+    lastAppliedContentRef.current = html // prevent useEffect feedback loop on every keystroke
     trackedContentChange(html)
   }
 

@@ -52,7 +52,7 @@ export interface AppDataContextValue {
   permanentlyDeleteFolder: (folderId: string) => Promise<void>
   permanentlyDeleteNote: (noteId: string) => Promise<void>
   emptyTrash: () => Promise<void>
-  refreshData: () => Promise<void>
+  refreshData: (forceFromServer?: boolean) => Promise<void>
 }
 
 export const AppDataContext = createContext<AppDataContextValue | undefined>(undefined)

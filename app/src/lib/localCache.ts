@@ -65,6 +65,15 @@ export async function loadCachedNotes(): Promise<NoteItem[] | null> {
   }
 }
 
+/** Ordner- und Notiz-Cache leeren (z. B. für „Vom Server laden“). Pending Changes bleiben. */
+export async function clearFoldersAndNotesCache(): Promise<void> {
+  try {
+    await Promise.all([del(CACHE_KEYS.folders), del(CACHE_KEYS.notes)])
+  } catch (e) {
+    console.warn('[localCache] Failed to clear folders/notes cache', e)
+  }
+}
+
 /** Add a pending change for later sync */
 export async function addPendingChange(change: Omit<PendingChange, 'id' | 'timestamp'>): Promise<void> {
   try {

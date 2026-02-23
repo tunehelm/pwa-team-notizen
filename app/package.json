@@ -8,7 +8,7 @@
     "dev:api": "vercel dev",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
+    "preview": "lsof -t -i :4173 | xargs kill -9 2>/dev/null; vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "docs:drift": "node scripts/checkDocsDrift.mjs"

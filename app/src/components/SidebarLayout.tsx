@@ -55,11 +55,11 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
   }, [refreshData])
 
   // ── Refresh-Handler (mit Timeout-Schutz, max 15 s) ──
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = useCallback(async (forceFromServer = false) => {
     setIsRefreshing(true)
     const timeout = setTimeout(() => setIsRefreshing(false), 15_000)
     try {
-      await refreshData()
+      await refreshData(forceFromServer)
     } finally {
       clearTimeout(timeout)
       setTimeout(() => setIsRefreshing(false), 600)
@@ -118,7 +118,7 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
 
   const layoutValue = {
     setSidebarOpen,
-    onRefresh: () => void handleRefresh(),
+    onRefresh: (forceFromServer?: boolean) => void handleRefresh(!!forceFromServer),
     isRefreshing,
     onSearch: () => {
       if (isDesktop()) {
@@ -194,14 +194,15 @@ export function SidebarLayout({ children, title }: SidebarLayoutProps) {
             </form>
           ) : (
             <div className="flex items-center gap-1">
-              {/* Refresh-Button */}
+              {/* Refresh-Button; Shift+Klick = vom Server laden (Cache ignorieren) */}
               <button
                 type="button"
-                onClick={() => void handleRefresh()}
+                onClick={(e) => void handleRefresh(e.shiftKey)}
                 disabled={isRefreshing}
                 className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
                 style={{ color: 'var(--color-sidebar-text-muted)' }}
                 aria-label="Aktualisieren"
+                title="Aktualisieren. Shift+Klick: vom Server laden (Cache ignorieren)"
               >
                 <svg
                   viewBox="0 0 24 24"

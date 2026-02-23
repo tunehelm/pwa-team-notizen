@@ -105,28 +105,26 @@ export function useRequirePasswordSetup(): {
 
         if (!isMounted) return;
 
-        let userFromGetUser: Session["user"] | null | undefined;
+        // Use local session immediately so the app loads without waiting for getUser()
+        setSession(sess);
+        finishLoading(null);
+
+        // Validate/refresh user in background to get latest user_metadata (e.g. password_set)
         if (sess?.user) {
           const { data: userData } = await supabase.auth.getUser();
           if (!isMounted) return;
-          userFromGetUser = userData?.user;
+          const userFromGetUser = userData?.user;
           if (userFromGetUser) {
             setSession({ ...sess, user: userFromGetUser });
-          } else {
-            setSession(sess);
           }
-        } else {
-          setSession(null);
+          if (DEBUG_AUTH) {
+            console.debug("[Auth:deep]", {
+              sessionFromGetSession: sess,
+              userFromGetUser: userFromGetUser ?? null,
+              localStorageKeys: Object.keys(localStorage).filter((k) => k.includes("sb-")),
+            });
+          }
         }
-
-        if (DEBUG_AUTH) {
-          console.debug("[Auth:deep]", {
-            sessionFromGetSession: sess,
-            userFromGetUser: userFromGetUser ?? null,
-            localStorageKeys: Object.keys(localStorage).filter((k) => k.includes("sb-")),
-          });
-        }
-        finishLoading(null);
       } catch (e) {
         console.error("[Auth:init] init error", e);
         if (isMounted && isSessionInvalidError(e)) {

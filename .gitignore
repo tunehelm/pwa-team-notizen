@@ -16,6 +16,9 @@ dev-dist
 *.local
 .env*.local
 
+# MCP config (contains API keys)
+.mcp.json
+
 # Editor
 .idea
 *.sw?

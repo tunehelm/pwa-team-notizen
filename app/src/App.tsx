@@ -425,10 +425,10 @@ function SetNewPasswordPage({ onDone, title, subtitle, buttonLabel }: {
     setSubmitting(true);
     setMessage(null);
 
-    const TIMEOUT_MS = 15_000;
+    const TIMEOUT_MS = 30_000;
     const timeoutPromise = new Promise<never>((_, reject) => {
       window.setTimeout(
-        () => reject(new Error("Zeitüberschreitung. Bitte Netzwerk prüfen und erneut versuchen.")),
+        () => reject(new Error("Zeitüberschreitung (30 s). Netzwerk prüfen oder in Supabase unter Authentication → Providers → Email „Secure password change“ deaktivieren und erneut versuchen.")),
         TIMEOUT_MS
       );
     });
