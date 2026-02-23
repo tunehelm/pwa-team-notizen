@@ -689,18 +689,9 @@ export async function updateNote(
   // data is an array – should contain exactly one row if update succeeded
   const rows = (data ?? []) as NoteRow[]
   if (rows.length === 0) {
-    // RLS might block the update – try a direct select to check if the note exists
-    const { data: existing } = await supabase
-      .from('notes')
-      .select(NOTE_COLUMNS)
-      .eq('id', noteId)
-      .maybeSingle()
-    if (existing) {
-      // Note exists but could not be updated (RLS policy) – return existing data
-      console.warn('[api.updateNote] Update returned 0 rows, returning existing data for', noteId)
-      return mapNoteRow(existing as NoteRow)
-    }
-    throw new Error('Notiz konnte nicht aktualisiert werden.')
+    // Update returned 0 rows – either RLS blocks the write or note doesn't exist.
+    // Always throw so the caller can queue a pending change and retry later.
+    throw new Error('Notiz konnte nicht gespeichert werden (keine Schreibberechtigung oder Notiz nicht gefunden).')
   }
   return mapNoteRow(rows[0])
 }

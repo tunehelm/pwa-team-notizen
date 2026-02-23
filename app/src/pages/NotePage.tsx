@@ -695,6 +695,13 @@ function NoteEditor({
 
     function handleClick(e: Event) {
       const target = e.target as HTMLElement
+      // Link-Klick: in contenteditable öffnet der Browser Links nicht nativ → manuell öffnen
+      const anchor = (target instanceof HTMLAnchorElement ? target : target.closest('a')) as HTMLAnchorElement | null
+      if (anchor && editor!.contains(anchor) && anchor.href) {
+        e.preventDefault()
+        window.open(anchor.href, '_blank', 'noopener,noreferrer')
+        return
+      }
       if (target instanceof HTMLImageElement && editor!.contains(target)) {
         e.preventDefault()
         selectImage(target)
