@@ -72,6 +72,8 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
   const contentSaveTimersRef = useRef<Map<string, number>>(new Map())
   /** Letzter noch nicht nach Supabase gespeicherter Inhalt je NoteId (für Flush vor Refresh). */
   const pendingContentRef = useRef<Map<string, string>>(new Map())
+  /** Laufende updateNoteApi-Promises (Debounce-Timer hat bereits gefeuert aber API-Call läuft noch). */
+  const inProgressSavesRef = useRef<Map<string, Promise<NoteItem>>>(new Map())
 
   const [apiError, setApiError] = useState<string | null>(null)
   const [currentUserEmail, setCurrentUserEmail] = useState('')
@@ -510,7 +512,7 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
             void addPendingChange({ type: 'updateNote', noteId, payload: { content } })
             return
           }
-          void updateNoteApi(noteId, { content })
+          const savePromise = updateNoteApi(noteId, { content })
             .then((updated: NoteItem) => {
               // Update with server response but keep the local content (may have changed since)
               setNotes((prev) =>
@@ -520,12 +522,18 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
                     : note,
                 ),
               )
+              return updated
             })
             .catch((error: unknown) => {
               // Save to pending queue so it can sync later
               void addPendingChange({ type: 'updateNote', noteId, payload: { content } })
               showApiError('Notizinhalte konnten nicht gespeichert werden.', error)
+              throw error
             })
+            .finally(() => {
+              inProgressSavesRef.current.delete(noteId)
+            })
+          inProgressSavesRef.current.set(noteId, savePromise as Promise<NoteItem>)
         }, CONTENT_SAVE_DEBOUNCE_MS)
 
         contentSaveTimersRef.current.set(noteId, timeoutId)
@@ -678,7 +686,7 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
         }
       },
       refreshData: async (forceFromServer = false) => {
-        // Flush: offene Debounce-Saves sofort nach Supabase schreiben bevor Daten geholt werden
+        // 1) Flush: Debounce-Timer noch nicht gefeuert → sofort nach Supabase schreiben
         if (pendingContentRef.current.size > 0) {
           const flushEntries = Array.from(pendingContentRef.current.entries())
           for (const [noteId, content] of flushEntries) {
@@ -694,6 +702,10 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
               void addPendingChange({ type: 'updateNote', noteId, payload: { content } })
             }
           }
+        }
+        // 2) Timer hat schon gefeuert, aber API-Call läuft noch → warten bis alle fertig sind
+        if (inProgressSavesRef.current.size > 0) {
+          await Promise.allSettled(Array.from(inProgressSavesRef.current.values()))
         }
         await loadFoldersAndNotes(forceFromServer)
       },
