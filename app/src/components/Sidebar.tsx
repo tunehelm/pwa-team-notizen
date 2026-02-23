@@ -240,6 +240,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           'lg:relative lg:z-0',
           // Toggle
           isOpen ? 'translate-x-0' : '-translate-x-full lg:-ml-64',
+          // Geschlossen: keine Klicks abfangen (behebt „Ordner/Notiz auf Start nicht anklickbar“)
+          isOpen ? '' : 'pointer-events-none lg:pointer-events-auto',
         ].join(' ')}
         style={{
           backgroundColor: 'var(--color-sidebar)',
