@@ -698,7 +698,7 @@ function NoteEditor({
       // Link-Klick: Ctrl+Klick (Windows) oder Cmd+Klick (Mac) öffnet Link in neuem Tab
       const anchor = (target instanceof HTMLAnchorElement ? target : target.closest('a')) as HTMLAnchorElement | null
       if (anchor && editor!.contains(anchor) && anchor.href) {
-        const me = e as MouseEvent
+        const me = e as unknown as MouseEvent
         if (me.ctrlKey || me.metaKey) {
           e.preventDefault()
           window.open(anchor.href, '_blank', 'noopener,noreferrer')
