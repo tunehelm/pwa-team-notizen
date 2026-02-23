@@ -91,8 +91,10 @@ export function useRequirePasswordSetup(): {
       timeoutId = setTimeout(() => {
         timeoutId = undefined;
         if (!isMounted) return;
-        console.error("[Auth] loading timeout – getSession/getUser did not resolve in time");
-        finishLoading("timeout");
+        // Token-Refresh läuft noch (langsames Netz) – Ladescreen beenden, kein Fehler zeigen.
+        // onAuthStateChange liefert die Session sobald der Refresh fertig ist.
+        console.warn("[Auth] loading timeout – showing login screen, waiting for onAuthStateChange");
+        finishLoading(null);
       }, LOADING_TIMEOUT_MS);
 
       try {

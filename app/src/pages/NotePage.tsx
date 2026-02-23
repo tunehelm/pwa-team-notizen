@@ -346,43 +346,37 @@ function NoteEditor({
     })
   }
 
-  // Nach explizitem Refresh: Draft verwerfen und Server-Inhalt erzwingen (verhindert Draft-Uhr-Versatz-Bug)
-  useEffect(() => {
-    if (!lastRefreshAt || !note?.id || !editorRef.current || !editorMounted) return
-    const serverContent = note.content ?? ''
-    clearDraft(note.id)
-    editorRef.current.innerHTML = serverContent
-    latestContentRef.current = serverContent
-    lastAppliedContentRef.current = serverContent
-    const mountId = window.setTimeout(() => { const ed = editorRef.current; if (ed) mountSmartBlocks(ed) }, 0)
-    return () => window.clearTimeout(mountId)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastRefreshAt])
-
-  // Apply draft or server content when editor is mounted; after Refresh (note.content from server changes) always show server content
+  // Apply draft or server content when editor is mounted; after Refresh always show server content
   useEffect(() => {
     if (!note?.id || !editorRef.current || !editorMounted) return
 
     const serverContent = note.content ?? ''
-
-    // Server hat neuen Inhalt geliefert (z. B. nach Refresh) → immer Server anzeigen, Draft verwerfen
-    if (initAppliedForNoteIdRef.current === note.id && lastAppliedContentRef.current !== serverContent) {
+    const applyServer = () => {
       clearDraft(note.id)
-      editorRef.current.innerHTML = serverContent
+      editorRef.current!.innerHTML = serverContent
       latestContentRef.current = serverContent
       lastAppliedContentRef.current = serverContent
       const mountId = window.setTimeout(() => { const ed = editorRef.current; if (ed) mountSmartBlocks(ed) }, 0)
       return () => window.clearTimeout(mountId)
     }
 
-    if (initAppliedForNoteIdRef.current === note.id) return
+    // Note bereits initialisiert: nur reagieren wenn Server-Inhalt sich geändert hat ODER Refresh kam
+    if (initAppliedForNoteIdRef.current === note.id) {
+      const contentChanged = lastAppliedContentRef.current !== serverContent
+      if (contentChanged || lastRefreshAt > 0) return applyServer()
+      return
+    }
 
+    // Erste Initialisierung dieser Note
     initAppliedForNoteIdRef.current = note.id
     const draft = loadDraft(note.id)
 
-    // Draft nur anzeigen wenn er neuer als der Server-Stand ist (anderes Gerät könnte neueren Stand haben)
+    // Draft nur zeigen wenn er neuer als Server-Stand UND neuer als letzter Refresh
+    // (verhindert: Mac-Draft "gewinnt" durch Uhrzeitabweichung gegen frische Surface-Daten)
     const serverUpdatedAt = note.updatedAt ?? 0
-    const draftIsNewer = draft && (serverUpdatedAt === 0 || draft.updatedAt > serverUpdatedAt)
+    const draftIsNewer = draft &&
+      (serverUpdatedAt === 0 || draft.updatedAt > serverUpdatedAt) &&
+      (lastRefreshAt === 0 || draft.updatedAt > lastRefreshAt)
 
     if (draftIsNewer) {
       editorRef.current.innerHTML = draft.content
@@ -399,18 +393,9 @@ function NoteEditor({
       }
     }
 
-    if (draft && !draftIsNewer) {
-      // Server ist neuer (andere Person hat auf einem anderen Gerät gespeichert) → Draft verwerfen
-      clearDraft(note.id)
-    }
-
-    editorRef.current.innerHTML = serverContent
-    latestContentRef.current = serverContent
-    lastAppliedContentRef.current = serverContent
-    clearDraft(note.id)
-    const mountId = window.setTimeout(() => { const ed = editorRef.current; if (ed) mountSmartBlocks(ed) }, 0)
-    return () => window.clearTimeout(mountId)
-  }, [note?.id, note?.content, editorMounted])
+    return applyServer()
+  // lastRefreshAt in deps: Refresh triggert den Effect neu → Server-Inhalt wird erzwungen
+  }, [note?.id, note?.content, editorMounted, lastRefreshAt])
 
   function syncEditorContent() {
     const editor = editorRef.current
