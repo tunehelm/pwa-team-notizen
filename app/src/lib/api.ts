@@ -97,6 +97,8 @@ function mapFolderRow(row: FolderRow): FolderItem {
 
 function mapNoteRow(row: NoteRow): NoteItem {
   const content = typeof row.content === 'string' ? row.content : ''
+  const rawTs = row.updated_at ?? row.created_at
+  const updatedAt = rawTs ? new Date(rawTs).getTime() : 0
 
   return {
     id: row.id,
@@ -105,6 +107,7 @@ function mapNoteRow(row: NoteRow): NoteItem {
     content,
     excerpt: buildExcerpt(content),
     updatedLabel: formatUpdatedLabel(row.updated_at ?? row.created_at),
+    updatedAt,
     pinned: Boolean(row.pinned),
     ownerId: row.user_id ?? row.owner_id ?? '',
   }

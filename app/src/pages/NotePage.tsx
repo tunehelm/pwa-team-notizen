@@ -360,7 +360,11 @@ function NoteEditor({
     initAppliedForNoteIdRef.current = note.id
     const draft = loadDraft(note.id)
 
-    if (draft) {
+    // Draft nur anzeigen wenn er neuer als der Server-Stand ist (anderes Gerät könnte neueren Stand haben)
+    const serverUpdatedAt = note.updatedAt ?? 0
+    const draftIsNewer = draft && (serverUpdatedAt === 0 || draft.updatedAt > serverUpdatedAt)
+
+    if (draftIsNewer) {
       editorRef.current.innerHTML = draft.content
       setTitleValue(draft.title)
       latestTitleRef.current = draft.title
@@ -373,6 +377,11 @@ function NoteEditor({
         window.clearTimeout(t)
         window.clearTimeout(mountId)
       }
+    }
+
+    if (draft && !draftIsNewer) {
+      // Server ist neuer (andere Person hat auf einem anderen Gerät gespeichert) → Draft verwerfen
+      clearDraft(note.id)
     }
 
     editorRef.current.innerHTML = serverContent
@@ -1719,11 +1728,12 @@ function NoteEditor({
               </button>
               <button
                 type="button"
-                onClick={layout.onRefresh}
+                onClick={(e) => layout.onRefresh(e.shiftKey)}
                 disabled={layout.isRefreshing}
                 className={headerBtn}
                 style={headerBtnStyle}
                 aria-label="Aktualisieren"
+                title="Aktualisieren. Shift+Klick: vom Server laden (Cache ignorieren)"
               >
                 <svg
                   viewBox="0 0 24 24"

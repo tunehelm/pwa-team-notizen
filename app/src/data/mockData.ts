@@ -17,6 +17,8 @@ export interface NoteItem {
   excerpt: string
   content: string
   updatedLabel: string
+  /** Unix-Timestamp (ms) des letzten Server-Updates – für Draft-Vergleich. */
+  updatedAt: number
   pinned: boolean
   ownerId: string
 }
@@ -48,6 +50,7 @@ export const initialNotes: NoteItem[] = [
     excerpt: 'Umfang der ersten Release-Phase und Timeline.',
     content: 'Kickoff-Notiz mit Zielen, Scope und den ersten UI-Shell-Bausteinen.',
     updatedLabel: 'vor 2 Std.',
+    updatedAt: 0,
     pinned: true,
     ownerId: 'mock',
   },
@@ -58,6 +61,7 @@ export const initialNotes: NoteItem[] = [
     excerpt: 'Topbar sichtbar, Keyboard-Flow, sichere Tap-Flächen.',
     content: 'Checkliste für iOS-optimierte Bedienung in der PWA.',
     updatedLabel: 'gestern',
+    updatedAt: 0,
     pinned: true,
     ownerId: 'mock',
   },
@@ -68,6 +72,7 @@ export const initialNotes: NoteItem[] = [
     excerpt: 'Offline, Synchronisiere, Synchronisiert als visuelle States.',
     content: 'Dummy-Notiz für spätere Zustände ohne Backend-Anbindung.',
     updatedLabel: 'vor 3 Tagen',
+    updatedAt: 0,
     pinned: false,
     ownerId: 'mock',
   },
@@ -78,6 +83,7 @@ export const initialNotes: NoteItem[] = [
     excerpt: 'Was lief gut, was wird nächste Woche verbessert?',
     content: 'Retro-Inhalte als Beispiel für die Ordneransicht.',
     updatedLabel: 'vor 5 Tagen',
+    updatedAt: 0,
     pinned: true,
     ownerId: 'mock',
   },
@@ -88,6 +94,7 @@ export const initialNotes: NoteItem[] = [
     excerpt: 'Persönliche Notizen für nächste Features.',
     content: 'Lokale Dummy-Inhalte ohne Persistenz.',
     updatedLabel: 'vor 1 Woche',
+    updatedAt: 0,
     pinned: false,
     ownerId: 'mock',
   },
@@ -98,6 +105,7 @@ export const initialNotes: NoteItem[] = [
     excerpt: 'Referenzseite mit Regeln für das Team.',
     content: 'Read-only Demo-Inhalt.',
     updatedLabel: 'vor 8 Tagen',
+    updatedAt: 0,
     pinned: true,
     ownerId: 'mock',
   },
