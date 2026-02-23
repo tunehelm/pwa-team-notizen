@@ -201,6 +201,8 @@ function NoteEditor({
   const initAppliedForNoteIdRef = useRef<string | null>(null)
   /** Inhalt, den wir zuletzt aus Server/Draft in den Editor geschrieben haben – damit wir bei Refresh (neues note.content) nachziehen. */
   const lastAppliedContentRef = useRef<string | undefined>(undefined)
+  /** Tracks which lastRefreshAt value was already applied – so applyServer() only fires on a NEW refresh, not permanently. */
+  const lastRefreshAtAppliedRef = useRef(0)
 
   useEffect(() => {
     latestTitleRef.current = titleValue
@@ -360,10 +362,14 @@ function NoteEditor({
       return () => window.clearTimeout(mountId)
     }
 
-    // Note bereits initialisiert: nur reagieren wenn Server-Inhalt sich geändert hat ODER Refresh kam
+    // Note bereits initialisiert: nur reagieren wenn Server-Inhalt sich geändert hat ODER ein NEUER Refresh kam
     if (initAppliedForNoteIdRef.current === note.id) {
       const contentChanged = lastAppliedContentRef.current !== serverContent
-      if (contentChanged || lastRefreshAt > 0) return applyServer()
+      const refreshIsNew = lastRefreshAt > lastRefreshAtAppliedRef.current
+      if (contentChanged || refreshIsNew) {
+        lastRefreshAtAppliedRef.current = lastRefreshAt
+        return applyServer()
+      }
       return
     }
 
