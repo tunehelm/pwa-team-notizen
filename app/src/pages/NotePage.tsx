@@ -38,6 +38,7 @@ export function NotePage() {
     toggleNotePinned,
     updateNoteTitle,
     updateNoteContent,
+    lastRefreshAt,
   } = useAppData()
   const note = findNoteById(id)
   const isAdmin = isAdminEmail(currentUserEmail)
@@ -85,6 +86,7 @@ export function NotePage() {
         }}
         onMoveNote={canDelete ? () => setShowMoveModal(true) : undefined}
         onShareNote={() => setShowShareModal(true)}
+        lastRefreshAt={lastRefreshAt}
       />
       {showShareModal && note ? (
         <ShareModal
@@ -157,6 +159,8 @@ interface NoteEditorProps {
   onDeleteNote: () => void
   onMoveNote?: () => void
   onShareNote?: () => void
+  /** Timestamp des letzten refreshData-Aufrufs – Draft wird danach verworfen, Server-Inhalt zeigen */
+  lastRefreshAt?: number
 }
 
 type ToolbarPanel = 'none' | 'format' | 'insert' | 'link' | 'draw' | 'table' | 'fontcolor' | 'symbols' | 'calculator'
@@ -187,6 +191,7 @@ function NoteEditor({
   onDeleteNote,
   onMoveNote,
   onShareNote,
+  lastRefreshAt = 0,
 }: NoteEditorProps) {
   const [titleValue, setTitleValue] = useState(note?.title ?? 'Neue Notiz')
   const [draftRestored, setDraftRestored] = useState(false)
@@ -341,6 +346,19 @@ function NoteEditor({
     })
   }
 
+  // Nach explizitem Refresh: Draft verwerfen und Server-Inhalt erzwingen (verhindert Draft-Uhr-Versatz-Bug)
+  useEffect(() => {
+    if (!lastRefreshAt || !note?.id || !editorRef.current || !editorMounted) return
+    const serverContent = note.content ?? ''
+    clearDraft(note.id)
+    editorRef.current.innerHTML = serverContent
+    latestContentRef.current = serverContent
+    lastAppliedContentRef.current = serverContent
+    const mountId = window.setTimeout(() => { const ed = editorRef.current; if (ed) mountSmartBlocks(ed) }, 0)
+    return () => window.clearTimeout(mountId)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastRefreshAt])
+
   // Apply draft or server content when editor is mounted; after Refresh (note.content from server changes) always show server content
   useEffect(() => {
     if (!note?.id || !editorRef.current || !editorMounted) return
@@ -395,7 +413,13 @@ function NoteEditor({
   }, [note?.id, note?.content, editorMounted])
 
   function syncEditorContent() {
-    const html = editorRef.current?.innerHTML ?? ''
+    const editor = editorRef.current
+    if (!editor) return
+    // Overlay-Elemente (Resize-Handle, Lösch-Button, Auswahl-Klasse) dürfen nicht gespeichert werden
+    const clone = editor.cloneNode(true) as HTMLElement
+    clone.querySelectorAll('.img-resize-handle, .img-delete-btn').forEach((el) => el.remove())
+    clone.querySelectorAll('.img-selected').forEach((el) => el.classList.remove('img-selected'))
+    const html = clone.innerHTML
     lastAppliedContentRef.current = html // prevent useEffect feedback loop on every keystroke
     trackedContentChange(html)
   }

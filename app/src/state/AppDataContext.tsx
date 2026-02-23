@@ -72,6 +72,7 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
   const contentSaveTimersRef = useRef<Map<string, number>>(new Map())
   /** Letzter noch nicht nach Supabase gespeicherter Inhalt je NoteId (für Flush vor Refresh). */
   const pendingContentRef = useRef<Map<string, string>>(new Map())
+  const [lastRefreshAt, setLastRefreshAt] = useState(0)
   /** Laufende updateNoteApi-Promises (Debounce-Timer hat bereits gefeuert aber API-Call läuft noch). */
   const inProgressSavesRef = useRef<Map<string, Promise<NoteItem>>>(new Map())
 
@@ -296,6 +297,7 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
       folders,
       notes,
       trash,
+      lastRefreshAt,
       createFolder: async (title, options) => {
         const cleanTitle = title.trim()
         if (!cleanTitle) return null
@@ -708,9 +710,11 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
           await Promise.allSettled(Array.from(inProgressSavesRef.current.values()))
         }
         await loadFoldersAndNotes(forceFromServer)
+        // Signal an NotePage: Refresh abgeschlossen → Drafts verwerfen, Server-Inhalt zeigen
+        setLastRefreshAt(Date.now())
       },
     }),
-    [apiError, currentUserEmail, currentUserName, profileLoaded, folders, loadFoldersAndNotes, notes, replaceFolderNotes, showApiError, trash, userId],
+    [apiError, currentUserEmail, currentUserName, lastRefreshAt, profileLoaded, folders, loadFoldersAndNotes, notes, replaceFolderNotes, showApiError, trash, userId],
   )
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>

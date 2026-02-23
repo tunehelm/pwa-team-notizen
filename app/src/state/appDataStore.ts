@@ -53,6 +53,8 @@ export interface AppDataContextValue {
   permanentlyDeleteNote: (noteId: string) => Promise<void>
   emptyTrash: () => Promise<void>
   refreshData: (forceFromServer?: boolean) => Promise<void>
+  /** Wird nach jedem refreshData-Aufruf inkrementiert – NotePage kann Drafts danach verwerfen. */
+  lastRefreshAt: number
 }
 
 export const AppDataContext = createContext<AppDataContextValue | undefined>(undefined)
