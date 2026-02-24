@@ -10,7 +10,7 @@ export function HeparinCalculator({ config, onRemove, onDuplicate }: CalculatorB
   const c = { ...DEFAULTS, ...config }
   const ieInSyringe = Number(c.ieInSyringe) || DEFAULTS.ieInSyringe
   const mlTotal = Number(c.mlTotal) || DEFAULTS.mlTotal
-  const targetIEPerKgH = Number(c.targetIEPerKgH) ?? DEFAULTS.targetIEPerKgH
+  const targetIEPerKgH = Number.isFinite(Number(c.targetIEPerKgH)) ? Number(c.targetIEPerKgH) : DEFAULTS.targetIEPerKgH
   const [weightInput, setWeightInput] = useState('')
 
   const weight = useMemo(() => {

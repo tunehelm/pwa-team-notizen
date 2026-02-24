@@ -8,7 +8,7 @@ const DEFAULTS = { doseMgPerKg: 10, maxDoseMg: 500, vialMg: 1000, finalVialVolum
 
 export function WeightDoseCalculator({ config, onRemove, onDuplicate }: CalculatorBlockProps) {
   const c = { ...DEFAULTS, ...config }
-  const doseMgPerKg = Number(c.doseMgPerKg) ?? DEFAULTS.doseMgPerKg
+  const doseMgPerKg = Number.isFinite(Number(c.doseMgPerKg)) ? Number(c.doseMgPerKg) : DEFAULTS.doseMgPerKg
   const maxDoseMg = c.maxDoseMg != null ? Number(c.maxDoseMg) : undefined
   const vialMg = c.vialMg != null ? Number(c.vialMg) : undefined
   const finalVialVolumeMl = c.finalVialVolumeMl != null ? Number(c.finalVialVolumeMl) : undefined

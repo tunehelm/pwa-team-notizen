@@ -19,8 +19,8 @@ const FORMULA_LINES = [
 export function MannitolCalculator({ config, onRemove, onDuplicate }: CalculatorBlockProps) {
   const c = { ...DEFAULTS, ...config }
   const label = (c.label as string) ?? DEFAULTS.label
-  const doseGPerKg = Number(c.doseGPerKg) ?? DEFAULTS.doseGPerKg
-  const concentrationGPerMl = Number(c.concentrationGPerMl) ?? DEFAULTS.concentrationGPerMl
+  const doseGPerKg = Number.isFinite(Number(c.doseGPerKg)) ? Number(c.doseGPerKg) : DEFAULTS.doseGPerKg
+  const concentrationGPerMl = Number.isFinite(Number(c.concentrationGPerMl)) ? Number(c.concentrationGPerMl) : DEFAULTS.concentrationGPerMl
 
   const [weightInput, setWeightInput] = useState('')
   const [doseInput, setDoseInput] = useState(String(doseGPerKg))
