@@ -57,7 +57,8 @@ export default defineConfig(({ mode }) => ({
         clientsClaim: true,
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+            // Alle Supabase-Anfragen (Auth, DB, Storage) immer direkt ans Netz – nie cachen
+            urlPattern: ({ url }) => url.hostname.includes('supabase.co'),
             handler: 'NetworkOnly',
           },
         ],
