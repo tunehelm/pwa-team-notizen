@@ -56,11 +56,13 @@ export default defineConfig(({ mode }) => ({
         skipWaiting: true,
         clientsClaim: true,
         runtimeCaching: [
-          {
-            // Alle Supabase-Anfragen (Auth, DB, Storage) immer direkt ans Netz – nie cachen
-            urlPattern: ({ url }) => url.hostname.includes('supabase.co'),
-            handler: 'NetworkOnly',
-          },
+          // Supabase: alle HTTP-Methoden direkt ans Netz (nie cachen)
+          // Separate Einträge pro Methode – Workbox matcht nur GET wenn kein method angegeben
+          { urlPattern: /supabase\.co/, handler: 'NetworkOnly', method: 'GET' },
+          { urlPattern: /supabase\.co/, handler: 'NetworkOnly', method: 'POST' },
+          { urlPattern: /supabase\.co/, handler: 'NetworkOnly', method: 'PUT' },
+          { urlPattern: /supabase\.co/, handler: 'NetworkOnly', method: 'PATCH' },
+          { urlPattern: /supabase\.co/, handler: 'NetworkOnly', method: 'DELETE' },
         ],
         // Terser-Workaround: Service Worker nicht minifizieren
         mode: 'development',
