@@ -52,6 +52,7 @@ export default defineConfig(({ mode }) => ({
         globPatterns: mode === 'development' ? [] : ['**/*.{js,css,ico,png,svg,webp,webmanifest}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/auth/, /supabase/],
+        navigateFallbackAllowlist: [/^\/$/, /^\/folder\//, /^\/note\//, /^\/team/, /^\/trash/, /^\/search/, /^\/private/, /^\/sales/, /^\/admin/],
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
@@ -64,8 +65,6 @@ export default defineConfig(({ mode }) => ({
           { urlPattern: /supabase\.co/, handler: 'NetworkOnly', method: 'PATCH' },
           { urlPattern: /supabase\.co/, handler: 'NetworkOnly', method: 'DELETE' },
         ],
-        // Terser-Workaround: Service Worker nicht minifizieren
-        mode: 'development',
       },
       devOptions: {
         enabled: true,

@@ -5,7 +5,14 @@ import { injectSpeedInsights } from '@vercel/speed-insights'
 import './index.css'
 import App from './App.tsx'
 
-registerSW()
+registerSW({
+  onRegisteredSW(_swUrl, registration) {
+    if (!registration) return
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload()
+    })
+  },
+})
 injectSpeedInsights()
 
 
