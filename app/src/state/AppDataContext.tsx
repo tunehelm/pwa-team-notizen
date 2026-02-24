@@ -714,7 +714,7 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
         setLastRefreshAt(Date.now())
       },
     }),
-    [apiError, currentUserEmail, currentUserName, lastRefreshAt, profileLoaded, folders, loadFoldersAndNotes, notes, replaceFolderNotes, showApiError, trash, userId],
+    [apiError, currentUserEmail, currentUserName, lastRefreshAt, profileLoaded, folders, loadFoldersAndNotes, notes, replaceFolderNotes, showApiError, trash, userId, userPinIds],
   )
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>

@@ -519,7 +519,14 @@ function NoteEditor({
   useEffect(() => {
     if (!note?.id || readOnly) return
     const handler = () => {
-      const content = editorRef.current?.innerHTML ?? latestContentRef.current
+      let content = latestContentRef.current
+      if (editorRef.current) {
+        // Strip overlay elements before persisting to draft (same as syncEditorContent)
+        const clone = editorRef.current.cloneNode(true) as HTMLElement
+        clone.querySelectorAll('.img-resize-handle, .img-delete-btn').forEach((el) => el.remove())
+        clone.querySelectorAll('.img-selected').forEach((el) => el.classList.remove('img-selected'))
+        content = clone.innerHTML
+      }
       saveDraft(note.id, {
         title: latestTitleRef.current,
         content,

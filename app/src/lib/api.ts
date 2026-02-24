@@ -770,7 +770,9 @@ export async function restoreNoteFromTrash(noteId: string): Promise<NoteItem> {
   // Try insert first, fall back to update if note already exists
   const { error: insertError } = await supabase.from('notes').insert(notePayload)
   if (insertError) {
-    const { error: updateError } = await supabase.from('notes').update(notePayload).eq('id', note.id)
+    // owner_id and user_id must never be overwritten on update — the original creator is preserved permanently
+    const { owner_id: _oid, user_id: _uid, ...updatePayload } = notePayload
+    const { error: updateError } = await supabase.from('notes').update(updatePayload).eq('id', note.id)
     if (updateError) throw updateError
   }
 

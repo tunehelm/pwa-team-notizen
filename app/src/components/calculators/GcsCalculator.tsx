@@ -6,9 +6,9 @@ const V_OPTIONS = [1, 2, 3, 4, 5] as const
 const M_OPTIONS = [1, 2, 3, 4, 5, 6] as const
 
 export function GcsCalculator({ config, onRemove, onDuplicate }: CalculatorBlockProps) {
-  const [e, setE] = useState<number>(Number(config?.e) ?? 4)
-  const [v, setV] = useState<number>(Number(config?.v) ?? 5)
-  const [m, setM] = useState<number>(Number(config?.m) ?? 6)
+  const [e, setE] = useState<number>(config?.e != null && Number.isFinite(Number(config.e)) ? Number(config.e) : 4)
+  const [v, setV] = useState<number>(config?.v != null && Number.isFinite(Number(config.v)) ? Number(config.v) : 5)
+  const [m, setM] = useState<number>(config?.m != null && Number.isFinite(Number(config.m)) ? Number(config.m) : 6)
 
   const total = useMemo(() => e + v + m, [e, v, m])
 
