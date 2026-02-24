@@ -46,14 +46,16 @@ export function DashboardPage() {
 
   /** Returns {email, name} for a given ownerId – uses profile data for correct avatars */
   function ownerProps(ownerId: string | undefined) {
-    if (!ownerId || ownerId === currentUserId) {
+    if (ownerId === currentUserId) {
       return { email: userEmail, name: userName }
     }
-    const profile = profileMap.get(ownerId)
-    if (profile) {
-      return { email: profile.email, name: profile.name || undefined }
+    if (ownerId) {
+      const profile = profileMap.get(ownerId)
+      if (profile) return { email: profile.email, name: profile.name || undefined }
+      return { email: ownerId }
     }
-    return { email: ownerId }
+    // ownerId fehlt – kein Fallback auf aktuellen User, sonst falsche Initialen
+    return {}
   }
 
   const pinnedFolders = getPinnedFolderItems()
