@@ -309,7 +309,13 @@ function LoginPage() {
       setMessage(null);
       setSubmitting(true);
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Zeitüberschreitung – bitte erneut versuchen")), 15_000)
+      );
+      const { error } = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        timeout,
+      ]);
 
       if (error) {
         setMessage({ type: "error", text: `Anmeldung fehlgeschlagen: ${error.message}` });
