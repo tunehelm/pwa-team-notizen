@@ -33,6 +33,7 @@ import {
   addPendingChange,
   getPendingChanges,
   clearPendingChanges,
+  removePendingChangesById,
   setLastSync,
   isOnline,
 } from '../lib/localCache'
@@ -166,6 +167,7 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
       const pending = await getPendingChanges()
       if (pending.length > 0) {
         console.log('[AppDataContext] Syncing', pending.length, 'pending changes')
+        const syncedChangeIds: string[] = []
         for (const change of pending) {
           try {
             if (change.type === 'updateNote') {
@@ -180,11 +182,16 @@ export function AppDataProvider({ children, userId }: { children: ReactNode; use
                 await removeUserPinApi(change.noteId)
               }
             }
+            syncedChangeIds.push(change.id)
           } catch (e) {
             console.warn('[AppDataContext] Failed to sync pending change', change, e)
           }
         }
-        await clearPendingChanges()
+        if (syncedChangeIds.length === pending.length) {
+          await clearPendingChanges()
+        } else {
+          await removePendingChangesById(syncedChangeIds)
+        }
       }
     } catch {
       // ignore sync errors

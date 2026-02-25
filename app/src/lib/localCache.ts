@@ -111,6 +111,20 @@ export async function clearPendingChanges(): Promise<void> {
   }
 }
 
+/** Remove specific pending changes by id, keep the rest for next sync attempt. */
+export async function removePendingChangesById(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  try {
+    const pending = (await get<PendingChange[]>(CACHE_KEYS.pendingChanges)) ?? []
+    if (pending.length === 0) return
+    const idSet = new Set(ids)
+    const remaining = pending.filter((item) => !idSet.has(item.id))
+    await set(CACHE_KEYS.pendingChanges, remaining)
+  } catch (e) {
+    console.warn('[localCache] Failed to remove pending changes by id', e)
+  }
+}
+
 /** Record the last sync timestamp */
 export async function setLastSync(): Promise<void> {
   try {
