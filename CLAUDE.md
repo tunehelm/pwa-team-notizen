@@ -99,6 +99,9 @@ Nach jedem Deploy: Browser braucht **"Clear site data"** (DevTools → Applicati
 ## Service Worker (vite.config.ts)
 - Alle Supabase-Requests müssen `NetworkOnly` sein — für **alle** HTTP-Methoden (GET/POST/PUT/PATCH/DELETE) separat registrieren; Workbox matcht standardmäßig nur GET
 - Regex `/supabase\.co/` statt Funktion verwenden — Funktionen werden beim SW-Build ggf. falsch serialisiert
+- `navigateFallbackAllowlist` enthält alle SPA-Routen (`/`, `/folder/`, `/note/`, `/team`, `/trash`, `/search`, `/private`, `/sales`, `/admin`) — neue Routen hier eintragen
+- `navigateFallbackDenylist: [/^\/auth/, /supabase/]` — Auth-Callbacks und Supabase-Requests nicht durch SW leiten
+- `controllerchange`-Reload-Listener in `main.tsx` (via `registerSW`) — Seite lädt automatisch neu wenn neuer SW aktiv wird
 - Bei SW-Problemen: DevTools → Application → Storage → "Clear site data" (nicht nur Hard Reload)
 
 ## Auth (useRequirePasswordSetup.ts)
