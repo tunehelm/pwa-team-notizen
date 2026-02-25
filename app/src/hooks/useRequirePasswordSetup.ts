@@ -141,15 +141,25 @@ export function useRequirePasswordSetup(): {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!isMounted) return;
+      // Set session immediately — never await getUser() here.
+      // Awaiting getUser() blocks on Supabase's internal auth lock while a
+      // concurrent getSession()/token-refresh is still in-flight, which
+      // prevents SIGNED_IN events from delivering the session after login.
+      setSession(newSession ?? null);
+      if (newSession) {
+        // A live session clears any stale init error and pending loading state.
+        setAuthError(null);
+        if (timeoutId) { clearTimeout(timeoutId); timeoutId = undefined; }
+        setLoading(false);
+      }
+      // Background: refresh user_metadata (e.g. password_set) without blocking.
       if (newSession?.user) {
-        const { data: userData } = await supabase.auth.getUser();
-        if (!isMounted) return;
-        const user = userData?.user ?? newSession.user;
-        setSession({ ...newSession, user });
-      } else {
-        setSession(newSession ?? null);
+        void supabase.auth.getUser().then(({ data }) => {
+          if (!isMounted || !data.user) return;
+          setSession((prev) => (prev ? { ...prev, user: data.user! } : prev));
+        });
       }
     });
 

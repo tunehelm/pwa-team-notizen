@@ -321,8 +321,14 @@ function LoginPage() {
         setMessage({ type: "error", text: `Anmeldung fehlgeschlagen: ${error.message}` });
       }
     } catch (error) {
-      const text = error instanceof Error ? error.message : "Unbekannter Fehler";
-      setMessage({ type: "error", text: `Technischer Fehler: ${text}` });
+      const isLoginTimeout =
+        error instanceof Error && error.message === "Zeitüberschreitung – bitte erneut versuchen";
+      setMessage({
+        type: "error",
+        text: isLoginTimeout
+          ? "Anmeldung dauert länger als erwartet. Bitte kurz warten oder erneut versuchen."
+          : `Technischer Fehler: ${error instanceof Error ? error.message : "Unbekannter Fehler"}`,
+      });
     } finally {
       setSubmitting(false);
     }
