@@ -128,3 +128,31 @@ Spezialisierte Agenten (via `/agents` CLI): `session-closer`, `gemini-research`,
 - **Offen / Next Steps**:
   - Kein spezifischer naechster Schritt aus dieser Session; Projekt-Governance-Setup ist abgeschlossen
   - Bei neuen Routen: `navigateFallbackAllowlist` in `vite.config.ts` aktuell halten
+
+## Session-Log
+
+### 2026-02-25 — PWA Update-Flow stabilisiert (Storage-Clear reduziert)
+
+Erledigt:
+- Service-Worker-Update-Strategie auf kontrollierten Prompt-Flow umgestellt (`registerType: 'prompt'`).
+- Update-UX ergänzt: Banner bei neuer Version + expliziter „Jetzt aktualisieren“-Flow.
+- Einmalige Legacy-Workbox-Cache-Migration beim App-Start eingebaut (Bestandsgeräte stabilisieren).
+- Offline-Sync robuster gemacht: Pending-Queue entfernt nur erfolgreich synchronisierte Einträge (Teilfehler bleiben für Retry erhalten).
+
+Betroffene App-Dateien:
+- `app/vite.config.ts`
+- `app/src/main.tsx`
+- `app/src/components/PwaUpdateBanner.tsx`
+- `app/src/lib/pwaUpdater.ts`
+- `app/src/lib/localCache.ts`
+- `app/src/state/AppDataContext.tsx`
+
+Validierung:
+- `npm run build` erfolgreich.
+- `npm run lint` weiterhin projektweit rot (bestehende Alt-Themen, nicht durch diesen Patch verursacht).
+
+Nächste Schritte:
+1. Realtest mit bereits installierten PWA-Clients (Desktop + iPhone).
+2. Prüfen, dass Updates ohne manuelles „Clear site data“ durchlaufen.
+3. Optional: SW-Update-Telemetrie + Chunk-Splitting als Follow-up.
+
