@@ -4,21 +4,25 @@ Die App ist eine **Vite SPA**. Es gibt **keine** Vercel API Routes mehr (Cron l�
 
 ## Für den Frontend-Build (Vercel) benötigt
 
-| Variable | Beschreibung |
-|----------|--------------|
-| `VITE_SUPABASE_URL` | Supabase Projekt-URL (z. B. `https://<project-ref>.supabase.co`) – **Pflicht** für Login |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anon/public Key (Dashboard → API → anon public) – **Pflicht** für Login |
+
+| Variable                 | Beschreibung                                                                             |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`      | Supabase Projekt-URL (z. B. `https://<project-ref>.supabase.co`) – **Pflicht** für Login |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon/public Key (Dashboard → API → anon public) – **Pflicht** für Login         |
+
 
 Optional:
 
-| Variable | Beschreibung |
-|----------|--------------|
+
+| Variable           | Beschreibung                                             |
+| ------------------ | -------------------------------------------------------- |
 | `VITE_ADMIN_EMAIL` | E-Mail für Admin-Erkennung (z. B. für Backlog/Statistik) |
-| `VITE_DEBUG_AUTH` | `true` = Auth-Debug-Logs in der Konsole |
+| `VITE_DEBUG_AUTH`  | `true` = Auth-Debug-Logs in der Konsole                  |
+
 
 ## Kann in Vercel entfernt werden (Cron-Umstellung)
 
-Diese Variablen wurden früher für die **entfernten** `/api/cron/*`-Routen genutzt. Der Code greift **nicht** mehr darauf zu:
+Diese Variablen wurden früher für die **entfernten** `/api/cron/`*-Routen genutzt. Der Code greift **nicht** mehr darauf zu:
 
 - `CRON_ENABLED`
 - `CRON_SECRET`
@@ -29,4 +33,5 @@ Diese Variablen wurden früher für die **entfernten** `/api/cron/*`-Routen genu
 
 ## Nach Änderung an ENV
 
-- **Neuer Build nötig:** Vite baut `VITE_*` zur Build-Zeit ein. Nach Anpassung in Vercel → Redeploy auslösen.
+- **Neuer Build nötig:** Vite baut `VITE_`* zur Build-Zeit ein. Nach Anpassung in Vercel → Redeploy auslösen.
+

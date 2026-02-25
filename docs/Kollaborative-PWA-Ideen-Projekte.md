@@ -1,32 +1,35 @@
 ---
+
 name: Kollaborative PWA für Ideen & Projekte
 overview: Plan für eine iOS-inspirierte, kollaborative PWA zur Ideen-, Projekt- und Wissenssammlung mit hierarchischer Ordnerstruktur, rollenbasierten Zugriffsrechten, Offline-first-Ansatz und kontrollierter Kollaboration (V1 ohne CRDT).
 todos:
-  - id: setup
-    content: "Projekt-Setup: Vite + React + TypeScript + Tailwind CSS + PWA-Plugin initialisieren"
-    status: pending
-  - id: backend
-    content: "Supabase-Projekt erstellen: Auth, Datenbank-Schema, Storage, RLS Policies"
-    status: pending
-  - id: design-system
-    content: "Design System: Tailwind Config mit iOS-inspirierter Farbpalette, Typografie, Basis-Komponenten"
-    status: pending
-  - id: auth
-    content: "Auth-Flow: Einladung, Login mit Magic Link oder Passwort, geschützte Routen"
-    status: pending
-  - id: dashboard
-    content: "Dashboard: Fixierte Projekte, Ordner-Hierarchie, Hauptnavigation"
-    status: pending
-  - id: editor
-    content: "Projekt-/Notiz-Editor: Rich Text, Autosave, Bilder, Undo/Redo"
-    status: pending
-  - id: collaboration
-    content: "Kollaboration: gleichzeitige Bearbeitung, Live-Hinweise, Konfliktbehandlung"
-    status: pending
-  - id: pwa
-    content: "PWA-Features: Offline-Support, Service Worker, App-Icon, Splash Screen"
-    status: pending
+
+- id: setup
+content: "Projekt-Setup: Vite + React + TypeScript + Tailwind CSS + PWA-Plugin initialisieren"
+status: pending
+- id: backend
+content: "Supabase-Projekt erstellen: Auth, Datenbank-Schema, Storage, RLS Policies"
+status: pending
+- id: design-system
+content: "Design System: Tailwind Config mit iOS-inspirierter Farbpalette, Typografie, Basis-Komponenten"
+status: pending
+- id: auth
+content: "Auth-Flow: Einladung, Login mit Magic Link oder Passwort, geschützte Routen"
+status: pending
+- id: dashboard
+content: "Dashboard: Fixierte Projekte, Ordner-Hierarchie, Hauptnavigation"
+status: pending
+- id: editor
+content: "Projekt-/Notiz-Editor: Rich Text, Autosave, Bilder, Undo/Redo"
+status: pending
+- id: collaboration
+content: "Kollaboration: gleichzeitige Bearbeitung, Live-Hinweise, Konfliktbehandlung"
+status: pending
+- id: pwa
+content: "PWA-Features: Offline-Support, Service Worker, App-Icon, Splash Screen"
+status: pending
 isProject: false
+
 ---
 
 # Kollaborative PWA für Ideen & Projekte
@@ -34,11 +37,13 @@ isProject: false
 ## Ziel der Anwendung
 
 Die Anwendung ist eine **mobile-first, iOS-inspirierte PWA**, mit der ein Team gemeinsam:
+
 - Ideen sammelt
 - Projekte dokumentiert
 - Wissen strukturiert ablegt
 
 Der Fokus liegt auf:
+
 - Klarer Struktur
 - Einfacher Bedienung
 - Kollaboration ohne Chaos
@@ -49,6 +54,7 @@ Der Fokus liegt auf:
 ## Festgelegter Tech-Stack
 
 Frontend:
+
 - Vite
 - React
 - TypeScript
@@ -56,6 +62,7 @@ Frontend:
 - React Router
 
 Backend / Services:
+
 - Supabase
   - PostgreSQL
   - Auth (E-Mail / Magic Link / Passwort nach Einladung)
@@ -63,6 +70,7 @@ Backend / Services:
   - Realtime optional (V1 nicht zwingend live-typing)
 
 PWA:
+
 - Vite PWA Plugin
 - Service Worker + Manifest
 
@@ -122,20 +130,23 @@ PWA:
 ### Tabellen
 
 **users**  
+
 - id  
 - email  
-- name  
+- name
 
 **folders**  
+
 - id  
 - name  
 - parent_id (NULL = Hauptordner)  
 - type (`private` | `team` | `readonly`)  
 - owner_id  
 - created_at  
-- updated_at  
+- updated_at
 
 **projects**  
+
 - id  
 - folder_id  
 - name  
@@ -143,19 +154,21 @@ PWA:
 - owner_id  
 - pinned (boolean)  
 - created_at  
-- updated_at  
+- updated_at
 
 **project_collaborators**  
+
 - project_id  
 - user_id  
-- role (`viewer` | `editor`)  
+- role (`viewer` | `editor`)
 
 **images**  
+
 - id  
 - project_id  
 - url  
 - uploaded_by  
-- created_at  
+- created_at
 
 ---
 
@@ -209,6 +222,7 @@ PWA:
   - Zuletzt bearbeitet von
 
 Auf dem iPhone:
+
 - Wichtige Aktionen in der oberen Leiste
 - Tastatur verdeckt keine Funktionen
 
@@ -300,6 +314,7 @@ Auf dem iPhone:
   - Badge an/aus
 
 Trigger (V1):
+
 - Einladung
 - Änderung in fixierten Projekten
 
@@ -317,6 +332,7 @@ Trigger (V1):
 ## Testbarkeit (Pflicht)
 
 Nach jedem Feature:
+
 1. Browser-Test (lokal)
 2. iPhone-Test (PWA über HTTPS, z. B. Vercel Preview)
 3. Kurze Testliste (3–6 Punkte)

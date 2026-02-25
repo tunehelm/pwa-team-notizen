@@ -1,4 +1,5 @@
 # Editor Update – Markdown Table Paste Support
+
 <— HIER den kompletten Text einfügen, den ich dir vorher gegeben habe
 
 ## Draft Restore Timing Fix
@@ -12,3 +13,4 @@
 - Draft oder Server-Content wird genau einmal pro Note angewendet
 - verhindert leeren Editor nach Reload
 - keine Regression beim Notiz-Wechsel
+

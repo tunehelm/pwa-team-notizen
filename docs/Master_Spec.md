@@ -1,5 +1,7 @@
 # MASTER_SPEC.md
+
 # Arbeitsvertrag für Claude Code & Codex
+
 # Projekt: PWA Team-Notizen App
 
 ## 1. Zweck dieses Dokuments
@@ -7,6 +9,7 @@
 Dieses Dokument ist die **oberste Arbeitsgrundlage** für Claude und Codex.
 
 Es definiert:
+
 - wie gearbeitet wird
 - in welcher Reihenfolge
 - was erlaubt ist
@@ -31,7 +34,9 @@ Bei Widersprüchen gilt immer diese Reihenfolge:
 ## 3. Rollen: Claude vs. Codex
 
 ### Claude
+
 Claude wird genutzt für:
+
 - Architektur- und Strukturentscheidungen
 - Klärung von Konzepten
 - Bewertung von Alternativen
@@ -42,7 +47,9 @@ Claude schreibt **keinen umfangreichen Code**, außer ausdrücklich angefordert.
 ---
 
 ### Codex
+
 Codex ist verantwortlich für:
+
 - Erstellen und Ändern von Code
 - Projekt-Setup
 - Implementierung einzelner Features
@@ -56,6 +63,7 @@ Codex hält sich **strikt** an die Spezifikationen.
 ## 4. Tech-Stack (fix, nicht verhandelbar)
 
 Frontend:
+
 - Vite
 - React
 - TypeScript
@@ -63,10 +71,12 @@ Frontend:
 - React Router
 
 Backend / Services:
+
 - Supabase (Auth, DB, Storage)
 - Realtime optional (V1 ohne CRDT)
 
 PWA:
+
 - Vite PWA Plugin
 - Service Worker
 - Web App Manifest
@@ -78,10 +88,12 @@ PWA:
 ## 5. Arbeitsmodus
 
 ### Plan-Mode
+
 - Wird genutzt für neue Phasen oder komplexe Features.
 - Erst Plan, dann Umsetzung.
 
 ### Auto-Accept Mode
+
 - Nur für klar abgegrenzte Aufgaben.
 - Keine Architekturänderungen erlaubt.
 
@@ -94,6 +106,7 @@ PWA:
 - Kein neues Feature, bevor das vorherige geprüft wurde.
 
 Nach jeder Phase MUSS geliefert werden:
+
 1. Liste der geänderten Dateien
 2. Befehl zum Starten der App im Browser
 3. HTTPS-Vorschau für iPhone (z. B. Vercel Preview)
@@ -117,17 +130,20 @@ Ein Feature gilt nur als „fertig“, wenn:
 ## 8. PWA-Pflichtanforderungen
 
 ### Manifest
+
 - name / short_name
 - Icons (192px, 512px)
 - display: standalone
 - start_url korrekt
 
 ### Service Worker
+
 - App-Shell gecacht
 - Offline-Fallback-Seite vorhanden
 - Sinnvolle Cache-Strategie
 
 ### Qualität
+
 - HTTPS überall
 - Lighthouse PWA Audit erfolgreich
 - Responsive Design

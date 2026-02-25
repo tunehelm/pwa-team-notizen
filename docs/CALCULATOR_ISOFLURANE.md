@@ -30,3 +30,4 @@
 - minuteVolumeLMin: 2–30 (Warnung)
 - alcoholFactor: 0,5–1,5 (Warnung)
 - Division durch 0 vermieden (kg/MV > 0).
+
