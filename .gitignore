@@ -25,3 +25,8 @@ dev-dist
 *.bak
 supabase/temp/
 supabase/.temp/
+
+# local tool state
+.claude/
+.cursor/
+app/.claude/
