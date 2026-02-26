@@ -64,8 +64,8 @@ Nach jedem Deploy: Browser braucht "Clear site data" (DevTools → Application �
 
 ### Auth
 
-- `useRequirePasswordSetup.ts`
-- `App.tsx` Auth-Gate
+- `useRequirePasswordSetup.ts` — `onAuthStateChange` ist synchron; `setSession()` sofort, `getUser()` non-blocking im Hintergrund
+- `App.tsx` Auth-Gate — Timeout-Fehler wird als weiche Meldung behandelt (nicht als harter Fehler)
 - Recovery-Flow: `?recovery=1` + Hash-Fragment
 
 ### Seiten
@@ -142,8 +142,6 @@ Spezialisierte Agenten (via `/agents` CLI): `session-closer`, `gemini-research`,
   - Kein spezifischer naechster Schritt aus dieser Session; Projekt-Governance-Setup ist abgeschlossen
   - Bei neuen Routen: `navigateFallbackAllowlist` in `vite.config.ts` aktuell halten
 
-## Session-Log
-
 ### 2026-02-25 — PWA Update-Flow stabilisiert (Storage-Clear reduziert)
 
 Erledigt:
@@ -199,8 +197,26 @@ Ergebnis:
 
 Nächste Verifikation:
 1. Desktop + iPhone: Update-Banner -> Aktualisieren -> Login ohne Timeout-Blockade.
-2. Kein manuelles „Clear site data“ im Normalfall nötig.
+2. Kein manuelles „Clear site data” im Normalfall nötig.
 
+### 2026-02-26 — Session-Ende
 
-
-
+- **Erledigt**:
+  - Auth-Timeout-Bugfix finalisiert (`app/src/hooks/useRequirePasswordSetup.ts` + `app/src/App.tsx`):
+    - Root cause: `onAuthStateChange` war `async` und blockierte auf internem Supabase Auth-Lock, waehrend `getSession()` lief → `SIGNED_IN`-Event lieferte Session nie rechtzeitig
+    - Fix: `onAuthStateChange` ist jetzt synchron; `setSession()` wird sofort aufgerufen; `getUser()` laeuft non-blocking via `.then()` im Hintergrund; `authError` + `loading` werden bei Session-Ankunft bereinigt
+    - Fix: `signIn()`-Catch-Block unterscheidet Timeout-Fehler (weiche Meldung “dauert laenger”) von echtem Fehler (“Technischer Fehler”)
+  - CLAUDE.md + AGENTS.md + gemini.md Sync: `weekKey.ts`-Eintrag vereinheitlicht, Governance-Struktur bestaetigt
+  - Monday Challenge W10 erstellt:
+    - `research/week-2026-W10-source.md` angelegt (Thema: Pflege als Adoptions-Treiber, ICU-Sedierung)
+    - `final/challenge-week-2026-W10.md` via monday-challenge-builder generiert (8 Sektionen, alle QC-Checks bestanden)
+    - Quality Gate: 3 Korrekturen (Variant C Formulierung, `x`-Symbol, Tippfehler)
+    - Status im Backlog: planned 2026-W10
+  - Neuer manueller Week-Start-Button eingebaut (SalesQuizPage oder AdminDashboard)
+- **Offen / Next Steps**:
+  - [ ] Edge-Function-Fehler debuggen: DevTools → Network → Request-URL, HTTP-Status, CORS-Header pruefen
+  - [ ] Supabase-Project-Ref in der Edge-Function-URL verifizieren (korrekte URL im Frontend?)
+  - [ ] Supabase CLI: `supabase functions deploy sales-week-start` — ist die Funktion deployed?
+  - [ ] Logs pruefen: Supabase Dashboard → Edge Functions → Logs fuer `sales-week-start`
+  - [ ] W10-Challenge im Admin-Backlog auf `active` setzen, sobald Edge-Function laeuft
+  - [ ] challenge-publisher Agent fuer W10 ausfuehren wenn Publish-Checklist abgehakt
