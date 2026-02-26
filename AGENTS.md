@@ -12,7 +12,7 @@ This file provides shared project context for AI agents (Claude, Gemini, Codex, 
 
 ## Projekt
 
-PWA Team-Notizen-App — https://sm-teamnotes.com  
+PWA Team-Notizen-App — [https://sm-teamnotes.com](https://sm-teamnotes.com)  
 Stack: Vite + React + TypeScript + Tailwind + Supabase + vite-plugin-pwa  
 Working dir für Build: `app/`
 
@@ -44,9 +44,11 @@ Nach jedem Deploy: Browser braucht "Clear site data" (DevTools → Application �
 ## Architektur (Kurzüberblick)
 
 ### Domaintypen
+
 `mockData.ts` enthält kanonische Typen `FolderItem`, `NoteItem`, `AccessType`. DB-Spalte `kind` wird in `api.ts` auf `FolderItem.access` gemappt.
 
 ### Datenschicht
+
 - `api.ts` — Supabase-Operationen + Mapping
 - `storage.ts` — Bild-Upload (note-media, PUBLIC)
 - `localCache.ts` — IndexedDB Cache + Offline PendingChange Queue
@@ -55,21 +57,25 @@ Nach jedem Deploy: Browser braucht "Clear site data" (DevTools → Application �
 - `calculateIso.ts` — Isofluran-Logik (mit Unit-Tests)
 
 ### State
+
 - `AppDataContext.tsx` — folders, notes, trash, lastRefreshAt
 - `appDataStore.ts`, `useAppData.ts`
 - `LayoutContext.tsx`
 
 ### Auth
+
 - `useRequirePasswordSetup.ts`
 - `App.tsx` Auth-Gate
 - Recovery-Flow: `?recovery=1` + Hash-Fragment
 
 ### Seiten
+
 `/`, `/folder/:id`, `/note/:id`, `/team`, `/trash`, `/search`, `/private`, `/sales-quiz`, `/admin`, `/admin/sales-backlog`, `/admin/sales-stats`, `/auth/callback`
 
 ## Kritische Implementierungsdetails
 
 ### Editor / Draft / Sync
+
 - Editor-Refs in `NotePage.tsx`: `initAppliedForNoteIdRef`, `lastAppliedContentRef`, `lastRefreshAtAppliedRef`
 - Draft key: `pwa_notes_draft:{noteId}`
 - Draft gewinnt nur bei neuerem `updatedAt` vs. Server + `lastRefreshAt`
@@ -77,6 +83,7 @@ Nach jedem Deploy: Browser braucht "Clear site data" (DevTools → Application �
 - `pendingContentRef` für Debounce-Timer
 
 ### Service Worker
+
 - Supabase-Requests: NetworkOnly für GET/POST/PUT/PATCH/DELETE
 - Regex `/supabase\.co/` verwenden
 - `navigateFallbackAllowlist` aktuell halten
@@ -84,12 +91,14 @@ Nach jedem Deploy: Browser braucht "Clear site data" (DevTools → Application �
 - `controllerchange`-Reload in `main.tsx`
 
 ### Supabase DB
+
 - `profiles(id, email, display_name)` muss vollständig sein
 - `updateNote()` schreibt nie `owner_id`
 - `moveNoteToFolder()` schreibt nur `folder_id`
 - `ARCHITECTURE.md` ist verbindliche Quelle für Datenmodell/RLS/UX
 
 ### Env (app/.env.local)
+
 ```
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
@@ -97,6 +106,7 @@ VITE_DEBUG_AUTH=true
 ```
 
 ## Smart Calculator System
+
 - Registry: `src/components/calculators/registry.ts`
 - Block-Attribute: `data-smart-block="calculator"`, `data-calculator-type`, `data-config`, `data-version`
 - Nach Content-Wechsel: `mountSmartBlocks(container)`
@@ -104,11 +114,13 @@ VITE_DEBUG_AUTH=true
 
 ## Agent-Rollen (Multi-AI)
 
-| Datei | Agent | Rolle |
-|---|---|---|
+
+| Datei       | Agent  | Rolle                                              |
+| ----------- | ------ | -------------------------------------------------- |
 | `CLAUDE.md` | Claude | Deep Work: Planung, Architektur, Long-form Writing |
-| `gemini.md` | Gemini | Research & Speed: schnelle Recherche, Iteration |
-| `CODEX.md` | Codex | Analysis & Review: Qualitaetsbewertung, Strategie |
+| `gemini.md` | Gemini | Research & Speed: schnelle Recherche, Iteration    |
+| `CODEX.md`  | Codex  | Analysis & Review: Qualitaetsbewertung, Strategie  |
+
 
 Spezialisierte Agenten (via `/agents` CLI): `session-closer`, `gemini-research`, `bug-fixer`, `code-reviewer`, `context-sync-agent`, `production-bug-hunter`, `senior-code-reviewer`
 
@@ -117,6 +129,7 @@ Spezialisierte Agenten (via `/agents` CLI): `session-closer`, `gemini-research`,
 ## Session-Log
 
 ### 2026-02-25 — Session-Ende
+
 - **Erledigt**:
   - `weekKey.ts` (`src/lib/sales/weekKey.ts`) in `CLAUDE.md` und `AGENTS.md` nachgetragen (war in `gemini.md` bereits vorhanden)
   - `AGENTS.md`-Header korrigiert (war faelschlicherweise als `# CLAUDE.md` mit Claude-spezifischer Beschreibung betitelt)
@@ -134,12 +147,14 @@ Spezialisierte Agenten (via `/agents` CLI): `session-closer`, `gemini-research`,
 ### 2026-02-25 — PWA Update-Flow stabilisiert (Storage-Clear reduziert)
 
 Erledigt:
+
 - Service-Worker-Update-Strategie auf kontrollierten Prompt-Flow umgestellt (`registerType: 'prompt'`).
 - Update-UX ergänzt: Banner bei neuer Version + expliziter „Jetzt aktualisieren“-Flow.
 - Einmalige Legacy-Workbox-Cache-Migration beim App-Start eingebaut (Bestandsgeräte stabilisieren).
 - Offline-Sync robuster gemacht: Pending-Queue entfernt nur erfolgreich synchronisierte Einträge (Teilfehler bleiben für Retry erhalten).
 
 Betroffene App-Dateien:
+
 - `app/vite.config.ts`
 - `app/src/main.tsx`
 - `app/src/components/PwaUpdateBanner.tsx`
@@ -148,11 +163,44 @@ Betroffene App-Dateien:
 - `app/src/state/AppDataContext.tsx`
 
 Validierung:
+
 - `npm run build` erfolgreich.
 - `npm run lint` weiterhin projektweit rot (bestehende Alt-Themen, nicht durch diesen Patch verursacht).
 
 Nächste Schritte:
+
 1. Realtest mit bereits installierten PWA-Clients (Desktop + iPhone).
 2. Prüfen, dass Updates ohne manuelles „Clear site data“ durchlaufen.
 3. Optional: SW-Update-Telemetrie + Chunk-Splitting als Follow-up.
+
+### 2026-02-25 — Auth-Timeout nach PWA-Update behoben
+
+Problem:
+- Nach „Neue Version verfügbar“ -> „Jetzt aktualisieren“ erschien beim Login häufig
+  „Technischer Fehler: Zeitüberschreitung“, obwohl `/auth/v1/token?grant_type=password` bereits `200` lieferte.
+
+Root Cause:
+- `onAuthStateChange` war async und wartete auf `getUser()` vor `setSession()`.
+- Während `getSession()`/Token-Refresh lief, blockierte ein interner Auth-Lock; dadurch kam `setSession()` zu spät bzw. nicht zuverlässig.
+- Zusätzlich wurde ein Sign-in-Timeout als harter technischer Fehler behandelt.
+
+Umsetzung:
+- `app/src/hooks/useRequirePasswordSetup.ts`:
+  - `onAuthStateChange` auf synchronen State-Update umgestellt.
+  - `setSession(newSession)` sofort, `getUser()` nur noch non-blocking im Hintergrund.
+  - Bei live Session: `authError` löschen, `loading` beenden, Timeout clearen.
+- `app/src/App.tsx`:
+  - Sign-in-Timeout als weiche Meldung statt harter „Technischer Fehler“.
+
+Ergebnis:
+- Login-Flow ist robust gegen den Timeout-Race nach SW-Update.
+- Erfolgreicher Auth-Request wird korrekt in Session/UI übernommen.
+- Deploy durchgeführt.
+
+Nächste Verifikation:
+1. Desktop + iPhone: Update-Banner -> Aktualisieren -> Login ohne Timeout-Blockade.
+2. Kein manuelles „Clear site data“ im Normalfall nötig.
+
+
+
 
