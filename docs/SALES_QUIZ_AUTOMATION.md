@@ -42,6 +42,14 @@ Den Service-Role-Key als geheimes Feld in cron-job.org (oder GitHub Actions Secr
 
 Die Supabase-Functions prüfen intern `now >= freeze_at` / `now >= reveal_at` und sind idempotent. **DST (Winter-/Sommerzeit)** wird von cron-job.org berücksichtigt, wenn du die Zeitzone „Europe/Berlin“ wählst.
 
+### Empfohlener Fallback für Week-Start (robust)
+
+Zusätzlich zum Montag-Job:
+
+- `sales-week-start` **täglich** (z. B. 12:00 Berlin) ausführen.
+- Ergebnis ist idempotent: existiert die Woche bereits, kommt `Challenge already exists`.
+- Dadurch werden verpasste Montag-Läufe automatisch nachgezogen.
+
 ### curl-Beispiele (zum Testen und für cron-job.org)
 
 Ersetze `<PROJECT_REF>` und `<SUPABASE_SERVICE_ROLE_KEY>` durch deine Werte (Supabase Dashboard → Project Settings → API).
@@ -54,6 +62,12 @@ KEY="<SUPABASE_SERVICE_ROLE_KEY>"
 # Montag: zuerst Archive, dann Week-Start
 curl -X POST "${BASE}/sales-archive-and-rollover" -H "Authorization: Bearer ${KEY}"
 curl -X POST "${BASE}/sales-week-start"           -H "Authorization: Bearer ${KEY}"
+
+# Manuell eine bestimmte Woche erzeugen (z. B. 2026-W10)
+curl -X POST "${BASE}/sales-week-start" \
+  -H "Authorization: Bearer ${KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"week_key":"2026-W10"}'
 
 # Freitag
 curl -X POST "${BASE}/sales-freeze"                -H "Authorization: Bearer ${KEY}"

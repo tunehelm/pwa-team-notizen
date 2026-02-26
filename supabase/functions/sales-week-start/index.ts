@@ -5,6 +5,24 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { getWeekKey, getWeekTimestamps } from "../_shared/sales-challenge-utils.ts"
 
+const WEEK_KEY_REGEX = /^\d{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$/
+
+async function readRequestedWeekKey(req: Request): Promise<string | null> {
+  const url = new URL(req.url)
+  const fromQuery = url.searchParams.get("week_key") ?? url.searchParams.get("week")
+  if (fromQuery && WEEK_KEY_REGEX.test(fromQuery)) return fromQuery
+
+  try {
+    const body = await req.json() as { week_key?: string; week?: string } | null
+    const fromBody = body?.week_key ?? body?.week ?? null
+    if (fromBody && WEEK_KEY_REGEX.test(fromBody)) return fromBody
+  } catch {
+    // ignore non-json / empty body
+  }
+
+  return null
+}
+
 serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!
@@ -15,7 +33,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
     const now = new Date()
-    const weekKey = getWeekKey(now)
+    const weekKey = (await readRequestedWeekKey(req)) ?? getWeekKey(now)
     const timestamps = getWeekTimestamps(weekKey)
 
     const { data: existing } = await supabase.from("sales_challenges").select("id").eq("week_key", weekKey).maybeSingle()
@@ -109,10 +127,13 @@ serve(async (req) => {
       if (entryError) console.error("[sales-week-start] insert ai entry error", entryError)
     }
 
-    return new Response(
-      JSON.stringify({ ok: true, week_key: weekKey, challenge_id: challengeId }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
-    )
+    return new Response(JSON.stringify({
+      ok: true,
+      week_key: weekKey,
+      challenge_id: challengeId,
+      source: backlogItem ? "backlog" : "placeholder",
+      backlog_id: backlogItem?.id ?? null,
+    }), { status: 200, headers: { "Content-Type": "application/json" } })
   } catch (err) {
     console.error("[sales-week-start] error", err)
     return new Response(JSON.stringify({ error: String(err) }), { status: 500 })

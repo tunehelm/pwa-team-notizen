@@ -7,6 +7,7 @@ import { isAdminEmail } from "../lib/admin";
 import { getWeekKey, getNextWeekKey, getPreviousWeekKey } from "../lib/sales/weekKey";
 
 const TEST_WEEK_KEY = "2099-W01";
+const WEEK_KEY_PATTERN = /^\d{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$/;
 
 function formatCountdown(until: Date): string {
   const now = new Date();
@@ -55,6 +56,10 @@ export function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
   const [bestofPrevWeekCount, setBestofPrevWeekCount] = useState<number>(0);
+  const [seedWeekKey, setSeedWeekKey] = useState(() => getWeekKey(new Date()));
+  const [seedWeekLoading, setSeedWeekLoading] = useState(false);
+  const [seedWeekError, setSeedWeekError] = useState<string | null>(null);
+  const [seedWeekInfo, setSeedWeekInfo] = useState<string | null>(null);
 
   // Quiz-Testdaten (Admin-only): Accordion + Buttons
   const [showTestTools, setShowTestTools] = useState(false);
@@ -153,6 +158,45 @@ export function AdminDashboardPage() {
     }
   };
 
+  const seedWeekNow = async () => {
+    const wk = seedWeekKey.trim();
+    if (!WEEK_KEY_PATTERN.test(wk)) {
+      setSeedWeekError("week_key muss Format YYYY-Www haben (z. B. 2026-W10).");
+      setSeedWeekInfo(null);
+      return;
+    }
+    setSeedWeekLoading(true);
+    setSeedWeekError(null);
+    setSeedWeekInfo(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("sales-week-start", {
+        method: "POST",
+        body: { week_key: wk },
+      });
+      if (error) throw new Error(error.message ?? "Week-start fehlgeschlagen.");
+      const res = data as {
+        ok?: boolean;
+        error?: string;
+        message?: string;
+        week_key?: string;
+        challenge_id?: string;
+      } | null;
+      if (res?.error) throw new Error(res.error);
+      if (res?.message === "Challenge already exists") {
+        setSeedWeekInfo(`Challenge existiert bereits für ${res.week_key ?? wk}.`);
+      } else if (res?.challenge_id) {
+        setSeedWeekInfo(`Challenge erzeugt für ${res.week_key ?? wk} (ID: ${res.challenge_id}).`);
+      } else {
+        setSeedWeekInfo(`Week-start ausgeführt für ${res?.week_key ?? wk}.`);
+      }
+      setTick((t) => t + 1);
+    } catch (e) {
+      setSeedWeekError(e instanceof Error ? e.message : "Week-start fehlgeschlagen.");
+    } finally {
+      setSeedWeekLoading(false);
+    }
+  };
+
   if (!profileLoaded || (!isAdmin && profileLoaded)) {
     if (!profileLoaded) {
       return (
@@ -242,6 +286,27 @@ export function AdminDashboardPage() {
                   )}
                 </ul>
               )}
+              <div className="mt-4 border-t border-[var(--color-border)] pt-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-text-muted)]">Manuell: Week-start</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <input
+                    value={seedWeekKey}
+                    onChange={(e) => setSeedWeekKey(e.target.value)}
+                    placeholder="YYYY-Www"
+                    className="w-36 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-page)] px-2.5 py-1.5 text-xs"
+                  />
+                  <button
+                    type="button"
+                    disabled={seedWeekLoading}
+                    onClick={() => void seedWeekNow()}
+                    className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-page)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    {seedWeekLoading ? "Starte…" : "Week jetzt starten"}
+                  </button>
+                </div>
+                {seedWeekError && <p className="mt-2 text-xs text-red-500">{seedWeekError}</p>}
+                {seedWeekInfo && <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">{seedWeekInfo}</p>}
+              </div>
             </section>
 
             {/* System Health (Admin-only) */}
