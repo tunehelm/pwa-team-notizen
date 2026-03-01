@@ -33,7 +33,7 @@ type Entry = {
   challenge_id: string;
   author_user_id: string | null;
   author_initials: string | null;
-  source: "human" | "ai";
+  source: "human" | "ai" | "admin";
   is_published: boolean;
   published_at: string | null;
   text: string;

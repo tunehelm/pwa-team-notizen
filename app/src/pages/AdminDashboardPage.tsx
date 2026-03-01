@@ -6,7 +6,6 @@ import { useAppData } from "../state/useAppData";
 import { isAdminEmail } from "../lib/admin";
 import { getWeekKey, getNextWeekKey, getPreviousWeekKey } from "../lib/sales/weekKey";
 
-const TEST_WEEK_KEY = "2099-W01";
 const WEEK_KEY_PATTERN = /^\d{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$/;
 
 function formatCountdown(until: Date): string {
@@ -39,7 +38,7 @@ function formatAt(iso: string): string {
 }
 
 export function AdminDashboardPage() {
-  const { currentUserEmail, currentUserId, profileLoaded } = useAppData();
+  const { currentUserEmail, profileLoaded } = useAppData();
   const isAdmin = profileLoaded && isAdminEmail(currentUserEmail);
   const [challenge, setChallenge] = useState<{
     week_key?: string;
@@ -60,14 +59,6 @@ export function AdminDashboardPage() {
   const [seedWeekLoading, setSeedWeekLoading] = useState(false);
   const [seedWeekError, setSeedWeekError] = useState<string | null>(null);
   const [seedWeekInfo, setSeedWeekInfo] = useState<string | null>(null);
-
-  // Quiz-Testdaten (Admin-only): Accordion + Buttons
-  const [showTestTools, setShowTestTools] = useState(false);
-  const [resetting, setResetting] = useState(false);
-  const [resetError, setResetError] = useState<string | null>(null);
-  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
-  const [createTestWeekLoading, setCreateTestWeekLoading] = useState(false);
-  const [createTestWeekError, setCreateTestWeekError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -118,46 +109,6 @@ export function AdminDashboardPage() {
     return () => clearInterval(id);
   }, []);
 
-  const resetTestData = async () => {
-    setConfirmResetOpen(false);
-    setResetting(true);
-    setResetError(null);
-    try {
-      const { data, error } = await supabase.functions.invoke("sales-reset-testweek", { method: "POST" });
-      if (error) throw new Error(error.message ?? "Reset fehlgeschlagen.");
-      const res = data as { error?: string; ok?: boolean } | null;
-      if (res?.error) throw new Error(res.error);
-      setTick((t) => t + 1);
-    } catch (e) {
-      setResetError(e instanceof Error ? e.message : "Reset fehlgeschlagen.");
-    } finally {
-      setResetting(false);
-    }
-  };
-
-  const seedTestWeek = async () => {
-    setCreateTestWeekLoading(true);
-    setCreateTestWeekError(null);
-    try {
-      const { data, error } = await supabase.functions.invoke("sales-seed-testweek", {
-        method: "POST",
-        body: { voter_user_id: currentUserId ?? undefined },
-      });
-      if (error) throw new Error(error.message ?? "Seed fehlgeschlagen.");
-      const res = data as { error?: string; ok?: boolean; message?: string } | null;
-      if (res?.error) throw new Error(res.error);
-      if (res?.message === "Challenge already exists") {
-        setCreateTestWeekError("Testwoche existiert bereits.");
-        return;
-      }
-      setTick((t) => t + 1);
-    } catch (e) {
-      setCreateTestWeekError(e instanceof Error ? e.message : "Anlegen fehlgeschlagen.");
-    } finally {
-      setCreateTestWeekLoading(false);
-    }
-  };
-
   const seedWeekNow = async () => {
     const wk = seedWeekKey.trim();
     if (!WEEK_KEY_PATTERN.test(wk)) {
@@ -180,9 +131,13 @@ export function AdminDashboardPage() {
         message?: string;
         week_key?: string;
         challenge_id?: string;
+        status?: string;
+        activation_blocked?: boolean;
       } | null;
       if (res?.error) throw new Error(res.error);
-      if (res?.message === "Challenge already exists") {
+      if (res?.activation_blocked || res?.status === "draft") {
+        setSeedWeekInfo(res?.message ?? `Entwurf bereit für ${res?.week_key ?? wk}. Vor Aktivierung bitte Varianten pflegen.`);
+      } else if (res?.message === "Challenge already exists") {
         setSeedWeekInfo(`Challenge existiert bereits für ${res.week_key ?? wk}.`);
       } else if (res?.challenge_id) {
         setSeedWeekInfo(`Challenge erzeugt für ${res.week_key ?? wk} (ID: ${res.challenge_id}).`);
@@ -330,94 +285,6 @@ export function AdminDashboardPage() {
                   ))}
                 </ul>
               </section>
-            )}
-
-            {/* Quiz-Testdaten (Admin-only, week_key=2099-W01) */}
-            {isAdmin && (
-              <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowTestTools(!showTestTools)}
-                  className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm font-semibold text-[var(--color-text-primary)] hover:bg-slate-50 dark:hover:bg-slate-800"
-                >
-                  <span>Technische Testwoche (2099-W01)</span>
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className={`h-4 w-4 transition-transform ${showTestTools ? "rotate-90" : ""}`}
-                  >
-                    <path d="M9 6l6 6-6 6" />
-                  </svg>
-                </button>
-                {showTestTools && (
-                  <div className="border-t border-[var(--color-border)] px-4 py-3 space-y-3">
-                    {resetError && (
-                      <p className="text-sm text-red-500">{resetError}</p>
-                    )}
-                    {createTestWeekError && (
-                      <p className="text-sm text-red-500">{createTestWeekError}</p>
-                    )}
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        disabled={resetting}
-                        onClick={() => setConfirmResetOpen(true)}
-                        className="rounded-lg border border-amber-500 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 disabled:opacity-50"
-                      >
-                        {resetting ? "Lösche…" : "Testdaten zurücksetzen"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={createTestWeekLoading}
-                        onClick={() => void seedTestWeek()}
-                        className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-page)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
-                      >
-                        {createTestWeekLoading ? "Anlegen…" : "Testwoche anlegen"}
-                      </button>
-                      <Link
-                        to={`/sales-quiz?week=${TEST_WEEK_KEY}`}
-                        className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-page)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-slate-100 dark:hover:bg-slate-800"
-                      >
-                        Zur Testwoche
-                      </Link>
-                    </div>
-                    <p className="text-xs text-[var(--color-text-muted)]">
-                      Technische Testwoche {TEST_WEEK_KEY} – nur für UI-/Logik-Tests. Kein Einfluss auf echte Produktivwochen. Für produktive Wochenplanung: <Link to="/admin/sales-planning" className="underline">Wochenplanung →</Link>
-                    </p>
-                  </div>
-                )}
-              </section>
-            )}
-
-            {confirmResetOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" role="dialog" aria-modal="true" aria-labelledby="confirm-reset-title">
-                <div className="w-full max-w-sm rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 shadow-xl">
-                  <h3 id="confirm-reset-title" className="text-sm font-semibold text-[var(--color-text-primary)]">
-                    Testdaten wirklich löschen?
-                  </h3>
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                    Alle Quiz-Daten für {TEST_WEEK_KEY} werden entfernt. Nicht rückgängig machbar.
-                  </p>
-                  <div className="mt-4 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setConfirmResetOpen(false)}
-                      className="rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm font-medium"
-                    >
-                      Abbrechen
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void resetTestData()}
-                      className="rounded-lg bg-amber-500 px-3 py-2 text-sm font-medium text-white hover:bg-amber-600"
-                    >
-                      Löschen
-                    </button>
-                  </div>
-                </div>
-              </div>
             )}
 
             {/* Backlog Status */}
