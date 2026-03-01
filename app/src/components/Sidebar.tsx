@@ -735,6 +735,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 Quiz-Backlog
               </Link>
               <Link
+                to="/admin/sales-planning"
+                onClick={onClose}
+                className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
+                  location.pathname === '/admin/sales-planning'
+                    ? 'bg-blue-500/20 text-blue-400 font-medium'
+                    : ''
+                }`}
+                style={location.pathname === '/admin/sales-planning' ? undefined : { color: 'var(--color-sidebar-text-muted)' }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                  <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+                </svg>
+                Wochenplanung
+              </Link>
+              <Link
                 to="/admin/sales-stats"
                 onClick={onClose}
                 className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${

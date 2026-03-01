@@ -42,3 +42,63 @@ export function getWeekKeysLastN(date: Date, n: number): string[] {
   }
   return keys.reverse();
 }
+
+/** Last Sunday of a given month (0-indexed) at 01:00 UTC — EU clock-change moment. */
+function getLastSundayUTC(year: number, month: number): Date {
+  const lastDay = new Date(Date.UTC(year, month + 1, 0));
+  lastDay.setUTCDate(lastDay.getUTCDate() - lastDay.getUTCDay()); // back to Sunday
+  lastDay.setUTCHours(1, 0, 0, 0); // 01:00 UTC = 02:00 CET (clock change)
+  return lastDay;
+}
+
+/** Berlin UTC offset in hours: 2 during CEST (last Sun Mar → last Sun Oct), else 1. */
+function getBerlinOffsetHours(date: Date): number {
+  const y = date.getUTCFullYear();
+  const cestStart = getLastSundayUTC(y, 2); // last Sunday of March
+  const cestEnd = getLastSundayUTC(y, 9);   // last Sunday of October
+  return date >= cestStart && date < cestEnd ? 2 : 1;
+}
+
+function getMondayOfISOWeek(year: number, week: number): Date {
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const day = jan4.getUTCDay() || 7;
+  return new Date(Date.UTC(year, 0, 4 - (day - 1) + (week - 1) * 7));
+}
+
+function parseWeekKey(weekKey: string): { year: number; week: number } {
+  const m = weekKey.match(/^(\d{4})-W(\d{2})$/);
+  return { year: parseInt(m![1], 10), week: parseInt(m![2], 10) };
+}
+
+export function getWeekTimestamps(weekKey: string): {
+  starts_at: string;
+  edit_deadline_at: string;
+  vote_deadline_at: string;
+  freeze_at: string;
+  reveal_at: string;
+  ends_at: string;
+} {
+  const { year, week } = parseWeekKey(weekKey);
+  const monday = getMondayOfISOWeek(year, week);
+  const nextMonday = new Date(monday);
+  nextMonday.setUTCDate(nextMonday.getUTCDate() + 7);
+  const friday = new Date(monday);
+  friday.setUTCDate(friday.getUTCDate() + 4);
+
+  const weekOffset = getBerlinOffsetHours(monday);
+  const nextWeekOffset = getBerlinOffsetHours(nextMonday);
+
+  const h = (base: Date, hour: number, offset: number) => {
+    const d = new Date(base);
+    d.setUTCHours(hour - offset, 0, 0, 0);
+    return d.toISOString();
+  };
+  return {
+    starts_at: h(monday, 11, weekOffset),
+    edit_deadline_at: h(friday, 12, weekOffset),
+    vote_deadline_at: h(friday, 14, weekOffset),
+    freeze_at: h(friday, 15, weekOffset),
+    reveal_at: h(friday, 16, weekOffset),
+    ends_at: h(nextMonday, 11, nextWeekOffset),
+  };
+}

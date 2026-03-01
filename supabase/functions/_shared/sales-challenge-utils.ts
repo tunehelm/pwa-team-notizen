@@ -1,7 +1,21 @@
 // Shared helpers for Sales Swipe Challenge Edge Functions
 // Europe/Berlin: Montag 11:00 Start, Freitag 12/14/15/16, Montag 11:00 Ende
 
-const BERLIN_OFFSET_HOURS = 1; // CET (winter); CEST = 2, vereinfacht 1
+/** Last Sunday of a given month (0-indexed) at 01:00 UTC — EU clock-change moment. */
+function getLastSundayUTC(year: number, month: number): Date {
+  const lastDay = new Date(Date.UTC(year, month + 1, 0));
+  lastDay.setUTCDate(lastDay.getUTCDate() - lastDay.getUTCDay()); // back to Sunday
+  lastDay.setUTCHours(1, 0, 0, 0); // 01:00 UTC = 02:00 CET (clock change)
+  return lastDay;
+}
+
+/** Berlin UTC offset in hours: 2 during CEST (last Sun Mar → last Sun Oct), else 1. */
+function getBerlinOffsetHours(date: Date): number {
+  const y = date.getUTCFullYear();
+  const cestStart = getLastSundayUTC(y, 2); // last Sunday of March
+  const cestEnd = getLastSundayUTC(y, 9);   // last Sunday of October
+  return date >= cestStart && date < cestEnd ? 2 : 1;
+}
 
 /** ISO week number (1–53) for a given date (UTC). */
 function getISOWeek(d: Date): number {
@@ -63,28 +77,25 @@ export function getWeekTimestamps(weekKey: string): {
   const nextMonday = new Date(monday);
   nextMonday.setUTCDate(nextMonday.getUTCDate() + 7);
 
-  const monday11 = new Date(monday);
-  monday11.setUTCHours(11 - BERLIN_OFFSET_HOURS, 0, 0, 0);
   const friday = new Date(monday);
   friday.setUTCDate(friday.getUTCDate() + 4);
-  const fri12 = new Date(friday);
-  fri12.setUTCHours(12 - BERLIN_OFFSET_HOURS, 0, 0, 0);
-  const fri14 = new Date(friday);
-  fri14.setUTCHours(14 - BERLIN_OFFSET_HOURS, 0, 0, 0);
-  const fri15 = new Date(friday);
-  fri15.setUTCHours(15 - BERLIN_OFFSET_HOURS, 0, 0, 0);
-  const fri16 = new Date(friday);
-  fri16.setUTCHours(16 - BERLIN_OFFSET_HOURS, 0, 0, 0);
-  const nextMon11 = new Date(nextMonday);
-  nextMon11.setUTCHours(11 - BERLIN_OFFSET_HOURS, 0, 0, 0);
+
+  const weekOffset = getBerlinOffsetHours(monday);
+  const nextWeekOffset = getBerlinOffsetHours(nextMonday);
+
+  const h = (base: Date, hour: number, offset: number) => {
+    const d = new Date(base);
+    d.setUTCHours(hour - offset, 0, 0, 0);
+    return d.toISOString();
+  };
 
   return {
-    starts_at: monday11.toISOString(),
-    edit_deadline_at: fri12.toISOString(),
-    vote_deadline_at: fri14.toISOString(),
-    freeze_at: fri15.toISOString(),
-    reveal_at: fri16.toISOString(),
-    ends_at: nextMon11.toISOString(),
+    starts_at: h(monday, 11, weekOffset),
+    edit_deadline_at: h(friday, 12, weekOffset),
+    vote_deadline_at: h(friday, 14, weekOffset),
+    freeze_at: h(friday, 15, weekOffset),
+    reveal_at: h(friday, 16, weekOffset),
+    ends_at: h(nextMonday, 11, nextWeekOffset),
   };
 }
 

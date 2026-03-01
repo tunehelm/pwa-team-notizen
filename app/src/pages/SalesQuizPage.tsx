@@ -4,6 +4,7 @@ import { SwipeDeck } from "../components/sales/SwipeDeck";
 import { SidebarLayout } from "../components/SidebarLayout";
 import { supabase } from "../lib/supabase";
 import { getWeekKey } from "../lib/salesChallengeUtils";
+import { isAdminEmail } from "../lib/admin";
 
 const WEEK_QUERY_REGEX = /^\d{4}-W\d{2}$/;
 
@@ -86,6 +87,7 @@ export function SalesQuizPage() {
   const weekKeyRef = useRef(weekKey);
   weekKeyRef.current = weekKey;
   const [userId, setUserId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadData = useCallback(async () => {
     const myWeekKey = weekKey;
@@ -94,13 +96,20 @@ export function SalesQuizPage() {
     try {
       const { data: userData } = await supabase.auth.getUser();
       const uid = userData.user?.id ?? null;
+      const userEmail = userData.user?.email ?? null;
+      const admin = isAdminEmail(userEmail);
       setUserId(uid);
+      setIsAdmin(admin);
+
+      const statusFilter = admin
+        ? ["draft", "active", "frozen", "revealed"]
+        : ["active", "frozen", "revealed"];
 
       const { data: chData, error: chErr } = await supabase
         .from("sales_challenges")
         .select("id, week_key, title, original_text, context_md, rules_md, status, edit_deadline_at, vote_deadline_at, freeze_at, reveal_at, ends_at")
         .eq("week_key", myWeekKey)
-        .in("status", ["active", "frozen", "revealed"])
+        .in("status", statusFilter)
         .maybeSingle();
 
       if (chErr) throw chErr;
@@ -200,6 +209,7 @@ export function SalesQuizPage() {
   const voteLocked = challenge?.vote_deadline_at ? new Date(challenge.vote_deadline_at) <= now : true;
   const isFrozen = challenge?.freeze_at ? new Date(challenge.freeze_at) <= now : false;
   const voteDisabled = voteLocked || isFrozen;
+  const isDraft = challenge?.status === "draft";
 
   // Shuffle pro Page-Load (loadCounter), stabil solange Liste gleich bleibt (challenge + entry ids)
   const shuffledEntries = useMemo(
@@ -215,7 +225,7 @@ export function SalesQuizPage() {
   /** Delta +1 oder -1; optimistisches Update, bei Fehler Rollback. */
   const setVoteDelta = useCallback(
     async (entryId: string, delta: 1 | -1) => {
-      if (!challenge || !userId || voteDisabled) return;
+      if (!challenge || !userId || voteDisabled || isDraft) return;
       setVoteError(null);
       const current = myVotes.find((v) => v.entry_id === entryId)?.weight ?? 0;
       const newWeight = Math.max(0, Math.min(2, current + delta));
@@ -263,14 +273,14 @@ export function SalesQuizPage() {
         setVoteError(msg.toLowerCase().includes("limit") || msg.toLowerCase().includes("constraint") ? "Du hast keine Stimmen mehr frei." : "Stimme konnte nicht gespeichert werden.");
       }
     },
-    [challenge, userId, voteDisabled, myVotesUsed, myVotes]
+    [challenge, userId, voteDisabled, isDraft, myVotesUsed, myVotes]
   );
 
   const voteFreezeReason = isFrozen ? "Voting ist eingefroren." : voteLocked ? "Voting geschlossen (Deadline)." : null;
 
   const saveDraft = useCallback(
     async (draftText: string, colorKey?: string) => {
-      if (!challenge || !userId || editLocked) return;
+      if (!challenge || !userId || editLocked || isDraft) return;
       if (myEntry) {
         await supabase
           .from("sales_entries")
@@ -294,11 +304,11 @@ export function SalesQuizPage() {
       }
       void loadData();
     },
-    [challenge, userId, editLocked, myEntry, loadData]
+    [challenge, userId, editLocked, isDraft, myEntry, loadData]
   );
 
   const publishEntry = useCallback(async () => {
-    if (!myEntry || editLocked) return;
+    if (!myEntry || editLocked || isDraft) return;
     const text = draftText.trim() || myEntry.text;
     await supabase
       .from("sales_entries")
@@ -311,7 +321,7 @@ export function SalesQuizPage() {
       })
       .eq("id", myEntry.id);
     void loadData();
-  }, [myEntry, editLocked, draftText, loadData]);
+  }, [myEntry, editLocked, isDraft, draftText, loadData]);
 
   if (loading) {
     return (
@@ -354,6 +364,14 @@ export function SalesQuizPage() {
   return (
     <SidebarLayout title="Montags-Quiz">
       <div className="mx-auto max-w-2xl px-4 py-6">
+        {/* Banner: Admin-Vorschau (Draft) */}
+        {isAdmin && challenge?.status === "draft" && (
+          <div className="mb-4 rounded-xl border border-purple-500/50 bg-purple-500/10 px-4 py-3 text-sm text-purple-700 dark:text-purple-300">
+            <strong>Admin-Vorschau:</strong> Diese Challenge ist noch ein Entwurf und für das Team nicht sichtbar.{" "}
+            <a href="/admin/sales-planning" className="underline">Zur Wochenplanung</a>
+          </div>
+        )}
+
         {/* Banner: Auswertung läuft */}
         {isFrozen && !isRevealed && (
           <div className="mb-4 rounded-xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
@@ -415,7 +433,11 @@ export function SalesQuizPage() {
         {/* Meine Karte */}
         <section className="mb-6 rounded-2xl border-2 border-blue-200 dark:border-blue-800 bg-[var(--color-bg-card)] p-4">
           <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Meine Karte</h2>
-          {editLocked ? (
+          {isDraft ? (
+            <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+              Admin-Vorschau – Einträge und Voting sind im Entwurfsstatus nicht möglich.
+            </p>
+          ) : editLocked ? (
             <>
               <p className="mt-2 text-sm text-[var(--color-text-primary)]">
                 {myEntry?.is_published ? myEntry.text : "Bearbeitung beendet."}
@@ -436,7 +458,7 @@ export function SalesQuizPage() {
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => myEntry && void saveDraft(draftText)}
+                  onClick={() => void saveDraft(draftText)}
                   className="rounded-xl bg-slate-200 px-3 py-1.5 text-xs font-medium dark:bg-slate-700"
                 >
                   Entwurf speichern
@@ -469,23 +491,31 @@ export function SalesQuizPage() {
         ) : (
           <section>
             <h2 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Varianten</h2>
-            {voteError && (
-              <p className="mb-3 text-sm text-amber-600 dark:text-amber-400">{voteError}</p>
-            )}
-            {voteDisabled && (
-              <p className="mb-3 text-xs text-[var(--color-text-muted)]">
-                {isFrozen ? "Voting beendet (Freeze)." : `Voting geschlossen (Deadline: ${challenge.vote_deadline_at ? new Date(challenge.vote_deadline_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "—"})`}
+            {isDraft ? (
+              <p className="text-sm text-[var(--color-text-muted)]">
+                Entwurf – Varianten und Voting sind noch nicht verfügbar.
               </p>
+            ) : (
+              <>
+                {voteError && (
+                  <p className="mb-3 text-sm text-amber-600 dark:text-amber-400">{voteError}</p>
+                )}
+                {voteDisabled && (
+                  <p className="mb-3 text-xs text-[var(--color-text-muted)]">
+                    {isFrozen ? "Voting beendet (Freeze)." : `Voting geschlossen (Deadline: ${challenge.vote_deadline_at ? new Date(challenge.vote_deadline_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "—"})`}
+                  </p>
+                )}
+                <SwipeDeck
+                  entries={shuffledEntries.map((e) => ({ id: e.id, text: e.text }))}
+                  getMyWeight={(entryId) => getVoteForEntry(entryId)}
+                  remainingVotes={Math.max(0, 3 - myVotesUsed)}
+                  onVotePlus={(entryId) => void setVoteDelta(entryId, 1)}
+                  onVoteMinus={(entryId) => void setVoteDelta(entryId, -1)}
+                  voteLocked={voteDisabled}
+                  voteFreezeReason={voteFreezeReason}
+                />
+              </>
             )}
-            <SwipeDeck
-              entries={shuffledEntries.map((e) => ({ id: e.id, text: e.text }))}
-              getMyWeight={(entryId) => getVoteForEntry(entryId)}
-              remainingVotes={Math.max(0, 3 - myVotesUsed)}
-              onVotePlus={(entryId) => void setVoteDelta(entryId, 1)}
-              onVoteMinus={(entryId) => void setVoteDelta(entryId, -1)}
-              voteLocked={voteDisabled}
-              voteFreezeReason={voteFreezeReason}
-            />
           </section>
         )}
       </div>

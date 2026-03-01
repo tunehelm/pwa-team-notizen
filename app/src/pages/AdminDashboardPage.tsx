@@ -340,7 +340,7 @@ export function AdminDashboardPage() {
                   onClick={() => setShowTestTools(!showTestTools)}
                   className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm font-semibold text-[var(--color-text-primary)] hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  <span>Testdaten</span>
+                  <span>Technische Testwoche (2099-W01)</span>
                   <svg
                     viewBox="0 0 24 24"
                     fill="none"
@@ -384,7 +384,7 @@ export function AdminDashboardPage() {
                       </Link>
                     </div>
                     <p className="text-xs text-[var(--color-text-muted)]">
-                      Nur {TEST_WEEK_KEY}. Kein Einfluss auf echte Wochen.
+                      Technische Testwoche {TEST_WEEK_KEY} – nur für UI-/Logik-Tests. Kein Einfluss auf echte Produktivwochen. Für produktive Wochenplanung: <Link to="/admin/sales-planning" className="underline">Wochenplanung →</Link>
                     </p>
                   </div>
                 )}
@@ -452,6 +452,12 @@ export function AdminDashboardPage() {
                   className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-page)] px-3 py-2 text-sm"
                 >
                   Quiz-Backlog
+                </Link>
+                <Link
+                  to="/admin/sales-planning"
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-page)] px-3 py-2 text-sm"
+                >
+                  Wochenplanung
                 </Link>
               </div>
             </section>
