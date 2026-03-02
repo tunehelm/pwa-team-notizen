@@ -70,7 +70,7 @@ Nach jedem Deploy: Browser braucht "Clear site data" (DevTools → Application �
 
 ### Seiten
 
-`/`, `/folder/:id`, `/note/:id`, `/team`, `/trash`, `/search`, `/private`, `/sales-quiz`, `/admin`, `/admin/sales-backlog`, `/admin/sales-stats`, `/auth/callback`
+`/`, `/folder/:id`, `/note/:id`, `/team`, `/trash`, `/search`, `/private`, `/sales-quiz`, `/admin`, `/admin/sales-backlog`, `/admin/sales-stats`, `/admin/sales-planning`, `/auth/callback`
 
 ## Kritische Implementierungsdetails
 
@@ -96,6 +96,18 @@ Nach jedem Deploy: Browser braucht "Clear site data" (DevTools → Application �
 - `updateNote()` schreibt nie `owner_id`
 - `moveNoteToFolder()` schreibt nur `folder_id`
 - `ARCHITECTURE.md` ist verbindliche Quelle für Datenmodell/RLS/UX
+
+### Sales-Quiz Wochenplanungssystem
+
+- Challenges haben `status`: `draft` | `active` | `archived`
+- `draft`-Challenges: nur für Admins sichtbar (RLS + Frontend-Guards in `SalesQuizPage.tsx`)
+- Admin-Seite `/admin/sales-planning` (`app/src/pages/admin/AdminSalesPlanningPage.tsx`): zeigt nächste 4 Wochen, Draft anlegen/bearbeiten/aktivieren
+- Edge Function `sales-week-start`: drei Codepfade — draft-activation, new-challenge, already-exists
+- Aktivierungs-Atomarität: `status='active'` wird erst gesetzt, nachdem alle Varianten erfolgreich inseriert wurden; `ai_entries_seeded=true` erst nach erfolgreichem Insert aller Entries; bei Fehler Flag zurücksetzen (Retry möglich)
+- Varianten-Workflow: manuell (`source='admin'`), keine automatische KI-Generierung
+- `supabase/functions/_shared/sales-challenge-utils.ts`: `getBerlinOffsetHours()` ist CEST/DST-aware (kein hartkodiertes `BERLIN_OFFSET_HOURS = 1`)
+- `app/src/lib/salesChallengeUtils.ts`: `getWeekTimestamps()` portiert aus Deno-Backend, ebenfalls CEST-aware
+- Testwoche `2099-W01` aus Admin-Dashboard entfernt
 
 ### Env (app/.env.local)
 
@@ -220,3 +232,32 @@ Nächste Verifikation:
   - [ ] Logs pruefen: Supabase Dashboard → Edge Functions → Logs fuer `sales-week-start`
   - [ ] W10-Challenge im Admin-Backlog auf `active` setzen, sobald Edge-Function laeuft
   - [ ] challenge-publisher Agent fuer W10 ausfuehren wenn Publish-Checklist abgehakt
+
+### 2026-03-02 — Session-Ende
+
+- **Erledigt**:
+  - Draft-Workflow fuer zukuenftige Quiz-Wochen implementiert: Challenges koennen mit `status='draft'` angelegt werden; Non-Admins sehen Drafts weder ueber RLS noch im Frontend
+  - Neue Admin-Seite `/admin/sales-planning` (`app/src/pages/admin/AdminSalesPlanningPage.tsx`) erstellt: zeigt naechste 4 Wochen, Draft anlegen/bearbeiten/aktivieren
+  - Edge Function `sales-week-start` erweitert: atomare Draft-Aktivierung; drei Codepfade (draft-activation, new-challenge, already-exists); `ai_entries_seeded`-Flag wird erst nach erfolgreichem Insert gesetzt, bei Fehler zurueckgesetzt (Retry-faehig)
+  - Manueller Varianten-Workflow finalisiert: keine automatische KI-Generierung; Admins pflegen 1-3 Varianten manuell; `source='admin'` statt `source='ai'`
+  - `getBerlinOffsetHours()` in `supabase/functions/_shared/sales-challenge-utils.ts` auf CEST/DST-aware umgestellt (kein hartkodiertes Offset mehr)
+  - `getWeekTimestamps()` in `app/src/lib/salesChallengeUtils.ts` portiert und CEST-aware gemacht
+  - Testwoche `2099-W01` aus Admin-Dashboard entfernt
+  - Neue Navigations-Links in Sidebar und Admin-Dashboard fuer `/admin/sales-planning`
+  - Vier neue Migrations-Dateien angelegt: RLS-Draft-Guard, `ai_entries_seeded`-Spalte, Schema fuer manuelle Varianten, RPC fuer atomare Wochenaktivierung
+  - Lokal getestet: Draft anlegen/aktivieren, Non-Admin-Sichtbarkeit, Backlog-Reconciliation, Duplikat-Schutz
+- **Offen / Next Steps**:
+  - [x] `supabase db push` — erledigt
+  - [x] `supabase functions deploy sales-week-start` — erledigt
+  - [x] Manueller Smoke-Test live: Workflow verifiziert (Draft anlegen, Variante, aktivieren, Non-Admin-Sichtbarkeit)
+  - [ ] (Optional) DOMPurify fuer `dangerouslySetInnerHTML` in `SalesQuizPage.tsx`
+  - [ ] W10-Challenge im Admin-Backlog auf `active` setzen
+
+### 2026-03-02 — Zukunftswochen-Bug behoben
+
+- **Problem**: Normale User konnten kuenftige Quiz-Wochen ueber `/sales-quiz?week=YYYY-Www` sehen, weil die RLS fuer `sales_challenges` nur `status IN ('active', ...)` prueft, aber kein `starts_at`-Gate hatte — aktivierte Wochen mit zukuenftigem `starts_at` waren damit sofort sichtbar.
+- **Fix**: Neue Migration `20260301050000_sales_challenges_starts_at_guard.sql`
+  - `sales_challenges_select_team`: Non-Admins sehen nur Challenges mit `starts_at <= now()`
+  - `sales_entries_select_own_or_published`: dazu passend ebenfalls `starts_at <= now()` der Parent-Challenge geprueft
+- **Ergebnis**: Zukuenftige Wochen fuer normale User nicht mehr sichtbar; Admin-Vorschau bleibt erhalten.
+- **Deployed**: `supabase db push` erfolgreich.
