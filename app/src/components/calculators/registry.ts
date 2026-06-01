@@ -11,12 +11,14 @@ import { GcsCalculator } from './GcsCalculator'
 import { BeCorrectionCalculator } from './BeCorrectionCalculator'
 import { MannitolCalculator } from './MannitolCalculator'
 import { IsofluraneSedationCalculator } from './IsofluraneSedationCalculator'
+import { PerfusorRateCalculator } from './PerfusorRateCalculator'
 
 export type CalculatorType =
   | 'dantrolene'
   | 'isoflurane-sedation'
   | 'mannitol-osmofundin'
   | 'noradrenaline-perfusor'
+  | 'perfusor-rate'
   | 'heparin'
   | 'sedation-infusion'
   | 'map-target'
@@ -98,6 +100,13 @@ export const CALCULATORS: Record<CalculatorType, CalculatorDef> = {
     },
     Component: NoradrenalinePerfusorCalculator,
   },
+  'perfusor-rate': {
+    title: 'Perfusor-Laufrate (µg/kg/h)',
+    defaultConfig: {
+      medicationId: 'sufentanil',
+    },
+    Component: PerfusorRateCalculator,
+  },
   heparin: {
     title: 'Heparin Perfusor (IE/kg/h ↔ ml/h)',
     defaultConfig: {
@@ -157,6 +166,7 @@ export const CALCULATOR_TYPES: CalculatorType[] = [
   'isoflurane-sedation',
   'mannitol-osmofundin',
   'noradrenaline-perfusor',
+  'perfusor-rate',
   'heparin',
   'sedation-infusion',
   'map-target',
